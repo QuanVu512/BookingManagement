@@ -1,0 +1,48 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Generate persistence client types
+        run: npm run prisma:generate
+        env:
+          DATABASE_URL: postgresql://placeholder:placeholder@localhost:5432/placeholder
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Unit tests
+        run: npm test
+
+      - name: Auth HTTP, frontend and phone audit checks
+        run: |
+          npm run test:auth:contract
+          npm run test:auth:ui
+          npm run test:auth:phones
+
+      - name: Build API and frontend
+        run: |
+          npm run build
+          npm run build:web
+        env:
+          DATABASE_URL: postgresql://placeholder:placeholder@localhost:5432/placeholder

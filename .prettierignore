@@ -1,0 +1,5 @@
+node_modules/
+backend/src/generated/prisma/
+backend/dist/
+frontend/.next/
+.temp/

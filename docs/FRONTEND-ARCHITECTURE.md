@@ -1,0 +1,51 @@
+# Kiến trúc frontend
+
+Frontend dùng Next.js App Router trong `frontend/`, React và TypeScript. Phiên bản khai báo và chính sách dependency nằm ở [TECH-STACK.md](TECH-STACK.md).
+
+## Các vùng chính
+
+| Đường dẫn                                                            | Vai trò hiện tại                                                    |
+| -------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| `frontend/app/`                                                      | Route `/`, `/dashboard`, layout và stylesheet toàn cục              |
+| `frontend/components/auth/`                                          | Modal auth và xác nhận tiếp tục ở chế độ guest                      |
+| `frontend/components/booking/`                                       | UI modal đặt sân                                                    |
+| `frontend/components/home/`                                          | Header, catalog sân và các khối trang chủ                           |
+| `frontend/context/auth-context.tsx`                                  | Auth state, trạng thái modal, guest session và các lời gọi auth API |
+| `frontend/services/auth.ts`, `frontend/services/courts.ts`           | Gọi HTTP, kiểm tra response và timeout/fallback cho các request đọc |
+| `frontend/hooks/use-auth-form.ts`, `frontend/lib/auth-validation.ts` | State form, validation/chuẩn hóa và khóa submit trùng               |
+| `frontend/types/`                                                    | Kiểu dữ liệu frontend                                               |
+
+`AuthProvider` được đặt ở root layout. Những component dùng hook/state, event handler hoặc `AuthContext` phải là client component (`'use client'`); giữ component server khi không cần tương tác phía browser.
+
+Auth state tách thành `useAuthSession`, `useAuthDialog` và `useAuthActions`. Header/dashboard chỉ đăng ký session và action ổn định; thay đổi trạng thái modal/guest không khiến Header render lại. `useAuth` vẫn cung cấp API kết hợp cho consumer cần cả ba nhóm.
+
+Client kiểm tra sơ bộ email (dot-atom/quoted local part, domain DNS) và số Việt Nam (`03/05/07/08/09`, `02`, dạng `0…` hoặc `+84…`) bằng regex; không import `class-validator` hoặc metadata số điện thoại toàn cầu vào bundle. Đây không phải bộ phân tích toàn bộ RFC 5322 hay danh sách đầu số được cấp phát. Backend vẫn xác thực hợp lệ cuối cùng bằng DTO và thư viện chuyên dụng. Form tự focus ô đầu, khóa input bằng fieldset khi gửi, hiển thị spinner và dùng khóa đồng bộ để ngăn submit trùng trước khi React cập nhật state.
+
+## State và API
+
+Chưa có thư viện state/API client riêng trong dependency. AuthContext ủy quyền HTTP cho service Auth; service gọi các route Nest:
+
+- `GET /api/auth/me`
+- `POST /api/auth/login`
+- `POST /api/auth/register`
+- `POST /api/auth/logout`
+
+URL lấy từ `NEXT_PUBLIC_API_URL`, mặc định `http://localhost:4000`. Auth request đặt `credentials: 'include'` để browser gửi/nhận cookie. Cookie do backend quản lý; frontend không đọc access token. Payload đăng ký có `confirmPassword`, chỉ dùng kiểm tra khớp tại backend.
+
+Trang chính gọi `GET /api/courts`; backend hiện có fallback dữ liệu showcase khi query DB thất bại hoặc chưa có sân. Không xem fallback/UI là dữ liệu persistence đã xác nhận.
+
+Mốc auth mặc định tắt link chi tiết sân bằng `NEXT_PUBLIC_COURT_DETAILS_ENABLED`. Chỉ bật giá trị `true` khi route `/courts/[courtId]` đã có trong bản phát hành; khi tắt, catalog dùng nút disabled với nhãn chức năng sắp ra mắt.
+
+Trang chính hiển thị danh mục dự phòng từ đầu, sau đó dùng `loadCourtCatalog` để cập nhật dữ liệu API. Session lookup và catalog dùng deadline 1.200 ms; khi lỗi mạng/HTTP hoặc hết hạn, frontend kết thúc loading session ở trạng thái chưa đăng nhập và dùng catalog dự phòng. Caller có thể hủy request khi unmount. Session lookup cũ không ghi đè kết quả login/register/logout mới.
+
+Catalog dùng `next/image` với `fill`, `sizes` và lazy loading mặc định. Hover/focus của card/ảnh dùng CSS, tắt chuyển động khi `prefers-reduced-motion: reduce`. Script `web:dev` chỉ định `--turbopack` và port 4001; không coi flag này là bằng chứng tăng tốc vì Next.js 16 đã mặc định dùng Turbopack.
+
+Khi thêm luồng API, giữ loading, lỗi, empty và conflict state ở đúng contract; không tự giả định endpoint, DTO, permission hoặc trạng thái server. Tránh đưa business rule booking/payment vào component.
+
+## Styling và cấu hình
+
+Style hiện nằm ở `frontend/app/globals.css`, dùng CSS thường và custom properties cho màu, font, radius, shadow, transition. Repository không khai báo Tailwind trong dependencies hiện tại. Đừng ghi Tailwind là công cụ đang dùng nếu manifest chưa đổi.
+
+Modal overlay dùng nền `rgba(7, 10, 17, 0.8)` không blur; content dùng `translate3d` và `will-change: opacity, transform`. Khi browser bật giảm chuyển động, animation bị tắt và `will-change` trở về `auto`.
+
+Chỉ biến `NEXT_PUBLIC_*` mới được đưa vào bundle browser; không đặt secret trong biến public. Cấu hình API và cách chạy frontend nằm trong [PIPELINES.md](PIPELINES.md).

@@ -1,0 +1,15 @@
+node_modules
+dist
+.next
+.git
+.env
+.env.*
+!.env.example
+coverage
+*.tsbuildinfo
+.temp
+backend/dist
+frontend/.next
+docs/learning
+ai
+coordination

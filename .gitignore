@@ -44,10 +44,15 @@ lerna-debug.log*
 .env.test.local
 .env.production.local
 .env.local
+.env.*
+!.env.example
 
 # temp directory
 .temp
 .tmp
+
+# Personal learning material (guides, labs, DOCX, TXT, screenshots)
+/guide/
 
 # Runtime data
 pids
@@ -60,11 +65,38 @@ report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 
 
 #AI agents
-/.agents
+# Local agent skills and references (including addyosmani/agent-skills)
+/.agents/
 /.opencode
-/ai
+ai/*
 AGENTS.md
 AIROLEs.md
 CLAUDE.md
 GEMINI.md
 /coordination
+docs/AI*
+ai/templates
+.codex
+skills-lock.json
+/.github/skills/
+/.github/agents/
+/.github/hooks/
+
+# Next.js and generated Prisma Client
+/.next
+/frontend/.next
+/backend/dist
+/backend/src/generated/prisma
+
+# Local Antigravity settings
+/.antigravity/
+
+# Local plans, tasks and proposed pilot material
+**/*[Pp][Ll][Aa][Nn]*.md
+**/*[Tt][Aa][Ss][Kk]*.md
+**/plans/
+**/tasks/
+/docs/AGENT-READING-RULES.md
+/docs/*PILOT*.md
+/docs/adr/*pilot*.md
+/GLOSSARY.md
