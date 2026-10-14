@@ -12,7 +12,7 @@ import {
   AUTH_FIELD_MAX_LENGTH,
   AUTH_VALIDATION_MESSAGES,
   PASSWORD_MIN_LENGTH,
-  PASSWORD_PATTERN,
+  PASSWORD_MAX_LENGTH,
   USERNAME_MIN_LENGTH,
   USERNAME_PATTERN,
 } from '../constants/auth-validation.constants.js';
@@ -23,6 +23,7 @@ import {
 } from '../helpers/auth-normalization.js';
 import {
   IsVietnamPhone,
+  IsAuthPassword,
   MatchesPassword,
 } from '../validators/auth.validators.js';
 
@@ -45,23 +46,23 @@ export class RegisterDto {
   @ApiProperty({
     format: 'password',
     minLength: PASSWORD_MIN_LENGTH,
+    maxLength: PASSWORD_MAX_LENGTH,
     writeOnly: true,
   })
   @IsString()
   @IsNotEmpty()
-  @MinLength(PASSWORD_MIN_LENGTH, {
-    message: AUTH_VALIDATION_MESSAGES.password,
-  })
-  @Matches(PASSWORD_PATTERN, { message: AUTH_VALIDATION_MESSAGES.password })
+  @IsAuthPassword({ message: AUTH_VALIDATION_MESSAGES.password })
   password!: string;
 
   @ApiProperty({
     format: 'password',
     minLength: PASSWORD_MIN_LENGTH,
+    maxLength: PASSWORD_MAX_LENGTH,
     writeOnly: true,
   })
   @IsString()
   @IsNotEmpty()
+  @IsAuthPassword({ message: AUTH_VALIDATION_MESSAGES.password })
   @MatchesPassword({ message: AUTH_VALIDATION_MESSAGES.confirmPassword })
   confirmPassword!: string;
 

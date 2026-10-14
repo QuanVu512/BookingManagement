@@ -4,12 +4,16 @@ import { ConfigService } from '@nestjs/config';
 import { AppModule } from './app.module.js';
 import { ValidationPipe } from '@nestjs/common';
 import { REQUEST_VALIDATION_OPTIONS } from './constants/validation.constants.js';
+import { resolveWebOrigin } from './modules/auth/helpers/auth-config.js';
+import { resolveTrustedProxy } from './modules/auth/helpers/auth-config.js';
+import type { NestExpressApplication } from '@nestjs/platform-express';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
   const configService = app.get(ConfigService);
+  app.set('trust proxy', resolveTrustedProxy(configService));
   app.enableCors({
-    origin: configService.get<string>('WEB_ORIGIN', 'http://localhost:3001'),
+    origin: resolveWebOrigin(configService),
     credentials: true,
   });
   app.useGlobalPipes(new ValidationPipe(REQUEST_VALIDATION_OPTIONS));

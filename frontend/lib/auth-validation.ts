@@ -3,13 +3,14 @@ import type { RegistrationData } from '../types/auth';
 export const AUTH_LIMITS = {
   usernameMin: 8,
   usernameMax: 100,
-  passwordMin: 6,
+  passwordMin: 12,
+  passwordMax: 128,
   fullNameMax: 150,
   emailMax: 254,
   phoneMax: 20,
   identifierMax: 254,
 } as const;
-export const AUTH_PASSWORD_PATTERN = /^[\x21-\x7e]+$/;
+
 const USERNAME_PATTERN = /^(?=.*[A-Za-z])[A-Za-z0-9]+$/;
 const VIETNAM_PHONE_PATTERN = /^(?:0|\+84)(?:[35789][0-9]{8}|2[0-9]{9})$/;
 // RFC dot-atom / quoted local parts and DNS domains; the backend validates final eligibility.
@@ -74,11 +75,12 @@ export function getLoginErrors(
   if (!username.trim() || username.trim().length > AUTH_LIMITS.identifierMax)
     errors.username = 'Vui lòng nhập tên đăng nhập, email hoặc số điện thoại.';
   if (
-    password.length < AUTH_LIMITS.passwordMin ||
-    !AUTH_PASSWORD_PATTERN.test(password)
+    password.length > AUTH_LIMITS.passwordMax * 2 ||
+    Array.from(password).length < AUTH_LIMITS.passwordMin ||
+    Array.from(password).length > AUTH_LIMITS.passwordMax
   )
     errors.password =
-      'Mật khẩu cần ít nhất 6 ký tự ASCII, không dấu và không có khoảng trắng.';
+      'Mật khẩu cần 12–128 ký tự; hỗ trợ Unicode và khoảng trắng.';
   return errors;
 }
 

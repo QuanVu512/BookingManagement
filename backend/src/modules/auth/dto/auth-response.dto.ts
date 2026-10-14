@@ -47,3 +47,16 @@ export class LogoutResponseDto {
   @ApiProperty()
   message!: string;
 }
+
+export class RegistrationResponseDto extends LogoutResponseDto {
+  @ApiProperty({ enum: ['verification_required'] })
+  status!: 'verification_required';
+}
+
+export class CsrfResponseDto {
+  @ApiProperty({
+    description:
+      'Token chống CSRF dùng trong header X-CSRF-Token; không lưu hoặc log.',
+  })
+  token!: string;
+}

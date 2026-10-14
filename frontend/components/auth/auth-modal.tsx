@@ -75,6 +75,7 @@ function AuthModalDialog() {
               {form.errorMessage}
             </div>
           )}
+          {form.successMessage && <p role="status">{form.successMessage}</p>}
           <form
             onSubmit={form.handleSubmit}
             noValidate
@@ -111,20 +112,13 @@ function AuthModalDialog() {
                   setField={form.setField}
                 />
               )}
-              {(form.capsLock || form.hasUnsupportedCharacters) && (
+              {form.capsLock && (
                 <div
                   className={styles.warning}
                   role="status"
                   aria-live="polite"
                 >
                   {form.capsLock && <p>Caps Lock đang bật.</p>}
-                  {form.hasUnsupportedCharacters && (
-                    <p>
-                      Ký tự mật khẩu không được hỗ trợ. Vui lòng kiểm tra và tắt
-                      bộ gõ tiếng Việt (Unikey/EVKey), xóa ký tự có dấu hoặc
-                      khoảng trắng.
-                    </p>
-                  )}
                 </div>
               )}
               <PasswordField
@@ -164,10 +158,15 @@ function AuthModalDialog() {
               {form.isSubmitting
                 ? 'Đang xử lý...'
                 : isRegistration
-                  ? 'Tạo tài khoản và tiếp tục'
+                  ? 'Tạo tài khoản và xác minh email'
                   : 'Đăng nhập và tiếp tục'}
             </button>
           </form>
+          <p>Mật khẩu 12–128 ký tự; có thể dùng Unicode và khoảng trắng.</p>
+          <p>
+            <a href="/auth/forgot-password">Quên mật khẩu?</a> ·{' '}
+            <a href="/auth/resend-verification">Gửi lại email xác minh</a>
+          </p>
           <div className={styles.divider}>HOẶC</div>
           <button
             type="button"

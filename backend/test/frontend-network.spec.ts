@@ -6,10 +6,18 @@ import {
   it,
   jest,
 } from '@jest/globals';
-import { getCurrentUser } from '../../frontend/services/auth.js';
+import {
+  getCurrentUser,
+  loginAccount,
+  registerAccount,
+  logoutAccount,
+} from '../../frontend/services/auth.js';
 import { loadCourtCatalog } from '../../frontend/services/courts.js';
 import { FALLBACK_COURTS } from '../../frontend/data/courts.js';
-import { READ_REQUEST_TIMEOUT_MS } from '../../frontend/constants/network.js';
+import {
+  READ_REQUEST_TIMEOUT_MS,
+  AUTH_REQUEST_TIMEOUT_MS,
+} from '../../frontend/constants/network.js';
 
 const ACTIVE_USER = {
   id: 'user-1',
@@ -23,6 +31,61 @@ const ACTIVE_USER = {
 };
 
 describe('Frontend read requests', () => {
+  it.each([401, 400, 429])(
+    'does not retry HTTP %s and treats only 401 as unauthenticated',
+    async (status) => {
+      const fetch = jest
+        .spyOn(globalThis, 'fetch')
+        .mockImplementation(async () => new Response('{}', { status }));
+      const result = await getCurrentUser(new AbortController().signal);
+      expect(result.status).toBe(
+        status === 401 ? 'unauthenticated' : 'unknown',
+      );
+      expect(fetch).toHaveBeenCalledTimes(1);
+    },
+  );
+  it('retries transient 5xx at most once', async () => {
+    const fetch = jest
+      .spyOn(globalThis, 'fetch')
+      .mockImplementation(async () => new Response('{}', { status: 503 }));
+    expect((await getCurrentUser(new AbortController().signal)).status).toBe(
+      'unknown',
+    );
+    expect(fetch).toHaveBeenCalledTimes(2);
+  });
+  it('recovers from a transient network failure on the second attempt', async () => {
+    const fetch = jest
+      .spyOn(globalThis, 'fetch')
+      .mockRejectedValueOnce(new TypeError('offline'))
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ success: true, user: ACTIVE_USER })),
+      );
+    expect(await getCurrentUser(new AbortController().signal)).toEqual({
+      status: 'authenticated',
+      user: ACTIVE_USER,
+    });
+    expect(fetch).toHaveBeenCalledTimes(2);
+  });
+  it('classifies malformed success as unknown without retry', async () => {
+    const fetch = jest
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(new Response(JSON.stringify({ user: 'invalid' })));
+    expect((await getCurrentUser(new AbortController().signal)).status).toBe(
+      'unknown',
+    );
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+  it('bounds retry for a timeout while reading session response content', async () => {
+    const response = new Response('{}');
+    jest
+      .spyOn(response, 'json')
+      .mockRejectedValue(new DOMException('body deadline', 'TimeoutError'));
+    const fetch = jest.spyOn(globalThis, 'fetch').mockResolvedValue(response);
+    expect((await getCurrentUser(new AbortController().signal)).status).toBe(
+      'unknown',
+    );
+    expect(fetch).toHaveBeenCalledTimes(2);
+  });
   beforeEach(() =>
     jest.spyOn(console, 'info').mockImplementation(() => undefined),
   );
@@ -36,7 +99,9 @@ describe('Frontend read requests', () => {
       .spyOn(globalThis, 'fetch')
       .mockRejectedValue(new TypeError('mock network offline'));
     const start = performance.now();
-    expect(await getCurrentUser(new AbortController().signal)).toBeNull();
+    expect(await getCurrentUser(new AbortController().signal)).toMatchObject({
+      status: 'unknown',
+    });
     expect(await loadCourtCatalog(new AbortController().signal)).toBe(
       FALLBACK_COURTS,
     );
@@ -50,11 +115,11 @@ describe('Frontend read requests', () => {
       getCurrentUser(new AbortController().signal),
       loadCourtCatalog(new AbortController().signal),
     ]);
-    expect(user).toBeNull();
+    expect(user).toMatchObject({ status: 'unknown' });
     expect(courts).toBe(FALLBACK_COURTS);
     const elapsed = performance.now() - start;
     expect(elapsed).toBeGreaterThanOrEqual(READ_REQUEST_TIMEOUT_MS - 20);
-    expect(elapsed).toBeLessThan(READ_REQUEST_TIMEOUT_MS + 300);
+    expect(elapsed).toBeLessThan(READ_REQUEST_TIMEOUT_MS * 2 + 300);
   });
 
   it('propagates caller cancellation without logging or returning fallback data', async () => {
@@ -74,9 +139,10 @@ describe('Frontend read requests', () => {
       .mockResolvedValue(
         new Response(JSON.stringify({ success: true, user: ACTIVE_USER })),
       );
-    expect(await getCurrentUser(new AbortController().signal)).toEqual(
-      ACTIVE_USER,
-    );
+    expect(await getCurrentUser(new AbortController().signal)).toEqual({
+      status: 'authenticated',
+      user: ACTIVE_USER,
+    });
     expect(fetch).toHaveBeenCalledWith(
       expect.stringContaining('/api/auth/me'),
       expect.objectContaining({ credentials: 'include' }),
@@ -111,7 +177,92 @@ describe('Frontend read requests', () => {
     jest
       .spyOn(globalThis, 'fetch')
       .mockResolvedValue(new Response('{}', { status: 401 }));
-    expect(await getCurrentUser(new AbortController().signal)).toBeNull();
+    expect(await getCurrentUser(new AbortController().signal)).toEqual({
+      status: 'unauthenticated',
+    });
+  });
+});
+
+describe('Frontend auth mutations', () => {
+  afterEach(() => jest.restoreAllMocks());
+  const registration = {
+    username: 'customer',
+    fullName: 'Customer',
+    email: 'customer@example.com',
+    phone: '+84912345678',
+    password: 'long password phrase',
+    confirmPassword: 'long password phrase',
+  };
+  it('sends CSRF and credentials while preserving the password exactly', async () => {
+    const fetch = jest
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ token: 'a'.repeat(64) })),
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ success: true, user: ACTIVE_USER })),
+      );
+    await expect(
+      loginAccount(' customer ', '  mật khẩu dài có dấu 😀  '),
+    ).resolves.toEqual(ACTIVE_USER);
+    expect(fetch).toHaveBeenLastCalledWith(
+      expect.stringContaining('/login'),
+      expect.objectContaining({
+        credentials: 'include',
+        headers: expect.objectContaining({ 'X-CSRF-Token': 'a'.repeat(64) }),
+        body: JSON.stringify({
+          username: 'customer',
+          password: '  mật khẩu dài có dấu 😀  ',
+        }),
+      }),
+    );
+  });
+  it.each(['login', 'register'] as const)(
+    'bounds %s, including CSRF acquisition, with no mutation retries',
+    async (kind) => {
+      const controller = new AbortController();
+      const timeout = jest
+        .spyOn(AbortSignal, 'timeout')
+        .mockReturnValue(controller.signal);
+      mockStalledFetch();
+      const pending =
+        kind === 'login'
+          ? loginAccount('customer', 'long password phrase')
+          : registerAccount(registration);
+      const assertion = expect(pending).rejects.toThrow('quá thời gian chờ');
+      controller.abort(new DOMException('deadline', 'TimeoutError'));
+      await assertion;
+      expect(timeout).toHaveBeenCalledWith(AUTH_REQUEST_TIMEOUT_MS);
+      expect(globalThis.fetch).toHaveBeenCalledTimes(1);
+    },
+  );
+  it.each([401, 400, 429, 503])(
+    'does not retry a login mutation on HTTP %s',
+    async (status) => {
+      const fetch = jest
+        .spyOn(globalThis, 'fetch')
+        .mockResolvedValueOnce(
+          new Response(JSON.stringify({ token: 'a'.repeat(64) })),
+        )
+        .mockResolvedValueOnce(
+          new Response(JSON.stringify({ message: 'controlled failure' }), {
+            status,
+          }),
+        );
+      await expect(
+        loginAccount('customer', 'long password phrase'),
+      ).rejects.toThrow('controlled failure');
+      expect(fetch).toHaveBeenCalledTimes(2);
+    },
+  );
+  it('requires explicit logout success, rejecting malformed 200 responses', async () => {
+    jest
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ token: 'a'.repeat(64) })),
+      )
+      .mockResolvedValueOnce(new Response('{}'));
+    await expect(logoutAccount()).rejects.toThrow();
   });
 });
 

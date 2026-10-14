@@ -5,6 +5,7 @@ import { ConfigService } from '@nestjs/config';
 import type { Request } from 'express';
 import { resolveJwtSecret } from '../helpers/auth-config.js';
 import { AUTH_COOKIE_NAME } from '../constants/auth-validation.constants.js';
+import { AuthSessionService } from '../services/auth-session.service.js';
 
 const cookieOrHeaderExtractor = (req: Request): string | null => {
   if (req?.headers?.cookie) {
@@ -19,15 +20,12 @@ const cookieOrHeaderExtractor = (req: Request): string | null => {
   return ExtractJwt.fromAuthHeaderAsBearerToken()(req);
 };
 
-export interface JwtPayload {
-  sub: string;
-  username: string;
-  roles: string[];
-}
-
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
-  constructor(configService: ConfigService) {
+  constructor(
+    configService: ConfigService,
+    private readonly sessions: AuthSessionService,
+  ) {
     super({
       jwtFromRequest: cookieOrHeaderExtractor,
       ignoreExpiration: false,
@@ -35,11 +33,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     });
   }
 
-  async validate(payload: JwtPayload) {
-    return {
-      userId: payload.sub,
-      username: payload.username,
-      roles: payload.roles,
-    };
+  validate(payload: unknown) {
+    return this.sessions.authenticate(payload);
   }
 }

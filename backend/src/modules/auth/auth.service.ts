@@ -28,6 +28,12 @@ import {
   phoneLookupValues,
 } from './helpers/auth-normalization.js';
 import { validateAuthInput } from './helpers/validate-auth-input.js';
+import { AuthSessionService } from './services/auth-session.service.js';
+import type { AuthenticatedAccount } from './services/auth-session.service.js';
+import { CompromisedPasswordService } from './services/compromised-password.service.js';
+import { authCookieOptions } from './helpers/auth-cookie.js';
+import { AuthRecoveryService } from './services/auth-recovery.service.js';
+import type { RegistrationResponseDto } from './dto/auth-response.dto.js';
 
 type AuthDatabaseUser = Prisma.UserGetPayload<{
   include: { profile: true; roles: true };
@@ -39,6 +45,9 @@ export class AuthService {
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
+    private readonly sessions: AuthSessionService,
+    private readonly passwords: CompromisedPasswordService,
+    private readonly recovery: AuthRecoveryService,
   ) {}
 
   async login(input: LoginDto, response: Response): Promise<AuthResponseDto> {
@@ -54,25 +63,35 @@ export class AuthService {
         'Tài khoản đang bị tạm khóa hoặc ngừng hoạt động.',
       );
     }
+    if (!user.emailVerifiedAt) {
+      throw new UnauthorizedException(
+        'Vui lòng xác minh email trước khi đăng nhập.',
+      );
+    }
     const publicUser = this.toPublicUser(user);
-    await this.issueSession(publicUser, response);
+    await this.issueSession(publicUser, user.tokenVersion, response);
     return { success: true, message: 'Đăng nhập thành công', user: publicUser };
   }
 
   async register(
     input: RegisterDto,
-    response: Response,
-  ): Promise<AuthResponseDto> {
+    _response: Response,
+  ): Promise<RegistrationResponseDto> {
     const dto = validateAuthInput(RegisterDto, input);
     await this.checkRegistrationConflict(dto);
+    await this.passwords.assertAllowed(dto.password);
     const passwordHash = await argon.hash(dto.password);
     const user = await this.createUser(dto, passwordHash);
-    const publicUser = this.toPublicUser(user);
-    await this.issueSession(publicUser, response);
+    await this.recovery.sendVerification({
+      id: user.id,
+      email: user.email,
+      tokenVersion: user.tokenVersion,
+    });
     return {
       success: true,
-      message: 'Đăng ký tài khoản thành công',
-      user: publicUser,
+      status: 'verification_required',
+      message:
+        'Tài khoản đã được tạo. Vui lòng kiểm tra email để xác minh trước khi đăng nhập.',
     };
   }
 
@@ -89,8 +108,15 @@ export class AuthService {
     return { success: true, user: this.toPublicUser(user) };
   }
 
-  logout(response: Response): LogoutResponseDto {
-    response.clearCookie(AUTH_COOKIE_NAME, { path: '/' });
+  async logout(
+    account: AuthenticatedAccount,
+    response: Response,
+  ): Promise<LogoutResponseDto> {
+    await this.sessions.revoke(account);
+    response.clearCookie(
+      AUTH_COOKIE_NAME,
+      authCookieOptions(this.configService),
+    );
     return { success: true, message: 'Đăng xuất thành công' };
   }
 
@@ -193,25 +219,16 @@ export class AuthService {
 
   private async issueSession(
     user: AuthUserResponseDto,
+    tokenVersion: number,
     response: Response,
   ): Promise<void> {
     const accessToken = await this.jwtService.signAsync(
-      {
-        sub: user.id,
-        username: user.username,
-        roles: user.roles,
-        primaryRole: user.primaryRole,
-      },
+      this.sessions.claims(user.id, tokenVersion),
       { expiresIn: AUTH_TOKEN_TTL },
     );
-    const isProduction =
-      this.configService.get<string>('NODE_ENV') === 'production';
     response.cookie(AUTH_COOKIE_NAME, accessToken, {
-      httpOnly: true,
-      secure: isProduction,
-      sameSite: isProduction ? 'none' : 'lax',
+      ...authCookieOptions(this.configService),
       maxAge: AUTH_COOKIE_MAX_AGE_MS,
-      path: '/',
     });
   }
 }

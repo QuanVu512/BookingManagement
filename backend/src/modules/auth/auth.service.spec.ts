@@ -1,3 +1,5 @@
+import { AuthRecoveryService } from './services/auth-recovery.service.js';
+import { CompromisedPasswordService } from './services/compromised-password.service.js';
 import {
   afterEach,
   beforeEach,
@@ -20,6 +22,17 @@ import { PrismaService } from '../../infrastructure/prisma/prisma.service.js';
 import { Role } from '../../enums/index.js';
 import { AuthService } from './auth.service.js';
 import { Prisma } from '../../generated/prisma/client.js';
+import { AuthSessionService } from './services/auth-session.service.js';
+
+const SESSION_ID = '10000000-0000-4000-8000-000000000001';
+const sessionsMock = {
+  claims: jest.fn<(id: string, version: number) => object>((id, version) => ({
+    sub: id,
+    tokenVersion: version,
+    jti: SESSION_ID,
+  })),
+  revoke: jest.fn<() => Promise<void>>(),
+};
 
 describe('AuthService.login', () => {
   const prismaMock = {
@@ -57,7 +70,16 @@ describe('AuthService.login', () => {
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
+        {
+          provide: AuthRecoveryService,
+          useValue: { sendVerification: async () => undefined },
+        },
+        {
+          provide: CompromisedPasswordService,
+          useValue: { assertAllowed: async () => undefined },
+        },
         AuthService,
+        { provide: AuthSessionService, useValue: sessionsMock },
         { provide: PrismaService, useValue: prismaMock },
         { provide: JwtService, useValue: jwtServiceMock },
         { provide: ConfigService, useValue: configServiceMock },
@@ -71,11 +93,43 @@ describe('AuthService.login', () => {
     jest.restoreAllMocks();
   });
 
+  it('rejects an unverified account without issuing a session', async () => {
+    prismaMock.user.findFirst.mockResolvedValue({
+      ...createActiveUser(),
+      emailVerifiedAt: null,
+    });
+    jest.spyOn(argon, 'verify').mockResolvedValue(true);
+    const response = createResponseMock();
+    await expect(
+      service.login(
+        { username: 'customer', password: 'a long passphrase' },
+        response,
+      ),
+    ).rejects.toBeInstanceOf(UnauthorizedException);
+    expect(response.cookie).not.toHaveBeenCalled();
+    expect(jwtServiceMock.signAsync).not.toHaveBeenCalled();
+  });
+
+  it('rejects a password beyond maximum before Argon verification', async () => {
+    const verify = jest.spyOn(argon, 'verify');
+    await expect(
+      service.login(
+        { username: 'customer', password: 'a'.repeat(129) },
+        createResponseMock(),
+      ),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(verify).not.toHaveBeenCalled();
+    expect(prismaMock.user.findFirst).not.toHaveBeenCalled();
+  });
+
   it('rejects a login request with a missing username or password', async () => {
     const response = createResponseMock();
 
     await expect(
-      service.login({ username: '', password: 'password' }, response),
+      service.login(
+        { username: '', password: 'test password phrase' },
+        response,
+      ),
     ).rejects.toBeInstanceOf(BadRequestException);
     await expect(
       service.login({ username: 'customer', password: '' }, response),
@@ -89,7 +143,10 @@ describe('AuthService.login', () => {
 
     await expect(
       service.login(
-        { username: ' customer@example.com ', password: 'password' },
+        {
+          username: ' customer@example.com ',
+          password: 'test password phrase',
+        },
         createResponseMock(),
       ),
     ).rejects.toBeInstanceOf(UnauthorizedException);
@@ -112,7 +169,7 @@ describe('AuthService.login', () => {
 
     await expect(
       service.login(
-        { username: 'unknown', password: 'password' },
+        { username: 'unknown', password: 'test password phrase' },
         createResponseMock(),
       ),
     ).rejects.toBeInstanceOf(UnauthorizedException);
@@ -130,7 +187,7 @@ describe('AuthService.login', () => {
       prismaMock.user.findFirst.mockResolvedValue(null);
       await expect(
         service.login(
-          { username: identifier, password: 'Secret1!' },
+          { username: identifier, password: 'SecretPhrase1!' },
           createResponseMock(),
         ),
       ).rejects.toBeInstanceOf(UnauthorizedException);
@@ -151,7 +208,7 @@ describe('AuthService.login', () => {
     prismaMock.user.findFirst.mockResolvedValue(null);
     await expect(
       service.login(
-        { username: ' CUSTOMER@EXAMPLE.COM ', password: 'Secret1!' },
+        { username: ' CUSTOMER@EXAMPLE.COM ', password: 'SecretPhrase1!' },
         createResponseMock(),
       ),
     ).rejects.toBeInstanceOf(UnauthorizedException);
@@ -192,7 +249,10 @@ describe('AuthService.login', () => {
     const response = createResponseMock();
 
     await expect(
-      service.login({ username: 'customer', password: 'password' }, response),
+      service.login(
+        { username: 'customer', password: 'test password phrase' },
+        response,
+      ),
     ).rejects.toBeInstanceOf(UnauthorizedException);
 
     expect(jwtServiceMock.signAsync).not.toHaveBeenCalled();
@@ -211,18 +271,17 @@ describe('AuthService.login', () => {
     const response = createResponseMock();
 
     const result = await service.login(
-      { username: ' customer ', password: 'password' },
+      { username: ' customer ', password: 'test password phrase' },
       response,
     );
 
     expect(jwtServiceMock.signAsync).toHaveBeenCalledWith(
       {
         sub: user.id,
-        username: user.username,
-        roles: [Role.STAFF, Role.MANAGER],
-        primaryRole: Role.MANAGER,
+        tokenVersion: user.tokenVersion,
+        jti: SESSION_ID,
       },
-      { expiresIn: '7d' },
+      { expiresIn: '15m' },
     );
     expect(response.cookie.mock.calls).toEqual([
       [
@@ -232,7 +291,7 @@ describe('AuthService.login', () => {
           httpOnly: true,
           secure: true,
           sameSite: 'none',
-          maxAge: 7 * 24 * 60 * 60 * 1000,
+          maxAge: 15 * 60 * 1000,
           path: '/',
         },
       ],
@@ -289,7 +348,16 @@ describe('AuthService.register', () => {
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
+        {
+          provide: AuthRecoveryService,
+          useValue: { sendVerification: async () => undefined },
+        },
+        {
+          provide: CompromisedPasswordService,
+          useValue: { assertAllowed: async () => undefined },
+        },
         AuthService,
+        { provide: AuthSessionService, useValue: sessionsMock },
         { provide: PrismaService, useValue: prismaMock },
         { provide: JwtService, useValue: jwtServiceMock },
         { provide: ConfigService, useValue: configServiceMock },
@@ -304,8 +372,8 @@ describe('AuthService.register', () => {
       service.register(
         {
           username: 'customer',
-          password: 'password',
-          confirmPassword: 'password',
+          password: 'test password phrase',
+          confirmPassword: 'test password phrase',
           fullName: 'Test',
           email: 'test@example.com',
           phone: '',
@@ -328,8 +396,8 @@ describe('AuthService.register', () => {
     await service.register(
       {
         username: ' customer ',
-        password: 'password',
-        confirmPassword: 'password',
+        password: 'test password phrase',
+        confirmPassword: 'test password phrase',
         fullName: ' Test Customer ',
         email: ' CUSTOMER@EXAMPLE.COM ',
         phone: ' 0900000000 ',
@@ -365,7 +433,7 @@ describe('AuthService.register', () => {
       service.register(
         {
           username: 'customer',
-          password: 'Secret1!',
+          password: 'SecretPhrase1!',
           confirmPassword: 'Wrong1!',
           fullName: 'Test Customer',
           email: 'customer@example.com',
@@ -392,8 +460,8 @@ describe('AuthService.register', () => {
       service.register(
         {
           username: 'customer',
-          password: 'Secret1!',
-          confirmPassword: 'Secret1!',
+          password: 'SecretPhrase1!',
+          confirmPassword: 'SecretPhrase1!',
           fullName: 'Test Customer',
           email: 'customer@example.com',
           phone: '0912345678',
@@ -428,8 +496,8 @@ describe('AuthService.register', () => {
         service.register(
           {
             username: 'customer',
-            password: 'password',
-            confirmPassword: 'password',
+            password: 'test password phrase',
+            confirmPassword: 'test password phrase',
             fullName: 'Test',
             email: 'customer@example.com',
             phone: '0900000000',
@@ -458,7 +526,16 @@ describe('AuthService.getMe and logout', () => {
     prismaMock.user.findUnique.mockReset();
     const module: TestingModule = await Test.createTestingModule({
       providers: [
+        {
+          provide: AuthRecoveryService,
+          useValue: { sendVerification: async () => undefined },
+        },
+        {
+          provide: CompromisedPasswordService,
+          useValue: { assertAllowed: async () => undefined },
+        },
         AuthService,
+        { provide: AuthSessionService, useValue: sessionsMock },
         { provide: PrismaService, useValue: prismaMock },
         { provide: JwtService, useValue: jwtServiceMock },
         { provide: ConfigService, useValue: configServiceMock },
@@ -503,16 +580,53 @@ describe('AuthService.getMe and logout', () => {
     );
   });
 
-  it('clears the auth cookie on logout', () => {
+  it('revokes the session before clearing the auth cookie on logout', async () => {
     const clearCookie = jest.fn();
     const response = { clearCookie } as unknown as Response;
-    expect(service.logout(response)).toEqual({
+    await expect(
+      service.logout(
+        {
+          userId: 'user-1',
+          username: 'customer',
+          roles: [Role.CUSTOMER],
+          jti: SESSION_ID,
+          tokenVersion: 0,
+          exp: Math.floor(Date.now() / 1000) + 900,
+        },
+        response,
+      ),
+    ).resolves.toEqual({
       success: true,
       message: 'Đăng xuất thành công',
     });
+    expect(sessionsMock.revoke).toHaveBeenCalled();
     expect(clearCookie).toHaveBeenCalledWith('access_token', {
+      httpOnly: true,
+      secure: false,
+      sameSite: 'lax',
       path: '/',
     });
+  });
+
+  it('does not clear the cookie or confirm logout when revocation fails', async () => {
+    const response = { clearCookie: jest.fn() };
+    sessionsMock.revoke.mockRejectedValueOnce(
+      new Error('revocation unavailable'),
+    );
+    await expect(
+      service.logout(
+        {
+          userId: 'user-1',
+          username: 'customer',
+          roles: [Role.CUSTOMER],
+          jti: SESSION_ID,
+          tokenVersion: 0,
+          exp: Math.floor(Date.now() / 1000) + 900,
+        },
+        response as unknown as Response,
+      ),
+    ).rejects.toThrow('revocation unavailable');
+    expect(response.clearCookie).not.toHaveBeenCalled();
   });
 });
 
@@ -524,6 +638,8 @@ function createActiveUser() {
     phone: '+84900000000',
     passwordHash: 'hashed-password',
     status: 'ACTIVE',
+    tokenVersion: 0,
+    emailVerifiedAt: new Date(),
     profile: { fullName: 'Test Customer' },
     roles: [{ role: Role.CUSTOMER }],
   };

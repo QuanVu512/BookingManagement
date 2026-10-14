@@ -13,11 +13,31 @@ const VALID_FORM = {
   fullName: 'Nguyễn Văn A',
   email: 'customer@business.vn',
   phone: '0912345678',
-  password: 'Secret1!',
-  confirmPassword: 'Secret1!',
+  password: 'SecretPhrase1!',
+  confirmPassword: 'SecretPhrase1!',
 };
 
 describe('Frontend auth validation', () => {
+  it.each([
+    'a'.repeat(12),
+    'a'.repeat(64),
+    '😀'.repeat(128),
+    '  mật khẩu dài có dấu 😀  ',
+  ])('accepts Unicode passphrases at backend boundaries: %s', (password) => {
+    expect(
+      getRegistrationErrors({
+        ...VALID_FORM,
+        password,
+        confirmPassword: password,
+      }),
+    ).toEqual({});
+  });
+  it.each(['a'.repeat(11), 'a'.repeat(129), '😀'.repeat(129)])(
+    'rejects password outside backend boundaries: %s',
+    (password) => {
+      expect(getLoginErrors('customer', password)).toHaveProperty('password');
+    },
+  );
   it('accepts Unicode names, corporate email and valid national phones', () => {
     expect(getRegistrationErrors(VALID_FORM)).toEqual({});
   });
@@ -50,9 +70,9 @@ describe('Frontend auth validation', () => {
     ).toHaveProperty(field);
   });
   it.each([
-    ['abcdef', 'Yếu'],
-    ['abcdefgh', 'Yếu'],
-    ['abcd1234', 'Vừa'],
+    ['a'.repeat(12), 'Yếu'],
+    ['a'.repeat(64), 'Yếu'],
+    ['abcd1234abcd', 'Vừa'],
     ['abcd1234!@#$', 'Mạnh'],
     ['abcdefghijkl', 'Yếu'],
     ['abcd1234abcd', 'Vừa'],
@@ -68,7 +88,7 @@ describe('Frontend auth validation', () => {
   });
   it('allows legacy usernames and all three login identifier forms', () => {
     for (const identifier of ['admin', '0912345678', 'CUSTOMER@BUSINESS.VN']) {
-      expect(getLoginErrors(identifier, 'Secret1!')).toEqual({});
+      expect(getLoginErrors(identifier, 'SecretPhrase1!')).toEqual({});
     }
   });
 });

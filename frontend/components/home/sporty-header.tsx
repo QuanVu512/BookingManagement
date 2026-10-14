@@ -10,8 +10,15 @@ export function SportyHeader({
 }: {
   currentPage?: 'home' | 'court-detail';
 }) {
-  const { user, isAuthenticated } = useAuthSession();
-  const { logout, openAuthModal } = useAuthActions();
+  const {
+    user,
+    isAuthenticated,
+    status,
+    isLoading,
+    sessionError,
+    logoutError,
+  } = useAuthSession();
+  const { logout, openAuthModal, refreshSession } = useAuthActions();
   const router = useRouter();
   const isHomePage = currentPage === 'home';
   const [activeNav, setActiveNav] = useState<'courts' | 'facilities' | 'about'>(
@@ -324,7 +331,21 @@ export function SportyHeader({
           className="site-header-account"
           style={{ display: 'flex', alignItems: 'center', gap: '12px' }}
         >
-          {isAuthenticated && user ? (
+          {status === 'unknown' ? (
+            <div>
+              <p role="status">
+                {isLoading ? 'Đang kiểm tra phiên...' : sessionError}
+              </p>
+              <button
+                type="button"
+                className="btn btn-sm btn-secondary"
+                disabled={isLoading}
+                onClick={() => void refreshSession()}
+              >
+                Thử lại phiên
+              </button>
+            </div>
+          ) : isAuthenticated && user ? (
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
               {user.isStaffOrAdmin ? (
                 <button
@@ -378,7 +399,7 @@ export function SportyHeader({
               <button
                 type="button"
                 className="btn btn-sm btn-secondary"
-                onClick={() => logout()}
+                onClick={() => void logout().catch(() => undefined)}
                 style={{ padding: '6px 12px', fontSize: '0.8rem' }}
               >
                 Đăng Xuất
@@ -393,6 +414,7 @@ export function SportyHeader({
               Đăng nhập
             </button>
           )}
+          {logoutError && <p role="alert">{logoutError}</p>}
         </div>
       </div>
     </header>

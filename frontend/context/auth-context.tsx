@@ -17,7 +17,13 @@ import type {
   RefObject,
   SetStateAction,
 } from 'react';
-import type { UserProfile, CourtItem, RegistrationData } from '../types/auth';
+import type {
+  UserProfile,
+  CourtItem,
+  RegistrationData,
+  RegistrationResult,
+  SessionStatus,
+} from '../types/auth';
 import {
   getCurrentUser,
   loginAccount,
@@ -29,6 +35,9 @@ interface AuthSessionValue {
   user: UserProfile | null;
   isAuthenticated: boolean;
   isLoading: boolean;
+  status: SessionStatus;
+  sessionError: string;
+  logoutError: string;
 }
 interface AuthDialogValue {
   isAuthModalOpen: boolean;
@@ -45,8 +54,9 @@ interface DialogActions {
 }
 interface SessionActions {
   login: (username: string, password: string) => Promise<UserProfile>;
-  register: (data: RegistrationData) => Promise<UserProfile>;
+  register: (data: RegistrationData) => Promise<RegistrationResult>;
   logout: () => Promise<void>;
+  refreshSession: () => Promise<void>;
 }
 type AuthActionsValue = DialogActions & SessionActions;
 type DialogCommand =
@@ -171,33 +181,115 @@ function useGuestDialogActions(dispatch: Dispatch<DialogCommand>) {
   );
 }
 
+type SessionSetter = Dispatch<SetStateAction<AuthSessionValue>>;
+
 function useSessionStore(closeModal: () => void, resetGuest: () => void) {
-  const [user, setUser] = useState<UserProfile | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [value, setValue] = useState<AuthSessionValue>({
+    user: null,
+    status: 'unknown',
+    isAuthenticated: false,
+    isLoading: true,
+    sessionError: '',
+    logoutError: '',
+  });
   const revision = useRef(0);
-  useInitialSession(setUser, setIsLoading, revision);
-  const acceptUser = useCallback(
-    (authenticatedUser: UserProfile) => {
-      revision.current += 1;
-      setUser(authenticatedUser);
-      closeModal();
-      return authenticatedUser;
-    },
-    [closeModal],
-  );
-  const actions = useSessionActions(acceptUser, setUser, revision, resetGuest);
-  const value = useMemo(
-    () => ({ user, isAuthenticated: user !== null, isLoading }),
-    [user, isLoading],
+  const refreshSession = useSessionChecks(setValue, revision);
+  const acceptUser = useAcceptedUser(setValue, revision, closeModal);
+  const acceptLogout = useAcceptedLogout(setValue, resetGuest);
+  const setLogoutError = useCallback((logoutError: string) => {
+    setValue((current) => ({ ...current, logoutError, isLoading: false }));
+  }, []);
+  const actions = useSessionActions(
+    acceptUser,
+    acceptLogout,
+    revision,
+    setLogoutError,
+    refreshSession,
   );
   return { value, actions };
 }
 
+function useSessionChecks(
+  setValue: SessionSetter,
+  revision: RefObject<number>,
+) {
+  const checkSession = useCallback(
+    async (signal: AbortSignal) => {
+      const requestRevision = ++revision.current;
+      setValue((current) => ({ ...current, isLoading: true }));
+      try {
+        const result = await getCurrentUser(signal);
+        if (!signal.aborted && requestRevision === revision.current) {
+          setValue((current) => ({
+            ...current,
+            status: result.status,
+            user:
+              result.status === 'authenticated'
+                ? result.user
+                : result.status === 'unauthenticated'
+                  ? null
+                  : current.user,
+            isAuthenticated: result.status === 'authenticated',
+            sessionError: result.status === 'unknown' ? result.message : '',
+          }));
+        }
+      } finally {
+        if (!signal.aborted && requestRevision === revision.current)
+          setValue((current) => ({ ...current, isLoading: false }));
+      }
+    },
+    [revision, setValue],
+  );
+  useInitialSession(checkSession);
+  return useCallback(
+    () => checkSession(new AbortController().signal),
+    [checkSession],
+  );
+}
+
+function useAcceptedUser(
+  setValue: SessionSetter,
+  revision: RefObject<number>,
+  closeModal: () => void,
+) {
+  return useCallback(
+    (user: UserProfile) => {
+      revision.current += 1;
+      setValue({
+        user,
+        status: 'authenticated',
+        isAuthenticated: true,
+        isLoading: false,
+        sessionError: '',
+        logoutError: '',
+      });
+      closeModal();
+      return user;
+    },
+    [closeModal, revision, setValue],
+  );
+}
+
+function useAcceptedLogout(setValue: SessionSetter, resetGuest: () => void) {
+  return useCallback(() => {
+    setValue({
+      user: null,
+      status: 'unauthenticated',
+      isAuthenticated: false,
+      isLoading: false,
+      sessionError: '',
+      logoutError: '',
+    });
+    resetGuest();
+  }, [resetGuest, setValue]);
+}
+
 function useSessionActions(
   acceptUser: (user: UserProfile) => UserProfile,
-  setUser: Dispatch<SetStateAction<UserProfile | null>>,
+  acceptLogout: () => void,
   revision: RefObject<number>,
-  resetGuest: () => void,
+  setLogoutError: (error: string) => void,
+  refreshSession: () => Promise<void>,
 ) {
   const login = useCallback(
     async (username: string, password: string) =>
@@ -205,47 +297,37 @@ function useSessionActions(
     [acceptUser],
   );
   const register = useCallback(
-    async (data: RegistrationData) => acceptUser(await registerAccount(data)),
-    [acceptUser],
+    (data: RegistrationData) => registerAccount(data),
+    [],
   );
   const logout = useCallback(async () => {
-    revision.current += 1;
+    const logoutRevision = ++revision.current;
+    setLogoutError('');
     try {
       await logoutAccount();
-    } catch {
-      console.info('Không thể xác nhận đăng xuất với máy chủ.');
+      if (logoutRevision === revision.current) acceptLogout();
+    } catch (error: unknown) {
+      if (logoutRevision === revision.current)
+        setLogoutError(
+          'Chưa thể xác nhận đăng xuất với máy chủ. Phiên đăng nhập được giữ lại; vui lòng thử lại.',
+        );
+      throw error;
     }
-    setUser(null);
-    resetGuest();
-  }, [revision, setUser, resetGuest]);
+  }, [revision, acceptLogout, setLogoutError]);
   return useMemo(
-    () => ({ login, register, logout }),
-    [login, register, logout],
+    () => ({ login, register, logout, refreshSession }),
+    [login, register, logout, refreshSession],
   );
 }
 
 function useInitialSession(
-  setUser: Dispatch<SetStateAction<UserProfile | null>>,
-  setIsLoading: Dispatch<SetStateAction<boolean>>,
-  revision: RefObject<number>,
+  checkSession: (signal: AbortSignal) => Promise<void>,
 ) {
   useEffect(() => {
     const controller = new AbortController();
-    const initialRevision = revision.current;
-    getCurrentUser(controller.signal)
-      .then((currentUser) => {
-        if (!controller.signal.aborted && revision.current === initialRevision)
-          setUser(currentUser);
-      })
-      .catch(() => {
-        if (!controller.signal.aborted)
-          console.info('Không thể kiểm tra phiên đăng nhập.');
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) setIsLoading(false);
-      });
+    void checkSession(controller.signal).catch(() => undefined);
     return () => controller.abort();
-  }, [setUser, setIsLoading, revision]);
+  }, [checkSession]);
 }
 
 function useRequiredContext<Value>(

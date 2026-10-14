@@ -7,8 +7,15 @@ import { useAuthActions, useAuthSession } from '../../context/auth-context';
 import { ThemeToggle } from '../../components/theme/theme-toggle';
 
 export default function DashboardPage() {
-  const { user, isAuthenticated, isLoading } = useAuthSession();
-  const { logout } = useAuthActions();
+  const {
+    user,
+    isAuthenticated,
+    isLoading,
+    status,
+    sessionError,
+    logoutError,
+  } = useAuthSession();
+  const { logout, refreshSession } = useAuthActions();
   const router = useRouter();
 
   if (isLoading) {
@@ -26,6 +33,21 @@ export default function DashboardPage() {
           Đang tải dữ liệu quản trị...
         </div>
       </div>
+    );
+  }
+
+  if (status === 'unknown') {
+    return (
+      <main className="container">
+        <p role="status">{sessionError}</p>
+        <button
+          type="button"
+          className="btn btn-secondary"
+          onClick={() => void refreshSession()}
+        >
+          Thử lại phiên đăng nhập
+        </button>
+      </main>
     );
   }
 
@@ -135,8 +157,12 @@ export default function DashboardPage() {
             type="button"
             className="btn btn-sm btn-secondary"
             onClick={async () => {
-              await logout();
-              router.push('/');
+              try {
+                await logout();
+                router.push('/');
+              } catch {
+                /* Auth context retains the session and displays the failure. */
+              }
             }}
           >
             Đăng Xuất
@@ -146,6 +172,7 @@ export default function DashboardPage() {
 
       {/* Main Dashboard Content */}
       <main className="container" style={{ padding: '36px 24px' }}>
+        {logoutError && <p role="alert">{logoutError}</p>}
         {/* Metric Cards Row */}
         <div
           style={{

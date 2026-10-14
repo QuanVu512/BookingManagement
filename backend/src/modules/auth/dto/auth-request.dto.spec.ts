@@ -5,7 +5,7 @@ import { REQUEST_VALIDATION_OPTIONS } from '../../../constants/validation.consta
 import { LoginDto } from './login.dto.js';
 import { RegisterDto } from './register.dto.js';
 
-const LOGIN_PAYLOAD = { username: 'customer', password: 'Secret1!' };
+const LOGIN_PAYLOAD = { username: 'customer', password: 'SecretPhrase1!' };
 const REGISTER_PAYLOAD = {
   ...LOGIN_PAYLOAD,
   confirmPassword: LOGIN_PAYLOAD.password,
@@ -170,18 +170,20 @@ describe('Auth completion rules', () => {
       pipe.transform({ ...REGISTER_PAYLOAD, username }, metadata),
     ).rejects.toBeInstanceOf(BadRequestException);
   });
-  it.each(['abcdef', 'ABC123', 'Abc!@#'])(
-    'accepts a six-character ASCII password %s',
-    async (password) => {
-      await expect(
-        pipe.transform(
-          { ...REGISTER_PAYLOAD, password, confirmPassword: password },
-          metadata,
-        ),
-      ).resolves.toBeInstanceOf(RegisterDto);
-    },
-  );
-  it.each(['abcde', 'mậtkhẩu123', 'Abc123😀', 'abc def', 'abc\ndef'])(
+  it.each([
+    'a'.repeat(12),
+    'a'.repeat(64),
+    '😀'.repeat(128),
+    '  mật khẩu dài có dấu 😀  ',
+  ])('accepts a bounded Unicode passphrase %s', async (password) => {
+    await expect(
+      pipe.transform(
+        { ...REGISTER_PAYLOAD, password, confirmPassword: password },
+        metadata,
+      ),
+    ).resolves.toBeInstanceOf(RegisterDto);
+  });
+  it.each(['a'.repeat(11), 'a'.repeat(129), '😀'.repeat(129)])(
     'rejects password %s',
     async (password) => {
       await expect(

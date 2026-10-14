@@ -6,7 +6,6 @@ import { useRouter } from 'next/navigation';
 import { useAuthActions } from '../context/auth-context';
 import type { RegistrationData } from '../types/auth';
 import {
-  AUTH_PASSWORD_PATTERN,
   getLoginErrors,
   getRegistrationErrors,
   normalizeRegistration,
@@ -40,12 +39,6 @@ export function useAuthForm() {
     setCapsLock(false);
     submission.clearErrors();
   }
-  const hasUnsupportedCharacters = [
-    values.password,
-    ...(mode === 'register' ? [values.confirmPassword] : []),
-  ].some(
-    (password) => password.length > 0 && !AUTH_PASSWORD_PATTERN.test(password),
-  );
   return {
     mode,
     values,
@@ -53,7 +46,6 @@ export function useAuthForm() {
     changeMode,
     capsLock,
     setCapsLock,
-    hasUnsupportedCharacters,
     ...submission,
   };
 }
@@ -63,11 +55,13 @@ function useAuthSubmission(mode: AuthMode, values: RegistrationData) {
   const router = useRouter();
   const [errors, setErrors] = useState<AuthFieldErrors>({});
   const [errorMessage, setErrorMessage] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const isSubmittingRef = useRef(false);
   function clearErrors() {
     setErrors({});
     setErrorMessage('');
+    setSuccessMessage('');
   }
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -79,11 +73,13 @@ function useAuthSubmission(mode: AuthMode, values: RegistrationData) {
     isSubmittingRef.current = true;
     setIsSubmitting(true);
     try {
-      const user =
-        mode === 'register'
-          ? await register(normalizeRegistration(values))
-          : await login(values.username, values.password);
-      if (user.isStaffOrAdmin) router.push('/dashboard');
+      if (mode === 'register') {
+        const result = await register(normalizeRegistration(values));
+        setSuccessMessage(result.message);
+      } else {
+        const user = await login(values.username, values.password);
+        if (user.isStaffOrAdmin) router.push('/dashboard');
+      }
     } catch (error: unknown) {
       setErrorMessage(getSubmissionError(error));
     } finally {
@@ -91,7 +87,14 @@ function useAuthSubmission(mode: AuthMode, values: RegistrationData) {
       setIsSubmitting(false);
     }
   }
-  return { errors, errorMessage, isSubmitting, clearErrors, handleSubmit };
+  return {
+    errors,
+    errorMessage,
+    successMessage,
+    isSubmitting,
+    clearErrors,
+    handleSubmit,
+  };
 }
 
 function getAuthFormErrors(

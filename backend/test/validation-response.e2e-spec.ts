@@ -1,3 +1,7 @@
+import { AuthRecoveryService } from '../src/modules/auth/services/auth-recovery.service.js';
+import { AuthRateLimitService } from '../src/modules/auth/services/auth-rate-limit.service.js';
+import { AuthRateLimitGuard } from '../src/modules/auth/guards/auth-rate-limit.guard.js';
+import { CompromisedPasswordService } from '../src/modules/auth/services/compromised-password.service.js';
 import 'reflect-metadata';
 import {
   afterAll,
@@ -21,6 +25,10 @@ import { REQUEST_VALIDATION_OPTIONS } from '../src/constants/validation.constant
 import { PrismaService } from '../src/infrastructure/prisma/prisma.service.js';
 import { AuthController } from '../src/modules/auth/auth.controller.js';
 import { AuthService } from '../src/modules/auth/auth.service.js';
+import { AuthSessionService } from '../src/modules/auth/services/auth-session.service.js';
+import { AuthCsrfService } from '../src/modules/auth/services/auth-csrf.service.js';
+import { AuthCsrfGuard } from '../src/modules/auth/guards/auth-csrf.guard.js';
+import { AuthRedisStore } from '../src/modules/auth/services/auth-redis.store.js';
 import { LoginDto } from '../src/modules/auth/dto/login.dto.js';
 import { RegisterDto } from '../src/modules/auth/dto/register.dto.js';
 import { JwtAuthGuard } from '../src/modules/auth/guards/jwt-auth.guard.js';
@@ -29,7 +37,9 @@ import { CourtsService } from '../src/modules/courts/courts.service.js';
 
 const USER_ID = '00000000-0000-4000-8000-000000000001';
 const AUTH_COOKIE = 'access_token';
-const LOGIN_PAYLOAD = { username: 'customer', password: 'Secret1!' };
+const TEST_ORIGIN = 'http://localhost:4001';
+const csrfEntries = new Map<string, string>();
+const LOGIN_PAYLOAD = { username: 'customer', password: 'SecretPhrase1!' };
 const REGISTER_PAYLOAD = {
   ...LOGIN_PAYLOAD,
   confirmPassword: LOGIN_PAYLOAD.password,
@@ -50,6 +60,7 @@ const PUBLIC_USER = {
 const DATABASE_USER = {
   ...PUBLIC_USER,
   status: 'ACTIVE',
+  emailVerifiedAt: new Date(),
   passwordHash: 'private-password-hash',
   tokenVersion: 7,
   profile: { fullName: PUBLIC_USER.fullName },
@@ -95,13 +106,52 @@ describe('Auth/Courts HTTP validation and response contract (mock dependencies)'
     const moduleFixture = await Test.createTestingModule({
       controllers: [AuthController, CourtsController],
       providers: [
+        {
+          provide: AuthRecoveryService,
+          useValue: { sendVerification: async () => undefined },
+        },
+        AuthRateLimitGuard,
+        {
+          provide: AuthRateLimitService,
+          useValue: { check: async () => undefined },
+        },
+        {
+          provide: CompromisedPasswordService,
+          useValue: { assertAllowed: async () => undefined },
+        },
         AuthService,
+        {
+          provide: AuthSessionService,
+          useValue: {
+            claims: () => ({
+              sub: USER_ID,
+              tokenVersion: 7,
+              jti: '10000000-0000-4000-8000-000000000001',
+            }),
+            revoke: async () => undefined,
+          },
+        },
         CourtsService,
+        AuthCsrfService,
+        AuthCsrfGuard,
+        {
+          provide: AuthRedisStore,
+          useValue: {
+            set: async (key: string, value: string) => {
+              csrfEntries.set(key, value);
+              return 'OK';
+            },
+            get: async (key: string) => csrfEntries.get(key) ?? null,
+          },
+        },
         { provide: PrismaService, useValue: prismaMock },
         { provide: JwtService, useValue: jwtMock },
         {
           provide: ConfigService,
-          useValue: new ConfigService({ NODE_ENV: 'test' }),
+          useValue: new ConfigService({
+            NODE_ENV: 'test',
+            WEB_ORIGIN: TEST_ORIGIN,
+          }),
         },
       ],
     })
@@ -109,7 +159,12 @@ describe('Auth/Courts HTTP validation and response contract (mock dependencies)'
       .useValue({
         canActivate(context: ExecutionContext): boolean {
           const request = context.switchToHttp().getRequest<Request>();
-          request.user = { userId: USER_ID };
+          request.user = {
+            userId: USER_ID,
+            jti: '10000000-0000-4000-8000-000000000001',
+            tokenVersion: 7,
+            exp: Math.floor(Date.now() / 1000) + 900,
+          };
           return true;
         },
       })
@@ -197,7 +252,17 @@ describe('Auth/Courts HTTP validation and response contract (mock dependencies)'
     login.mockRestore();
   });
 
-  it('transforms register input and preserves the 201 response contract', async () => {
+  it('rejects an auth mutation without CSRF before checking credentials', async () => {
+    const response = await fetch(`${baseUrl}/api/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(LOGIN_PAYLOAD),
+    });
+    expect(response.status).toBe(403);
+    expect(argon.verify).not.toHaveBeenCalled();
+  });
+
+  it('transforms register input and returns pending verification without a session', async () => {
     prismaMock.user.findFirst.mockResolvedValue(null);
     const register = jest.spyOn(app.get(AuthService), 'register');
     const response = await postAuth('register', REGISTER_PAYLOAD);
@@ -206,12 +271,12 @@ describe('Auth/Courts HTTP validation and response contract (mock dependencies)'
     expect(argon.hash).toHaveBeenCalledWith(REGISTER_PAYLOAD.password);
     expect(await response.json()).toEqual({
       success: true,
-      message: 'Đăng ký tài khoản thành công',
-      user: PUBLIC_USER,
+      status: 'verification_required',
+      message:
+        'Tài khoản đã được tạo. Vui lòng kiểm tra email để xác minh trước khi đăng nhập.',
     });
-    expect(response.headers.get('set-cookie')).toContain(
-      `${AUTH_COOKIE}=mock-signed-token`,
-    );
+    expect(response.headers.get('set-cookie')).toBeNull();
+    expect(jwtMock.signAsync).not.toHaveBeenCalled();
     register.mockRestore();
   });
 
@@ -286,12 +351,27 @@ describe('Auth/Courts HTTP validation and response contract (mock dependencies)'
         post: { responses: { '200': jsonSchema('AuthResponseDto') } },
       },
       '/api/auth/register': {
-        post: { responses: { '201': jsonSchema('AuthResponseDto') } },
+        post: { responses: { '201': jsonSchema('RegistrationResponseDto') } },
       },
       '/api/auth/me': {
         get: { responses: { '200': jsonSchema('AuthSessionResponseDto') } },
       },
       '/api/auth/logout': {
+        post: { responses: { '200': jsonSchema('LogoutResponseDto') } },
+      },
+      '/api/auth/csrf': {
+        get: { responses: { '200': jsonSchema('CsrfResponseDto') } },
+      },
+      '/api/auth/verify-email': {
+        post: { responses: { '200': jsonSchema('LogoutResponseDto') } },
+      },
+      '/api/auth/resend-verification': {
+        post: { responses: { '200': jsonSchema('LogoutResponseDto') } },
+      },
+      '/api/auth/forgot-password': {
+        post: { responses: { '200': jsonSchema('LogoutResponseDto') } },
+      },
+      '/api/auth/reset-password': {
         post: { responses: { '200': jsonSchema('LogoutResponseDto') } },
       },
       '/api/courts': {
@@ -307,6 +387,11 @@ describe('Auth/Courts HTTP validation and response contract (mock dependencies)'
       'user',
     ]);
     expect(schemaKeys('AuthSessionResponseDto')).toEqual(['success', 'user']);
+    expect(schemaKeys('RegistrationResponseDto')).toEqual([
+      'message',
+      'status',
+      'success',
+    ]);
     expect(schemaKeys('LogoutResponseDto')).toEqual(['message', 'success']);
     expect(schemaKeys('CourtsResponseDto')).toEqual(['data', 'success']);
     expect(schemaKeys('PublicCourtDto')).toEqual(PUBLIC_COURT_KEYS);
@@ -316,7 +401,27 @@ describe('Auth/Courts HTTP validation and response contract (mock dependencies)'
     expect(document.components?.schemas).toMatchObject({
       LoginDto: {
         required: ['username', 'password'],
-        properties: { username: { maxLength: 254 } },
+        properties: {
+          username: { maxLength: 254 },
+          password: { minLength: 12, maxLength: 128, writeOnly: true },
+        },
+      },
+      AuthEmailDto: {
+        required: ['email'],
+        properties: { email: { format: 'email', maxLength: 254 } },
+      },
+      AuthTokenDto: {
+        required: ['token'],
+        properties: {
+          token: { minLength: 64, maxLength: 64, writeOnly: true },
+        },
+      },
+      ResetPasswordDto: {
+        required: ['token', 'password', 'confirmPassword'],
+        properties: {
+          password: { minLength: 12, maxLength: 128, writeOnly: true },
+          confirmPassword: { minLength: 12, maxLength: 128, writeOnly: true },
+        },
       },
       RegisterDto: {
         required: [
@@ -356,10 +461,21 @@ describe('Auth/Courts HTTP validation and response contract (mock dependencies)'
     });
   });
 
-  function postAuth(endpoint: string, payload: unknown): Promise<Response> {
+  async function postAuth(
+    endpoint: string,
+    payload: unknown,
+  ): Promise<Response> {
+    const csrf = await fetch(`${baseUrl}/api/auth/csrf`);
+    const issued: { token: string } = await csrf.json();
+    const cookie = csrf.headers.get('set-cookie')?.split(';')[0] ?? '';
     return fetch(`${baseUrl}/api/auth/${endpoint}`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        Origin: TEST_ORIGIN,
+        'X-CSRF-Token': issued.token,
+        Cookie: cookie,
+      },
       body: JSON.stringify(payload),
     });
   }

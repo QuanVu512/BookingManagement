@@ -1,6 +1,18 @@
 import { registerDecorator } from 'class-validator';
 import type { ValidationArguments, ValidationOptions } from 'class-validator';
 import { normalizeVietnamPhone } from '../helpers/auth-normalization.js';
+import { isValidAuthPassword } from '../helpers/auth-password.js';
+
+export function IsAuthPassword(options?: ValidationOptions): PropertyDecorator {
+  return (target, propertyKey) =>
+    registerDecorator({
+      name: 'isAuthPassword',
+      target: target.constructor,
+      propertyName: String(propertyKey),
+      options,
+      validator: { validate: isValidAuthPassword },
+    });
+}
 
 export function IsVietnamPhone(options?: ValidationOptions): PropertyDecorator {
   return (target, propertyKey) =>
