@@ -44,7 +44,7 @@ export class AuthCsrfService {
       ...authCookieOptions(this.config),
       maxAge: AUTH_CSRF_TTL_SECONDS * 1000,
     });
-    response.setHeader('Cache-Control', 'no-store');
+    response.setHeader('Cache-Control', 'no-store, private');
     return { token };
   }
 

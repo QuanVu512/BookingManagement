@@ -1,8 +1,16 @@
+import 'reflect-metadata';
+import { AccountStore } from '../src/modules/auth/ports/account-store.js';
+import { PasswordHasher } from '../src/modules/auth/ports/password-hasher.js';
+import { SessionTokenSigner } from '../src/modules/auth/ports/session-token-signer.js';
+import { PrismaAccountStore } from '../src/modules/auth/infrastructure/prisma-account-store.js';
+import { ArgonPasswordHasher } from '../src/modules/auth/infrastructure/argon-password-hasher.js';
+import { JwtSessionTokenSigner } from '../src/modules/auth/infrastructure/jwt-session-token-signer.js';
+import { AuthCookiePresenter } from '../src/modules/auth/presentation/auth-cookie.presenter.js';
 import { AuthRecoveryService } from '../src/modules/auth/services/auth-recovery.service.js';
 import { AuthRateLimitService } from '../src/modules/auth/services/auth-rate-limit.service.js';
 import { AuthRateLimitGuard } from '../src/modules/auth/guards/auth-rate-limit.guard.js';
 import { CompromisedPasswordService } from '../src/modules/auth/services/compromised-password.service.js';
-import 'reflect-metadata';
+
 import {
   afterAll,
   beforeAll,
@@ -120,6 +128,10 @@ describe('Auth/Courts HTTP validation and response contract (mock dependencies)'
           useValue: { assertAllowed: async () => undefined },
         },
         AuthService,
+        AuthCookiePresenter,
+        { provide: AccountStore, useClass: PrismaAccountStore },
+        { provide: PasswordHasher, useClass: ArgonPasswordHasher },
+        { provide: SessionTokenSigner, useClass: JwtSessionTokenSigner },
         {
           provide: AuthSessionService,
           useValue: {
@@ -273,7 +285,7 @@ describe('Auth/Courts HTTP validation and response contract (mock dependencies)'
       success: true,
       status: 'verification_required',
       message:
-        'Tài khoản đã được tạo. Vui lòng kiểm tra email để xác minh trước khi đăng nhập.',
+        'Nếu thông tin phù hợp, hướng dẫn xác minh sẽ được gửi qua email. Nếu chưa nhận được, hãy dùng chức năng gửi lại hoặc kiểm tra thông tin đăng ký.',
     });
     expect(response.headers.get('set-cookie')).toBeNull();
     expect(jwtMock.signAsync).not.toHaveBeenCalled();

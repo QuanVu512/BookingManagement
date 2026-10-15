@@ -1,3 +1,14 @@
+import 'reflect-metadata';
+import { SessionTokenSigner } from './ports/session-token-signer.js';
+import { JwtSessionTokenSigner } from './infrastructure/jwt-session-token-signer.js';
+import { SecurityAudit } from './ports/security-audit.js';
+import { LoggingSecurityAudit } from './infrastructure/logging-security-audit.js';
+import { AuthAuditMiddleware } from './presentation/auth-audit.middleware.js';
+import { AccountStore } from './ports/account-store.js';
+import { PrismaAccountStore } from './infrastructure/prisma-account-store.js';
+import { PasswordHasher } from './ports/password-hasher.js';
+import { ArgonPasswordHasher } from './infrastructure/argon-password-hasher.js';
+import { AuthCookiePresenter } from './presentation/auth-cookie.presenter.js';
 import { AuthRecoveryService } from './services/auth-recovery.service.js';
 import { AuthMailService } from './services/auth-mail.service.js';
 import { AuthOneTimeTokenService } from './services/auth-one-time-token.service.js';
@@ -30,6 +41,8 @@ import { AuthCsrfGuard } from './guards/auth-csrf.guard.js';
   ],
   controllers: [AuthController],
   providers: [
+    AuthAuditMiddleware,
+    { provide: SecurityAudit, useClass: LoggingSecurityAudit },
     AuthRecoveryService,
     AuthMailService,
     AuthOneTimeTokenService,
@@ -37,6 +50,10 @@ import { AuthCsrfGuard } from './guards/auth-csrf.guard.js';
     AuthRateLimitGuard,
     CompromisedPasswordService,
     AuthService,
+    { provide: SessionTokenSigner, useClass: JwtSessionTokenSigner },
+    { provide: AccountStore, useClass: PrismaAccountStore },
+    { provide: PasswordHasher, useClass: ArgonPasswordHasher },
+    AuthCookiePresenter,
     JwtStrategy,
     JwtAuthGuard,
     RolesGuard,

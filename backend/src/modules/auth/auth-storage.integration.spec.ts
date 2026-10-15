@@ -1,3 +1,5 @@
+import { PasswordHasher } from './ports/password-hasher.js';
+import { ArgonPasswordHasher } from './infrastructure/argon-password-hasher.js';
 import 'reflect-metadata';
 import {
   afterAll,
@@ -22,12 +24,24 @@ import { AuthOneTimeTokenService } from './services/auth-one-time-token.service.
 import { AuthRecoveryService } from './services/auth-recovery.service.js';
 import { AuthMailService } from './services/auth-mail.service.js';
 import { CompromisedPasswordService } from './services/compromised-password.service.js';
-import { AUTH_RATE_COUNTER_SCRIPT } from './services/auth-rate-limit.service.js';
+import {
+  AuthRateLimitService,
+  AUTH_RATE_COUNTER_SCRIPT,
+  AUTH_RECIPIENT_SCRIPT,
+} from './services/auth-rate-limit.service.js';
 import { BadRequestException, UnauthorizedException } from '@nestjs/common';
 import argon from 'argon2';
 
 const databaseUrl = process.env.AUTH_SECURITY_DATABASE_TEST_URL;
 const redisUrl = process.env.AUTH_SECURITY_REDIS_TEST_URL;
+if (
+  process.env.AUTH_SECURITY_REQUIRE_STORAGE === 'true' &&
+  (!databaseUrl || !redisUrl)
+) {
+  throw new Error(
+    'Mandatory auth storage tests require explicit disposable database and Redis URLs.',
+  );
+}
 const liveDescribe = databaseUrl && redisUrl ? describe : describe.skip;
 
 liveDescribe(
@@ -65,6 +79,8 @@ liveDescribe(
           AuthSessionService,
           AuthOneTimeTokenService,
           AuthRecoveryService,
+          { provide: PasswordHasher, useClass: ArgonPasswordHasher },
+          AuthRateLimitService,
           { provide: PrismaService, useValue: prisma },
           { provide: RedisService, useValue: { client: redis } },
           {
@@ -138,6 +154,21 @@ liveDescribe(
       expect(
         await store.evaluate(AUTH_RATE_COUNTER_SCRIPT, key, ['1']),
       ).toEqual([1, 1]);
+    });
+    it('admits one recipient concurrently, preserves cooldown and resets after finite TTL', async () => {
+      const key = `booking:auth:v1:test-recipient:${id}`;
+      trackedKeys.add(key);
+      const results = await Promise.all(
+        Array.from({ length: 20 }, () =>
+          store.evaluate(AUTH_RECIPIENT_SCRIPT, key, ['3', '2', '1']),
+        ),
+      );
+      expect(results.filter((result) => result === 1)).toHaveLength(1);
+      expect(await redis.ttl(key)).toBeGreaterThanOrEqual(0);
+      await new Promise((resolveWait) => setTimeout(resolveWait, 2100));
+      expect(
+        await store.evaluate(AUTH_RECIPIENT_SCRIPT, key, ['3', '2', '1']),
+      ).toBe(1);
     });
     it('consumes a one-time token once across concurrent Redis GETDEL calls', async () => {
       const token = await tokens.issue('verify-email', {

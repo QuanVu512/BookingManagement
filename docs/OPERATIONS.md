@@ -44,6 +44,8 @@ Migration kiểm tra lại dữ liệu/collision trong transaction trước khi 
 
 ## Phạm vi chức năng
 
+Trước rollout hardening auth: cung cấp `WEB_ORIGIN` và `NEXT_PUBLIC_API_URL` HTTPS, đặt `AUTH_MAIL_MAX_PER_HOUR` theo quota provider; giữ proxy allowlist và Secure cookie theo topology hiện hành. JWT issuer/audience mới làm phiên cũ phải đăng nhập lại. Không rollback bằng cách tắt CSRF/validation/Secure hoặc flush Redis. Redis reconnect quá budget cần restart sau khi dịch vụ phục hồi; kiểm eviction/durability/ACL/TLS riêng. CSP giữ Report-Only cho tới khi browser/edge verification đạt. Release còn phụ thuộc xử lý/chấp nhận advisory bởi owner, storage thật, SMTP provider, audit retention/quyền đọc, backup/restore và review độc lập.
+
 Repo có22 Prisma models và migration v1; workflows booking/payment/refund/check-in/email chưa implement. Trạng thái auth/API đọc ở [BACKEND-ARCHITECTURE.md](BACKEND-ARCHITECTURE.md) và [SECURITY.md](SECURITY.md). Không có seeding chi nhánh/sân trong v1. Tính occupied_until theo giờ chơi/buffer và các invariant xuyên nhiều row cần application transaction khi triển khai.
 
 Scaffold observability giữ cấu hình placeholder hiện hữu. Điều kiện startup và trạng thái migration của mỗi DB cần được xác minh trong môi trường đó; tài liệu/source không chứng minh DB đã được apply.

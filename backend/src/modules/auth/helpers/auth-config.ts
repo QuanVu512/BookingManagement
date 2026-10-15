@@ -5,6 +5,8 @@ import {
   AUTH_JWT_SECRET_PATTERN,
   AUTH_JWT_SECRET_MIN_DISTINCT_CHARACTERS,
   AUTH_TOKEN_TTL,
+  AUTH_JWT_ISSUER,
+  AUTH_JWT_AUDIENCE,
 } from '../constants/auth-validation.constants.js';
 
 export function resolveJwtSecret(configService: ConfigService): string {
@@ -26,7 +28,17 @@ export function resolveJwtSecret(configService: ConfigService): string {
 export function authJwtOptions(configService: ConfigService): JwtModuleOptions {
   return {
     secret: resolveJwtSecret(configService),
-    signOptions: { expiresIn: AUTH_TOKEN_TTL },
+    signOptions: {
+      expiresIn: AUTH_TOKEN_TTL,
+      algorithm: 'HS256',
+      issuer: AUTH_JWT_ISSUER,
+      audience: AUTH_JWT_AUDIENCE,
+    },
+    verifyOptions: {
+      algorithms: ['HS256'],
+      issuer: AUTH_JWT_ISSUER,
+      audience: AUTH_JWT_AUDIENCE,
+    },
   };
 }
 
@@ -39,7 +51,10 @@ export function resolveWebOrigin(config: ConfigService): string {
     origin.password ||
     origin.pathname !== '/' ||
     origin.search ||
-    origin.hash
+    origin.hash ||
+    (origin.protocol === 'http:' &&
+      (config.get<string>('NODE_ENV') === 'production' ||
+        !['localhost', '127.0.0.1', '[::1]'].includes(origin.hostname)))
   )
     throw new Error('WEB_ORIGIN must be one explicit HTTP(S) origin.');
   return origin.origin;

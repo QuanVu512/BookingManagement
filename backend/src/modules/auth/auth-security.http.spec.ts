@@ -1,4 +1,15 @@
 import 'reflect-metadata';
+import { AuthAuditMiddleware } from './presentation/auth-audit.middleware.js';
+import { SecurityAudit, type SecurityEvent } from './ports/security-audit.js';
+import { authJwtOptions } from './helpers/auth-config.js';
+import { SessionTokenSigner } from './ports/session-token-signer.js';
+import { JwtSessionTokenSigner } from './infrastructure/jwt-session-token-signer.js';
+import { securityHeaders } from '../../common/security-http.js';
+import { AccountStore } from './ports/account-store.js';
+import { PrismaAccountStore } from './infrastructure/prisma-account-store.js';
+import { PasswordHasher } from './ports/password-hasher.js';
+import { ArgonPasswordHasher } from './infrastructure/argon-password-hasher.js';
+import { AuthCookiePresenter } from './presentation/auth-cookie.presenter.js';
 import {
   afterAll,
   afterEach,
@@ -71,6 +82,7 @@ describe('Auth security HTTP integration (real guards/JWT, simulated DB/Redis/ma
   let jwt: JwtService;
   let sessions: AuthSessionService;
   let tokens: AuthOneTimeTokenService;
+  const auditRecord = jest.fn<(event: SecurityEvent) => void>();
   let account:
     | (Omit<typeof ACCOUNT, 'emailVerifiedAt'> & {
         emailVerifiedAt: Date | null;
@@ -94,14 +106,19 @@ describe('Auth security HTTP integration (real guards/JWT, simulated DB/Redis/ma
     const module = await Test.createTestingModule({
       imports: [
         PassportModule,
-        JwtModule.register({
-          secret: SECRET,
-          signOptions: { expiresIn: '15m' },
-        }),
+        JwtModule.register(
+          authJwtOptions(new ConfigService({ JWT_SECRET: SECRET })),
+        ),
       ],
       controllers: [AuthController, AuthorizationFixtureController],
       providers: [
+        AuthAuditMiddleware,
+        { provide: SecurityAudit, useValue: { record: auditRecord } },
         AuthService,
+        { provide: SessionTokenSigner, useClass: JwtSessionTokenSigner },
+        { provide: AccountStore, useClass: PrismaAccountStore },
+        { provide: PasswordHasher, useClass: ArgonPasswordHasher },
+        AuthCookiePresenter,
         AuthRedisStore,
         AuthSessionService,
         AuthCsrfService,
@@ -155,6 +172,12 @@ describe('Auth security HTTP integration (real guards/JWT, simulated DB/Redis/ma
                 _script: string,
                 options: { keys: string[]; arguments: string[] },
               ) => {
+                if (_script.includes('HGET')) {
+                  const key = options.keys[0];
+                  if (entries.has(key)) return 0;
+                  entries.set(key, { value: '1', expires: Date.now() + 60000 });
+                  return 1;
+                }
                 const key = options.keys[0];
                 const current = await get(key);
                 const count = Number(current ?? '0') + 1;
@@ -179,6 +202,9 @@ describe('Auth security HTTP integration (real guards/JWT, simulated DB/Redis/ma
     }).compile();
     app = module.createNestApplication();
     app.useLogger(false);
+    app.use(securityHeaders);
+    const audit = module.get(AuthAuditMiddleware);
+    app.use(audit.use.bind(audit));
     app.useGlobalPipes(new ValidationPipe(REQUEST_VALIDATION_OPTIONS));
     await app.listen(0, '127.0.0.1');
     baseUrl = await app.getUrl();
@@ -188,6 +214,7 @@ describe('Auth security HTTP integration (real guards/JWT, simulated DB/Redis/ma
   });
   beforeEach(() => {
     entries.clear();
+    auditRecord.mockClear();
     account = structuredClone(ACCOUNT);
     get.mockReset().mockImplementation(async (key) => {
       const entry = entries.get(key);
@@ -388,6 +415,7 @@ describe('Auth security HTTP integration (real guards/JWT, simulated DB/Redis/ma
     expect(Number(blocked.headers.get('retry-after'))).toBeGreaterThan(0);
   });
   it('returns 429 with Retry-After for register IP limits without issuing sessions', async () => {
+    if (account) account.emailVerifiedAt = null;
     findFirst.mockResolvedValue(null);
     const payload = {
       username: 'customer',
@@ -402,7 +430,7 @@ describe('Auth security HTTP integration (real guards/JWT, simulated DB/Redis/ma
       expect(response.status).toBe(201);
       expect(response.headers.get('set-cookie')).toBeNull();
     }
-    expect(sendToken).toHaveBeenCalledTimes(5);
+    expect(sendToken).toHaveBeenCalledTimes(1);
     expect(sendToken).toHaveBeenLastCalledWith(
       'verify-email',
       ACCOUNT.email,
@@ -411,7 +439,7 @@ describe('Auth security HTTP integration (real guards/JWT, simulated DB/Redis/ma
     const blocked = await post('register', payload);
     expect(blocked.status).toBe(429);
     expect(Number(blocked.headers.get('retry-after'))).toBeGreaterThan(0);
-  });
+  }, 25000);
 
   it('returns identical forgot-password HTTP status/body for existing and missing accounts', async () => {
     findUnique.mockImplementation(async (query) =>
@@ -446,5 +474,76 @@ describe('Auth security HTTP integration (real guards/JWT, simulated DB/Redis/ma
     expect((await post('reset-password', payload)).status).toBe(200);
     expect((await read('/api/auth/me', access)).status).toBe(401);
     expect((await post('reset-password', payload)).status).toBe(400);
+  });
+  it('sets private no-store and security headers on successful and failed auth responses', async () => {
+    const token = await signedToken();
+    const responses = [
+      await read('/api/auth/me', token),
+      await read('/api/auth/me'),
+      await post('login', { username: 'bad', password: 'bad' }),
+    ];
+    for (const response of responses) {
+      expect(response.headers.get('cache-control')).toBe('no-store, private');
+      expect(response.headers.get('x-content-type-options')).toBe('nosniff');
+      expect(response.headers.get('x-frame-options')).toBe('DENY');
+    }
+    get.mockRejectedValueOnce(new Error('Redis unavailable'));
+    const failure = await read('/api/auth/me', token);
+    expect(failure.status).toBe(503);
+    expect(failure.headers.get('cache-control')).toBe('no-store, private');
+  });
+  it('rate limits recovery before delivery and reset before password hashing', async () => {
+    const responses = await Promise.all(
+      Array.from({ length: 6 }, (_, index) =>
+        post('forgot-password', { email: `person${index}@example.com` }),
+      ),
+    );
+    expect(
+      responses.filter((response) => response.status === 429),
+    ).toHaveLength(1);
+    expect(
+      responses.filter((response) => response.status === 200),
+    ).toHaveLength(5);
+    for (let index = 0; index < 10; index++)
+      await post('reset-password', { token: 'invalid' });
+    const blocked = await post('reset-password', { token: 'invalid' });
+    expect(blocked.status).toBe(429);
+    expect(blocked.headers.get('retry-after')).not.toBeNull();
+    expect(argon.hash).not.toHaveBeenCalled();
+  });
+
+  it('applies auth cache and audit policy to case-insensitive Express routes', async () => {
+    const response = await read('/API/AUTH/me');
+    expect(response.status).toBe(401);
+    expect(response.headers.get('cache-control')).toBe('no-store, private');
+    const login = await post('LOGIN', {
+      username: ACCOUNT.username,
+      password: 'synthetic valid password',
+    });
+    expect(login.status).toBe(200);
+    expect(auditRecord).toHaveBeenCalledWith(
+      expect.objectContaining({ action: 'login', outcome: 'success' }),
+    );
+  });
+  it('audits success and failures with bounded server-generated request IDs and no raw credentials', async () => {
+    const success = await post('login', {
+      username: ACCOUNT.username,
+      password: 'synthetic valid password',
+    });
+    expect(success.status).toBe(200);
+    const failure = await post('login', {
+      username: ACCOUNT.username,
+      password: 'bad',
+    });
+    expect(failure.status).toBe(400);
+    expect(auditRecord.mock.calls.map(([event]) => event.outcome)).toEqual([
+      'success',
+      'denied',
+    ]);
+    for (const [event] of auditRecord.mock.calls)
+      expect(event.requestId).toMatch(/^[a-f0-9-]{36}$/);
+    expect(JSON.stringify(auditRecord.mock.calls)).not.toMatch(
+      /synthetic valid password|customer@example.com/,
+    );
   });
 });

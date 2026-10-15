@@ -1,4 +1,6 @@
+import { AuthCookiePresenter } from './presentation/auth-cookie.presenter.js';
 import { AuthRateLimitGuard } from './guards/auth-rate-limit.guard.js';
+import { AuthRateLimit } from './decorators/auth-rate-policy.decorator.js';
 import {
   Controller,
   Post,
@@ -41,6 +43,7 @@ export class AuthController {
     private readonly authService: AuthService,
     private readonly csrf: AuthCsrfService,
     private readonly recovery: AuthRecoveryService,
+    private readonly cookies: AuthCookiePresenter,
   ) {}
 
   @Get('csrf')
@@ -53,6 +56,7 @@ export class AuthController {
   }
 
   @Post('login')
+  @AuthRateLimit('login')
   @UseGuards(AuthRateLimitGuard)
   @HttpCode(HttpStatus.OK)
   @ApiOkResponse({ type: AuthResponseDto })
@@ -60,21 +64,21 @@ export class AuthController {
     @Body() dto: LoginDto,
     @Res({ passthrough: true }) res: Response,
   ): Promise<AuthResponseDto> {
-    return this.authService.login(dto, res);
+    return this.cookies.login(await this.authService.login(dto), res);
   }
 
   @Post('register')
+  @AuthRateLimit('register')
   @UseGuards(AuthRateLimitGuard)
   @HttpCode(HttpStatus.CREATED)
   @ApiCreatedResponse({ type: RegistrationResponseDto })
-  async register(
-    @Body() dto: RegisterDto,
-    @Res({ passthrough: true }) res: Response,
-  ): Promise<RegistrationResponseDto> {
-    return this.authService.register(dto, res);
+  async register(@Body() dto: RegisterDto): Promise<RegistrationResponseDto> {
+    return this.authService.register(dto);
   }
 
   @Post('verify-email')
+  @AuthRateLimit('token')
+  @UseGuards(AuthRateLimitGuard)
   @HttpCode(HttpStatus.OK)
   @ApiOkResponse({ type: LogoutResponseDto })
   verifyEmail(@Body() dto: AuthTokenDto): Promise<LogoutResponseDto> {
@@ -82,6 +86,8 @@ export class AuthController {
   }
 
   @Post('resend-verification')
+  @AuthRateLimit('recovery')
+  @UseGuards(AuthRateLimitGuard)
   @HttpCode(HttpStatus.OK)
   @ApiOkResponse({ type: LogoutResponseDto })
   resendVerification(@Body() dto: AuthEmailDto): Promise<LogoutResponseDto> {
@@ -89,6 +95,8 @@ export class AuthController {
   }
 
   @Post('forgot-password')
+  @AuthRateLimit('recovery')
+  @UseGuards(AuthRateLimitGuard)
   @HttpCode(HttpStatus.OK)
   @ApiOkResponse({ type: LogoutResponseDto })
   forgotPassword(@Body() dto: AuthEmailDto): Promise<LogoutResponseDto> {
@@ -96,6 +104,8 @@ export class AuthController {
   }
 
   @Post('reset-password')
+  @AuthRateLimit('token')
+  @UseGuards(AuthRateLimitGuard)
   @HttpCode(HttpStatus.OK)
   @ApiOkResponse({ type: LogoutResponseDto })
   resetPassword(@Body() dto: ResetPasswordDto): Promise<LogoutResponseDto> {
@@ -119,6 +129,8 @@ export class AuthController {
     @CurrentUser() account: AuthenticatedAccount,
     @Res({ passthrough: true }) res: Response,
   ): Promise<LogoutResponseDto> {
-    return this.authService.logout(account, res);
+    const result = await this.authService.logout(account);
+    this.cookies.clear(res);
+    return result;
   }
 }

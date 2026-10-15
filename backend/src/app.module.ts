@@ -14,7 +14,6 @@ import { PaymentsModule } from './modules/payments/payments.module.js';
 import { CheckInModule } from './modules/check-in/check-in.module.js';
 import { PrismaModule } from './infrastructure/prisma/prisma.module.js';
 import { QueueModule } from './infrastructure/queue/queue.module.js';
-import { RealtimeModule } from './modules/notifications/realtime.module.js';
 import { RedisModule } from './infrastructure/redis/redis.module.js';
 
 export const { ObserveModule, ObserveInstrument } = createObserveModule();
@@ -39,7 +38,6 @@ export const { ObserveModule, ObserveInstrument } = createObserveModule();
     CheckInModule,
     PrismaModule,
     QueueModule,
-    RealtimeModule,
     RedisModule,
     ThrottlerModule.forRoot([{ ttl: 60_000, limit: 60 }]),
     // Distributed tracing, auto-correlated logs, request/job metrics, error

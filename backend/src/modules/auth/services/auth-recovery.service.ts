@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
-import argon from 'argon2';
+import { PasswordHasher } from '../ports/password-hasher.js';
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service.js';
 import { UserStatus } from '../../../enums/index.js';
 import {
@@ -15,23 +15,47 @@ import { AuthMailService } from './auth-mail.service.js';
 import type { AuthTokenPurpose } from './auth-mail.service.js';
 import { CompromisedPasswordService } from './compromised-password.service.js';
 import { AUTH_RECOVERY_RESPONSE_MS } from '../constants/auth-validation.constants.js';
+import { AUTH_RECOVERY_CONCURRENCY } from '../constants/auth-validation.constants.js';
+import { AuthRateLimitService } from './auth-rate-limit.service.js';
 
 export const AUTH_RECOVERY_MESSAGE =
   'Nếu tài khoản phù hợp tồn tại, hướng dẫn sẽ được gửi qua email.';
 
 @Injectable()
 export class AuthRecoveryService {
+  private activeDeliveries = 0;
+  private readonly backgroundDeliveries = new Set<Promise<void>>();
   private readonly logger = new Logger(AuthRecoveryService.name);
   constructor(
     private readonly prisma: PrismaService,
     private readonly tokens: AuthOneTimeTokenService,
     private readonly mail: AuthMailService,
     private readonly passwords: CompromisedPasswordService,
+    private readonly limiter: AuthRateLimitService,
+    private readonly hasher: PasswordHasher,
   ) {}
 
-  async sendVerification(account: AuthTokenAccount): Promise<void> {
-    const token = await this.tokens.issue('verify-email', account);
-    await this.mail.sendToken('verify-email', account.email, token);
+  sendVerification(account: AuthTokenAccount): Promise<void> {
+    if (this.activeDeliveries >= AUTH_RECOVERY_CONCURRENCY)
+      return Promise.resolve();
+    this.activeDeliveries++;
+    // Delivery is observed and bounded but cannot extend the public registration response.
+    const delivery = this.deliverInitialVerification(account)
+      .catch(() => this.logger.warn('Auth email delivery unavailable.'))
+      .finally(() => {
+        this.activeDeliveries--;
+        this.backgroundDeliveries.delete(delivery);
+      });
+    this.backgroundDeliveries.add(delivery);
+    return Promise.resolve();
+  }
+
+  private async deliverInitialVerification(
+    account: AuthTokenAccount,
+  ): Promise<void> {
+    if (await this.limiter.reserveRecipient(account.email, 'verify-email')) {
+      await this.deliverIfEligible(account.email, 'verify-email');
+    }
   }
 
   async requestEmail(
@@ -39,15 +63,32 @@ export class AuthRecoveryService {
     purpose: AuthTokenPurpose,
   ): Promise<LogoutResponseDto> {
     const dto = validateAuthInput(AuthEmailDto, input);
+    const allowed = await this.limiter.reserveRecipient(dto.email, purpose);
     // Same response deadline for existing, missing, disabled and delivery-failed accounts.
     const deadline = new Promise<void>((resolve) =>
       setTimeout(resolve, AUTH_RECOVERY_RESPONSE_MS),
     );
-    const delivery = this.deliverIfEligible(dto.email, purpose).catch(() => {
-      this.logger.warn('Auth email delivery unavailable.');
-    });
+    const delivery = this.deliverBounded(dto.email, purpose, allowed).catch(
+      () => {
+        this.logger.warn('Auth email delivery unavailable.');
+      },
+    );
     await Promise.all([deadline, Promise.race([delivery, deadline])]);
     return { success: true, message: AUTH_RECOVERY_MESSAGE };
+  }
+
+  private async deliverBounded(
+    email: string,
+    purpose: AuthTokenPurpose,
+    allowed: boolean,
+  ): Promise<void> {
+    if (!allowed || this.activeDeliveries >= AUTH_RECOVERY_CONCURRENCY) return;
+    this.activeDeliveries++;
+    try {
+      await this.deliverIfEligible(email, purpose);
+    } finally {
+      this.activeDeliveries--;
+    }
   }
 
   async verifyEmail(input: AuthTokenDto): Promise<LogoutResponseDto> {
@@ -72,7 +113,7 @@ export class AuthRecoveryService {
     });
     if (!user) throw this.invalid();
     await this.passwords.assertAllowed(dto.password);
-    const passwordHash = await argon.hash(dto.password);
+    const passwordHash = await this.hasher.hash(dto.password);
     const consumed = await this.tokens.consume('reset-password', dto.token);
     if (JSON.stringify(account) !== JSON.stringify(consumed))
       throw this.invalid();

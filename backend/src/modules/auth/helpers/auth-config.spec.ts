@@ -104,7 +104,17 @@ describe('JWT secret configuration', () => {
     expect(resolveJwtSecret(config)).toBe(TEST_SECRET);
     expect(authJwtOptions(config)).toEqual({
       secret: TEST_SECRET,
-      signOptions: { expiresIn: '15m' },
+      signOptions: {
+        expiresIn: '15m',
+        algorithm: 'HS256',
+        issuer: 'booking-api',
+        audience: 'booking-web',
+      },
+      verifyOptions: {
+        algorithms: ['HS256'],
+        issuer: 'booking-api',
+        audience: 'booking-web',
+      },
     });
   });
 

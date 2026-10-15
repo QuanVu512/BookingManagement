@@ -30,7 +30,9 @@ Chưa có thư viện state/API client riêng trong dependency. AuthContext ủy
 - `POST /api/auth/register`
 - `POST /api/auth/logout`
 
-URL lấy từ `NEXT_PUBLIC_API_URL`, mặc định `http://localhost:4000`. Auth request đặt `credentials: 'include'` để browser gửi/nhận cookie. Cookie do backend quản lý; frontend không đọc access token. Payload đăng ký có `confirmPassword`, chỉ dùng kiểm tra khớp tại backend.
+URL lấy từ `NEXT_PUBLIC_API_URL`; dev/test mặc định `http://localhost:4000`, production bắt buộc origin HTTPS hợp lệ và fail build nếu thiếu/sai. Auth request đặt `credentials: 'include'` để browser gửi/nhận cookie. Cookie do backend quản lý; frontend không đọc access token. Payload đăng ký có `confirmPassword`, chỉ dùng kiểm tra khớp tại backend. Form hiển thị message generic từ server cho đăng ký mới/trùng email/phone; username trùng vẫn là lỗi. Không suy ra account được tạo chỉ từ 201.
+
+Next config đặt nosniff/frame deny/no-referrer và CSP Report-Only với API origin tường minh. Chưa enforce CSP cho inline Next hydration/styles; cần browser evidence và nonce/hash trước rollout enforce. Không bật unsafe-eval production.
 
 Trang chính gọi `GET /api/courts`; backend hiện có fallback dữ liệu showcase khi query DB thất bại hoặc chưa có sân. Không xem fallback/UI là dữ liệu persistence đã xác nhận.
 

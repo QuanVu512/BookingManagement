@@ -1,3 +1,6 @@
+import { PasswordHasher } from '../ports/password-hasher.js';
+import { ArgonPasswordHasher } from '../infrastructure/argon-password-hasher.js';
+import { AuthRateLimitService } from './auth-rate-limit.service.js';
 import {
   AUTH_ONE_TIME_TTLS,
   AUTH_RECOVERY_RESPONSE_MS,
@@ -85,6 +88,11 @@ describe('Email verification and recovery', () => {
     const module = await Test.createTestingModule({
       providers: [
         AuthRecoveryService,
+        { provide: PasswordHasher, useClass: ArgonPasswordHasher },
+        {
+          provide: AuthRateLimitService,
+          useValue: { reserveRecipient: async () => true },
+        },
         AuthOneTimeTokenService,
         {
           provide: AuthRedisStore,
@@ -257,4 +265,14 @@ describe('Email verification and recovery', () => {
       });
     },
   );
+  it('does not hold registration open for stalled SMTP and bounds all background deliveries', async () => {
+    sendToken.mockImplementation(() => new Promise(() => undefined));
+    await Promise.all(
+      Array.from({ length: 20 }, () => recovery.sendVerification(account)),
+    );
+    await jest.advanceTimersByTimeAsync(0);
+    expect(sendToken).toHaveBeenCalledTimes(4);
+    await expect(recovery.sendVerification(account)).resolves.toBeUndefined();
+    expect(sendToken).toHaveBeenCalledTimes(4);
+  });
 });

@@ -5,6 +5,10 @@ import { ConfigService } from '@nestjs/config';
 import type { Request } from 'express';
 import { resolveJwtSecret } from '../helpers/auth-config.js';
 import { AUTH_COOKIE_NAME } from '../constants/auth-validation.constants.js';
+import {
+  AUTH_JWT_ISSUER,
+  AUTH_JWT_AUDIENCE,
+} from '../constants/auth-validation.constants.js';
 import { AuthSessionService } from '../services/auth-session.service.js';
 
 const cookieOrHeaderExtractor = (req: Request): string | null => {
@@ -30,6 +34,9 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       jwtFromRequest: cookieOrHeaderExtractor,
       ignoreExpiration: false,
       secretOrKey: resolveJwtSecret(configService),
+      algorithms: ['HS256'],
+      issuer: AUTH_JWT_ISSUER,
+      audience: AUTH_JWT_AUDIENCE,
     });
   }
 

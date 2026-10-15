@@ -29,10 +29,10 @@ Workflow chạy khi push hoặc pull request:
 
 1. Cài Node theo `.nvmrc` và `npm ci`.
 2. Generate Prisma client với `DATABASE_URL` placeholder.
-3. Chạy `npm run lint`, `npm test`, kiểm tra HTTP/frontend auth và tiền kiểm điện thoại với dữ liệu giả lập. Test migration PostgreSQL bị skip khi chưa có DB test được chỉ định.
+3. Tạo service PostgreSQL/Redis disposable, migrate DB riêng `auth_security_test`; `AUTH_SECURITY_REQUIRE_STORAGE=true` buộc storage suite không được bỏ qua vì thiếu URL. Chạy `npm audit --audit-level=high`, focused source security gate, lint, unit/storage và HTTP/frontend auth checks. Local không có URL test vẫn skip storage; phải báo riêng.
 4. Build API và frontend.
 
-Workflow này không khởi động database, không chứng minh runtime DB/payment/provider hoạt động và không deploy ứng dụng. Docker Compose chỉ khai báo PostgreSQL 16 và Redis 7 local.
+Workflow không deploy ứng dụng và không chứng minh DB ứng dụng/payment/provider hoạt động. URLs chỉ trỏ service containers CI; không fallback sang DATABASE_URL ứng dụng trong storage suite. Frontend build CI dùng HTTPS API placeholder, không chứng minh topology production. Actions checkout/setup-node được pin SHA; pin phải được xác minh với repository chính thức khi cập nhật. Scan errors/findings không được coi là clean. Dependency high chưa xử lý sẽ làm gate fail theo chủ đích.
 
 ## Pre-flight cho thay đổi
 

@@ -141,4 +141,26 @@ describe('Auth rate limits', () => {
       service.check('login', request('ip'), response as unknown as Response),
     ).rejects.toBeInstanceOf(ServiceUnavailableException);
   });
+  it('suppresses recipients before global quota and fails closed on malformed admission', async () => {
+    evaluate.mockResolvedValueOnce(0);
+    await expect(
+      service.reserveRecipient(' PRIVATE@example.com ', 'reset-password'),
+    ).resolves.toBe(false);
+    expect(evaluate).toHaveBeenCalledTimes(1);
+    expect(JSON.stringify(evaluate.mock.calls)).not.toContain(
+      'PRIVATE@example.com',
+    );
+    evaluate.mockResolvedValueOnce(1).mockResolvedValueOnce([1, 3600]);
+    await expect(
+      service.reserveRecipient('private@example.com', 'reset-password'),
+    ).resolves.toBe(true);
+    evaluate.mockResolvedValueOnce(1).mockResolvedValueOnce([61, 3600]);
+    await expect(
+      service.reserveRecipient('other@example.com', 'reset-password'),
+    ).resolves.toBe(false);
+    evaluate.mockResolvedValueOnce(null);
+    await expect(
+      service.reserveRecipient('other@example.com', 'reset-password'),
+    ).rejects.toBeInstanceOf(ServiceUnavailableException);
+  });
 });

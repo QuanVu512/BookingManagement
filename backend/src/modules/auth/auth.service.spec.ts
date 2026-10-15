@@ -1,3 +1,13 @@
+import 'reflect-metadata';
+import { SessionTokenSigner } from './ports/session-token-signer.js';
+import { JwtSessionTokenSigner } from './infrastructure/jwt-session-token-signer.js';
+import { AccountStore } from './ports/account-store.js';
+import { PrismaAccountStore } from './infrastructure/prisma-account-store.js';
+import { PasswordHasher } from './ports/password-hasher.js';
+import { ArgonPasswordHasher } from './infrastructure/argon-password-hasher.js';
+import { AuthCsrfService } from './services/auth-csrf.service.js';
+import { AuthCookiePresenter } from './presentation/auth-cookie.presenter.js';
+import { AuthController } from './auth.controller.js';
 import { AuthRecoveryService } from './services/auth-recovery.service.js';
 import { CompromisedPasswordService } from './services/compromised-password.service.js';
 import {
@@ -57,7 +67,7 @@ describe('AuthService.login', () => {
     get: jest.fn<(...args: unknown[]) => unknown>(),
   };
 
-  let service: AuthService;
+  let service: AuthController;
 
   beforeEach(async () => {
     jest.clearAllMocks();
@@ -70,6 +80,7 @@ describe('AuthService.login', () => {
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
+        { provide: AuthCsrfService, useValue: {} },
         {
           provide: AuthRecoveryService,
           useValue: { sendVerification: async () => undefined },
@@ -79,6 +90,10 @@ describe('AuthService.login', () => {
           useValue: { assertAllowed: async () => undefined },
         },
         AuthService,
+        { provide: SessionTokenSigner, useClass: JwtSessionTokenSigner },
+        { provide: AccountStore, useClass: PrismaAccountStore },
+        { provide: PasswordHasher, useClass: ArgonPasswordHasher },
+        AuthCookiePresenter,
         { provide: AuthSessionService, useValue: sessionsMock },
         { provide: PrismaService, useValue: prismaMock },
         { provide: JwtService, useValue: jwtServiceMock },
@@ -86,7 +101,12 @@ describe('AuthService.login', () => {
       ],
     }).compile();
 
-    service = module.get<AuthService>(AuthService);
+    service = new AuthController(
+      module.get(AuthService),
+      module.get(AuthCsrfService),
+      module.get(AuthRecoveryService),
+      module.get(AuthCookiePresenter),
+    );
   });
 
   afterEach(() => {
@@ -163,7 +183,7 @@ describe('AuthService.login', () => {
     });
   });
 
-  it('rejects an unknown account without checking a password or issuing a token', async () => {
+  it('verifies a dummy hash for an unknown account without issuing a token', async () => {
     prismaMock.user.findFirst.mockResolvedValue(null);
     const verifyPassword = jest.spyOn(argon, 'verify');
 
@@ -174,7 +194,7 @@ describe('AuthService.login', () => {
       ),
     ).rejects.toBeInstanceOf(UnauthorizedException);
 
-    expect(verifyPassword).not.toHaveBeenCalled();
+    expect(verifyPassword).toHaveBeenCalledTimes(1);
     expect(jwtServiceMock.signAsync).not.toHaveBeenCalled();
   });
 
@@ -314,6 +334,10 @@ describe('AuthService.login', () => {
 });
 
 describe('AuthService.register', () => {
+  const register = (
+    input: Parameters<AuthService['register']>[0],
+    _response: Response,
+  ) => service.register(input);
   const prismaMock = {
     user: {
       findFirst: jest.fn<(...args: unknown[]) => Promise<unknown>>(),
@@ -333,7 +357,7 @@ describe('AuthService.register', () => {
     signAsync: jest.fn<(...args: unknown[]) => Promise<string>>(),
   };
   const configServiceMock = { get: jest.fn<(...args: unknown[]) => unknown>() };
-  let service: AuthService;
+  let service: AuthController;
 
   afterEach(() => jest.restoreAllMocks());
 
@@ -348,6 +372,7 @@ describe('AuthService.register', () => {
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
+        { provide: AuthCsrfService, useValue: {} },
         {
           provide: AuthRecoveryService,
           useValue: { sendVerification: async () => undefined },
@@ -357,6 +382,10 @@ describe('AuthService.register', () => {
           useValue: { assertAllowed: async () => undefined },
         },
         AuthService,
+        { provide: SessionTokenSigner, useClass: JwtSessionTokenSigner },
+        { provide: AccountStore, useClass: PrismaAccountStore },
+        { provide: PasswordHasher, useClass: ArgonPasswordHasher },
+        AuthCookiePresenter,
         { provide: AuthSessionService, useValue: sessionsMock },
         { provide: PrismaService, useValue: prismaMock },
         { provide: JwtService, useValue: jwtServiceMock },
@@ -364,12 +393,17 @@ describe('AuthService.register', () => {
       ],
     }).compile();
 
-    service = module.get<AuthService>(AuthService);
+    service = new AuthController(
+      module.get(AuthService),
+      module.get(AuthCsrfService),
+      module.get(AuthRecoveryService),
+      module.get(AuthCookiePresenter),
+    );
   });
 
   it('requires username, password, full name, email, and phone', async () => {
     await expect(
-      service.register(
+      register(
         {
           username: 'customer',
           password: 'test password phrase',
@@ -393,7 +427,7 @@ describe('AuthService.register', () => {
     jest.spyOn(argon, 'hash').mockResolvedValue('hashed-password');
     jwtServiceMock.signAsync.mockResolvedValue('signed-token');
 
-    await service.register(
+    await register(
       {
         username: ' customer ',
         password: 'test password phrase',
@@ -430,7 +464,7 @@ describe('AuthService.register', () => {
 
   it('rejects a mismatch even when the service is called without the HTTP pipe', async () => {
     await expect(
-      service.register(
+      register(
         {
           username: 'customer',
           password: 'SecretPhrase1!',
@@ -446,7 +480,7 @@ describe('AuthService.register', () => {
     expect(prismaMock.$transaction).not.toHaveBeenCalled();
   });
 
-  it('maps a concurrent unique violation to conflict without issuing a token', async () => {
+  it('maps a concurrent private identifier conflict to generic response without issuing a token', async () => {
     prismaMock.user.findFirst.mockResolvedValue(null);
     jest.spyOn(argon, 'hash').mockResolvedValue('hashed-password');
     prismaMock.$transaction.mockRejectedValue(
@@ -457,7 +491,7 @@ describe('AuthService.register', () => {
       }),
     );
     await expect(
-      service.register(
+      register(
         {
           username: 'customer',
           password: 'SecretPhrase1!',
@@ -468,7 +502,10 @@ describe('AuthService.register', () => {
         },
         createResponseMock(),
       ),
-    ).rejects.toBeInstanceOf(ConflictException);
+    ).resolves.toMatchObject({
+      success: true,
+      status: 'verification_required',
+    });
     expect(jwtServiceMock.signAsync).not.toHaveBeenCalled();
   });
 
@@ -492,19 +529,25 @@ describe('AuthService.register', () => {
         id: 'existing-user',
         ...existingUser,
       });
-      await expect(
-        service.register(
-          {
-            username: 'customer',
-            password: 'test password phrase',
-            confirmPassword: 'test password phrase',
-            fullName: 'Test',
-            email: 'customer@example.com',
-            phone: '0900000000',
-          },
-          createResponseMock(),
-        ),
-      ).rejects.toBeInstanceOf(ConflictException);
+      jest.spyOn(argon, 'hash').mockResolvedValue('hashed-password');
+      const result = register(
+        {
+          username: 'customer',
+          password: 'test password phrase',
+          confirmPassword: 'test password phrase',
+          fullName: 'Test',
+          email: 'customer@example.com',
+          phone: '0900000000',
+        },
+        createResponseMock(),
+      );
+      if (_field === 'username')
+        await expect(result).rejects.toBeInstanceOf(ConflictException);
+      else
+        await expect(result).resolves.toMatchObject({
+          success: true,
+          status: 'verification_required',
+        });
       expect(prismaMock.$transaction).not.toHaveBeenCalled();
     },
   );
@@ -520,12 +563,13 @@ describe('AuthService.getMe and logout', () => {
     signAsync: jest.fn<(...args: unknown[]) => Promise<string>>(),
   };
   const configServiceMock = { get: jest.fn<(...args: unknown[]) => unknown>() };
-  let service: AuthService;
+  let service: AuthController;
 
   beforeEach(async () => {
     prismaMock.user.findUnique.mockReset();
     const module: TestingModule = await Test.createTestingModule({
       providers: [
+        { provide: AuthCsrfService, useValue: {} },
         {
           provide: AuthRecoveryService,
           useValue: { sendVerification: async () => undefined },
@@ -535,13 +579,22 @@ describe('AuthService.getMe and logout', () => {
           useValue: { assertAllowed: async () => undefined },
         },
         AuthService,
+        { provide: SessionTokenSigner, useClass: JwtSessionTokenSigner },
+        { provide: AccountStore, useClass: PrismaAccountStore },
+        { provide: PasswordHasher, useClass: ArgonPasswordHasher },
+        AuthCookiePresenter,
         { provide: AuthSessionService, useValue: sessionsMock },
         { provide: PrismaService, useValue: prismaMock },
         { provide: JwtService, useValue: jwtServiceMock },
         { provide: ConfigService, useValue: configServiceMock },
       ],
     }).compile();
-    service = module.get<AuthService>(AuthService);
+    service = new AuthController(
+      module.get(AuthService),
+      module.get(AuthCsrfService),
+      module.get(AuthRecoveryService),
+      module.get(AuthCookiePresenter),
+    );
   });
 
   it('returns the active session with required account fields and resolved roles', async () => {
