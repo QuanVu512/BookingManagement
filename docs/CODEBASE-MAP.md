@@ -52,7 +52,7 @@ booking-project/
 | Đăng nhập/JWT               | `backend/src/modules/auth/`                                            | Controller và service có luồng login/register/me/logout; xem [SECURITY.md](SECURITY.md) |
 | Hồ sơ người dùng            | `backend/src/modules/users/`                                           | Module còn scaffold; xem [BACKEND-ARCHITECTURE.md](BACKEND-ARCHITECTURE.md)             |
 | Danh sách sân               | `backend/src/modules/courts/`                                          | Có endpoint public; UI ở `frontend/app/page.tsx`                                        |
-| Đặt sân/giữ chỗ             | `backend/src/modules/bookings/`, schema `Booking` và `CourtOccupancy`  | Module backend chưa có workflow; xem [WORKFLOWS.md](WORKFLOWS.md)                       |
+| Đặt sân/giữ chỗ             | `backend/src/modules/bookings/`, schema `Booking` và `CourtOccupancy`  | HOLDING/expiry/cancel đã có; xem [BOOKING-MVP.md](BOOKING-MVP.md)                       |
 | Thanh toán/hoàn tiền        | `backend/src/modules/payments/`, schema `Payment*` và `Refund*`        | Module chưa có workflow                                                                 |
 | Check-in                    | `backend/src/modules/check-in/` và schema `BookingCheckin`             | Module chưa có workflow                                                                 |
 | Giao diện đăng nhập/đăng ký | `frontend/components/auth/`, `frontend/context/auth-context.tsx`       | Client gọi Nest API qua `NEXT_PUBLIC_API_URL`                                           |

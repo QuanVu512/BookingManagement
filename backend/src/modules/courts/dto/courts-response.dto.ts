@@ -2,8 +2,14 @@ import { ApiProperty } from '@nestjs/swagger';
 import { CourtStatus, CourtType } from '../../../enums/index.js';
 
 export class PublicCourtDto {
-  @ApiProperty({ description: 'UUID sân hoặc ID của danh mục mẫu' })
+  @ApiProperty({ description: 'UUID sân từ database' })
   id!: string;
+
+  @ApiProperty() timezone!: string;
+  @ApiProperty() branchName!: string;
+  @ApiProperty() address!: string;
+  @ApiProperty({ type: 'integer' }) cleanupMinutes!: number;
+  @ApiProperty() priceLabel!: string;
 
   @ApiProperty()
   name!: string;
@@ -23,7 +29,10 @@ export class PublicCourtDto {
   @ApiProperty({ type: [String] })
   features!: string[];
 
-  @ApiProperty({ description: 'Giá mỗi giờ, đơn vị VND' })
+  @ApiProperty({
+    description:
+      'Giá từ trong ngày (VND/giờ), 0 = chưa có giá. Báo giá chính xác qua availability.',
+  })
   pricePerHour!: number;
 
   @ApiProperty()

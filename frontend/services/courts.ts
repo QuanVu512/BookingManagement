@@ -1,5 +1,4 @@
 import type { CourtItem } from '../types/auth';
-import { FALLBACK_COURTS } from '../data/courts';
 import { API_BASE_URL, READ_REQUEST_TIMEOUT_MS } from '../constants/network';
 
 const COURTS_PATH = '/api/courts';
@@ -8,7 +7,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
 
-function isCourtItem(value: unknown): value is CourtItem {
+export function isCourtItem(value: unknown): value is CourtItem {
   if (!isRecord(value)) return false;
   return (
     ['id', 'name', 'code', 'surfaceType', 'imageUrl'].every(
@@ -29,13 +28,7 @@ function isCourtItem(value: unknown): value is CourtItem {
 export async function loadCourtCatalog(
   signal: AbortSignal,
 ): Promise<CourtItem[]> {
-  try {
-    return await fetchCourtCatalog(signal);
-  } catch (error: unknown) {
-    if (signal.aborted) throw error;
-    console.info('Danh mục sân đang dùng dữ liệu dự phòng.');
-    return FALLBACK_COURTS;
-  }
+  return fetchCourtCatalog(signal);
 }
 
 async function fetchCourtCatalog(signal: AbortSignal): Promise<CourtItem[]> {
@@ -49,6 +42,37 @@ async function fetchCourtCatalog(signal: AbortSignal): Promise<CourtItem[]> {
   const payload: unknown = await response.json();
   if (!isRecord(payload) || !Array.isArray(payload.data))
     throw new Error('Dữ liệu danh mục sân không hợp lệ.');
-  const courts = payload.data.filter(isCourtItem);
-  return courts.length ? courts : FALLBACK_COURTS;
+  if (payload.success !== true || !payload.data.every(isCourtItem))
+    throw new Error('Dữ liệu danh mục sân không hợp lệ.');
+  return payload.data;
+}
+
+export async function loadCourtDetail(
+  id: string,
+  signal: AbortSignal,
+): Promise<CourtItem> {
+  const response = await fetch(
+    `${API_BASE_URL}${COURTS_PATH}/${encodeURIComponent(id)}`,
+    {
+      cache: 'no-store',
+      signal: AbortSignal.any([
+        signal,
+        AbortSignal.timeout(READ_REQUEST_TIMEOUT_MS),
+      ]),
+    },
+  );
+  if (!response.ok)
+    throw new Error(
+      response.status === 404
+        ? 'Không tìm thấy sân đang hoạt động.'
+        : 'Không tải được thông tin sân.',
+    );
+  const payload: unknown = await response.json();
+  if (
+    !isRecord(payload) ||
+    payload.success !== true ||
+    !isCourtItem(payload.data)
+  )
+    throw new Error('Dữ liệu sân không hợp lệ.');
+  return payload.data;
 }

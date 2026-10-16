@@ -18,15 +18,15 @@ HTTP Controller → Service/use case → PrismaService → PostgreSQL
 
 ## Module
 
-| Module          | Trạng thái trong source                                                            |
-| --------------- | ---------------------------------------------------------------------------------- |
-| `auth`          | Controller/service login, register, session lookup, logout; JWT strategy và guards |
-| `users`         | Scaffold controller/service; chức năng còn hạn chế                                 |
-| `courts`        | Endpoint đọc danh sách sân và service Prisma/fallback                              |
-| `bookings`      | Module boundary rỗng; chưa có booking workflow                                     |
-| `payments`      | Module boundary rỗng; chưa có provider/webhook/refund workflow                     |
-| `check-in`      | Module boundary rỗng; chưa có check-in workflow                                    |
-| `notifications` | Realtime gateway/module; chưa có pipeline gửi email hoàn chỉnh                     |
+| Module          | Trạng thái trong source                                                                  |
+| --------------- | ---------------------------------------------------------------------------------------- |
+| `auth`          | Controller/service login, register, session lookup, logout; JWT strategy và guards       |
+| `users`         | Scaffold controller/service; chức năng còn hạn chế                                       |
+| `courts`        | Danh sách/chi tiết ACTIVE, giá từ PriceRule, availability theo khoảng có buffer          |
+| `bookings`      | HOLDING 5 phút, lazy expiry, idempotency, list/cancel theo owner; transaction PostgreSQL |
+| `payments`      | Module boundary rỗng; chưa có provider/webhook/refund workflow                           |
+| `check-in`      | Module boundary rỗng; chưa có check-in workflow                                          |
+| `notifications` | Realtime gateway/module; chưa có pipeline gửi email hoàn chỉnh                           |
 
 ## Hạ tầng
 
@@ -41,4 +41,4 @@ Redis/BullMQ/Socket.IO có mặt trong scaffold nhưng không đồng nghĩa đ�
 
 Giữ thao tác booking, occupancy và các dòng lịch sử liên quan nhất quán bằng transaction DB; constraint SQL là lớp bảo vệ concurrency bổ sung. Redis lock không thay thế exclusion constraint/transaction. DB transaction không thể atomic với ngân hàng hay Redis; thiết kế tích hợp cần idempotency, outbox và đối soát.
 
-Contract model và SQL constraint được tóm tắt trong [DATABASE.md](DATABASE.md). Các workflow vẫn chưa triển khai được liệt kê ở [WORKFLOWS.md](WORKFLOWS.md).
+Contract model và SQL constraint được tóm tắt trong [DATABASE.md](DATABASE.md). [BOOKING-MVP.md](BOOKING-MVP.md) mô tả API giữ chỗ đã triển khai; [WORKFLOWS.md](WORKFLOWS.md) phân biệt phần này với thiết kế payment/check-in còn thiếu.

@@ -32,6 +32,9 @@ jobs:
       AUTH_SECURITY_DATABASE_TEST_URL: postgresql://auth_test:disposable_test_only@127.0.0.1:5432/auth_security_test
       AUTH_SECURITY_REDIS_TEST_URL: redis://127.0.0.1:6379
       AUTH_SECURITY_REQUIRE_STORAGE: 'true'
+      BOOKING_DATABASE_TEST_URL: postgresql://auth_test:disposable_test_only@127.0.0.1:5432/booking_mvp_test
+      BOOKING_REDIS_TEST_URL: redis://127.0.0.1:6379
+      BOOKING_REQUIRE_STORAGE: 'true'
       NEXT_PUBLIC_API_URL: https://api.example.test
     steps:
       - name: Check out source
@@ -50,6 +53,15 @@ jobs:
         run: npm run prisma:generate
       - name: Migrate disposable auth test database
         run: npm run prisma:migrate:deploy
+
+      - name: Create and migrate isolated booking test database
+        run: |
+          psql "$DATABASE_URL" -c 'CREATE DATABASE booking_mvp_test'
+          DATABASE_URL="$BOOKING_DATABASE_TEST_URL" npm run prisma:migrate:deploy
+      - name: Booking PostgreSQL integration (UTC runner)
+        run: |
+          TZ=UTC npm run test:booking:integration
+          TZ=UTC npm run test:booking:ui
 
       - name: Dependency and focused source security gates
         run: |

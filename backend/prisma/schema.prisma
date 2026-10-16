@@ -452,7 +452,7 @@ model Booking {
   /// Nhân viên tạo tại quầy, nếu có
   createdByUserId String? @map("created_by_user_id") @db.Uuid
   /// Tránh tạo hai đơn do gửi lại request
-  idempotencyKey String @unique(map: "bookings_idempotency_key_key") @map("idempotency_key") @db.VarChar(100)
+  idempotencyKey String @map("idempotency_key") @db.VarChar(100)
   /// Kiểm soát sửa trạng thái đồng thời
   version Int @default(0) @map("version")
   /// Tạo
@@ -474,6 +474,7 @@ model Booking {
   paymentRequests PaymentRequest[] @relation("PaymentRequest_booking")
   notificationDeliveries NotificationDelivery[] @relation("NotificationDelivery_booking")
   @@unique([id, courtId], map: "bookings_id_court_id_key")
+  @@unique([userId, idempotencyKey], map: "bookings_user_id_idempotency_key_key")
   @@index([courtId, startsAt], map: "bookings_court_id_starts_at_idx")
   @@index([userId, createdAt], map: "bookings_user_id_created_at_idx")
   @@index([status, holdExpiresAt], map: "bookings_status_hold_expires_at_idx")

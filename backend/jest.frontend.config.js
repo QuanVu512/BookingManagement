@@ -3,7 +3,7 @@ import base from './jest.config.js';
 export default {
   ...base,
   roots: ['<rootDir>/test'],
-  testMatch: ['**/frontend-auth-rendering.spec.tsx'],
+  testMatch: ['**/frontend-*-rendering.spec.tsx'],
   extensionsToTreatAsEsm: ['.ts', '.tsx'],
   transform: {
     '^.+\\.tsx?$': [

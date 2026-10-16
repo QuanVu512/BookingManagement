@@ -107,7 +107,7 @@ async function mutate(endpoint: string, payload: unknown): Promise<unknown> {
   }
 }
 
-async function csrfToken(signal: AbortSignal): Promise<string> {
+export async function csrfToken(signal: AbortSignal): Promise<string> {
   const csrf = await readResponse(
     await fetch(`${API_BASE_URL}/api/auth/csrf`, {
       credentials: 'include',

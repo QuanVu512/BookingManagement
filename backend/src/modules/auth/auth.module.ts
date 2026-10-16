@@ -62,6 +62,14 @@ import { AuthCsrfGuard } from './guards/auth-csrf.guard.js';
     AuthCsrfService,
     AuthCsrfGuard,
   ],
-  exports: [PassportModule, JwtModule, AuthService, JwtAuthGuard, RolesGuard],
+  exports: [
+    PassportModule,
+    JwtModule,
+    AuthService,
+    JwtAuthGuard,
+    RolesGuard,
+    AuthCsrfGuard,
+    AuthCsrfService,
+  ],
 })
 export class AuthModule {}

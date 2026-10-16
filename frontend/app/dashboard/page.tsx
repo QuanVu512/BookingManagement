@@ -173,6 +173,10 @@ export default function DashboardPage() {
       {/* Main Dashboard Content */}
       <main className="container" style={{ padding: '36px 24px' }}>
         {logoutError && <p role="alert">{logoutError}</p>}
+        <p role="note" className="badge badge-standard">
+          DEMO / Dữ liệu minh họa — mọi số liệu, booking, email và thanh toán
+          bên dưới là mẫu, chưa kết nối API quản trị.
+        </p>
         {/* Metric Cards Row */}
         <div
           style={{

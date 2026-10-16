@@ -1,134 +1,176 @@
-import { Injectable } from '@nestjs/common';
+﻿import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../infrastructure/prisma/prisma.service.js';
-import type { PublicCourtDto } from './dto/courts-response.dto.js';
+import { Prisma } from '../../generated/prisma/client.js';
+import {
+  applicableRules,
+  localClock,
+  quoteCourt,
+  timeMinute,
+} from './court-pricing.js';
+import { BookingWindowDto } from '../bookings/dto/booking-request.dto.js';
+import { databaseNow, expireHolds } from '../bookings/booking-lifecycle.js';
+import {
+  BOOKING_TRANSACTION_OPTIONS,
+  HOLD_DURATION_MS,
+  MINUTE_MS,
+} from '../bookings/booking.constants.js';
 
-export type PublicCourtItem = PublicCourtDto;
+const courtInclude = {
+  priceRules: true,
+  branch: { include: { businessHours: true } },
+} satisfies Prisma.CourtInclude;
+type ScheduledCourt = Prisma.CourtGetPayload<{ include: typeof courtInclude }>;
 
 @Injectable()
 export class CourtsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async getPublicCourts(): Promise<PublicCourtItem[]> {
-    try {
-      const courts = await this.prisma.court.findMany({
-        where: { status: 'ACTIVE' },
-        include: {
-          priceRules: true,
-          branch: true,
-        },
-      });
-
-      if (courts.length > 0) {
-        return courts.map((court) => ({
-          id: court.id,
-          name: court.name,
-          code: court.code,
-          courtType: court.courtType,
-          status: court.status,
-          surfaceType:
-            court.courtType === 'VIP'
-              ? 'Sân Pickleball trong nhà Cushion Pro'
-              : 'Sân Pickleball trong nhà tiêu chuẩn',
-          features:
-            court.courtType === 'VIP'
-              ? [
-                  'Sân trong nhà mái che cách nhiệt',
-                  'Đèn LED thi đấu 500 Lux',
-                  'Hàng rào lưới ngăn an toàn',
-                  'Khu lounge VIP riêng',
-                ]
-              : [
-                  'Sân trong nhà thoáng mát',
-                  'Mặt sân giảm chấn chống trượt',
-                  'Lưới thi đấu cao cấp',
-                ],
-          pricePerHour: court.courtType === 'VIP' ? 250000 : 160000,
-          imageUrl:
-            court.courtType === 'VIP'
-              ? '/courts/court-1.jpg'
-              : '/courts/court-3.jpg',
-          rating: 0,
-          reviewCount: 0,
-        }));
-      }
-    } catch {
-      // Fallback below if DB is unreachable or unseeded
-    }
-
-    // Curated showcase courts for Sporty E-commerce catalog
-    return [
-      {
-        id: 'court-pro-01',
-        name: 'Center Court Pro 1',
-        code: 'PRO-01',
-        courtType: 'VIP',
-        status: 'ACTIVE',
-        surfaceType: 'Sân Pickleball trong nhà Cushion Pro',
-        features: [
-          'Mái che cách nhiệt tiêu chuẩn',
-          'Đèn LED thi đấu 500 Lux',
-          'Hàng rào lưới ngăn an toàn',
-          'Khu lounge VIP riêng',
-        ],
-        pricePerHour: 280000,
-        imageUrl: '/courts/court-1.jpg',
-        rating: 0,
-        reviewCount: 0,
-      },
-      {
-        id: 'court-pro-02',
-        name: 'Championship Arena 2',
-        code: 'PRO-02',
-        courtType: 'VIP',
-        status: 'ACTIVE',
-        surfaceType: 'Sân Pickleball trong nhà Cushion 5 lớp',
-        features: [
-          'Khán đài mini theo dõi',
-          'Đèn LED chuẩn thi đấu',
-          'Phòng thay đồ nước nóng',
-          'Tủ đồ thông minh',
-        ],
-        pricePerHour: 240000,
-        imageUrl: '/courts/court-2.jpg',
-        rating: 0,
-        reviewCount: 0,
-      },
-      {
-        id: 'court-std-03',
-        name: 'Pickle Standard 3',
-        code: 'STD-03',
-        courtType: 'STANDARD',
-        status: 'ACTIVE',
-        surfaceType: 'Sân Pickleball trong nhà High-Grip',
-        features: [
-          'Mặt sân hai màu chống trơn trượt',
-          'Hệ thống đèn LED siêu sáng',
-          'Trọng tài ghế cao',
-          'Nước uống miễn phí',
-        ],
-        pricePerHour: 170000,
-        imageUrl: '/courts/court-3.jpg',
-        rating: 0,
-        reviewCount: 0,
-      },
-      {
-        id: 'court-std-04',
-        name: 'Dynamic Court 4',
-        code: 'STD-04',
-        courtType: 'STANDARD',
-        status: 'ACTIVE',
-        surfaceType: 'Sân Pickleball trong nhà Elastic Cushion',
-        features: [
-          'Độ nảy bóng ổn định chuẩn thi đấu',
-          'Mái che quạt trần công nghiệp',
-          'Lưới thi đấu cao cấp',
-          'Khu căng cơ khởi động',
-        ],
-        pricePerHour: 160000,
-        imageUrl: '/courts/court-4.jpg',
-        rating: 0,
-        reviewCount: 0,
-      },
-    ];
+  async activeCourt(
+    id: string,
+    database: Prisma.TransactionClient = this.prisma,
+  ) {
+    const court = await database.court.findFirst({
+      where: { id, status: 'ACTIVE', branch: { isActive: true } },
+      include: courtInclude,
+    });
+    if (!court)
+      throw new NotFoundException('Không tìm thấy sân đang hoạt động.');
+    return court;
   }
+
+  async getPublicCourts() {
+    const courts = await this.prisma.court.findMany({
+      where: { status: 'ACTIVE', branch: { isActive: true } },
+      include: courtInclude,
+      orderBy: { code: 'asc' },
+    });
+    return courts.map(presentCourt);
+  }
+
+  async getPublicCourt(id: string) {
+    return presentCourt(await this.activeCourt(id));
+  }
+
+  async availability(id: string, window: BookingWindowDto) {
+    return this.prisma.$transaction(async (transaction) => {
+      const now = await databaseNow(transaction);
+      await expireHolds(transaction, { courtId: id }, now);
+      const court = await this.activeCourt(id, transaction);
+      const startsAt = new Date(window.startsAt);
+      const endsAt = new Date(window.endsAt);
+      const quote = quoteCourt(court, startsAt, endsAt);
+      const occupiedUntil = new Date(
+        endsAt.getTime() + court.cleanupMinutes * MINUTE_MS,
+      );
+      const conflict = await hasOccupancyConflict(
+        transaction,
+        id,
+        startsAt,
+        occupiedUntil,
+      );
+      const tooSoon = startsAt.valueOf() - now.valueOf() < HOLD_DURATION_MS;
+      return presentAvailability(
+        court,
+        quote,
+        now,
+        occupiedUntil,
+        !!conflict,
+        tooSoon,
+      );
+    }, BOOKING_TRANSACTION_OPTIONS);
+  }
+}
+
+async function hasOccupancyConflict(
+  transaction: Prisma.TransactionClient,
+  courtId: string,
+  startsAt: Date,
+  occupiedUntil: Date,
+) {
+  return !!(await transaction.courtOccupancy.findFirst({
+    where: {
+      courtId,
+      state: 'ACTIVE',
+      occupiedFrom: { lt: occupiedUntil },
+      occupiedUntil: { gt: startsAt },
+    },
+    select: { id: true },
+  }));
+}
+
+function startingPrice(court: ScheduledCourt) {
+  const local = localClock(new Date(), court.branch.timezone);
+  const rules = applicableRules(court.priceRules, local.date, local.weekday);
+  const opening = court.branch.businessHours.find(
+    (hour) => hour.dayOfWeek === local.weekday,
+  );
+  if (!opening?.openTime || !opening.closeTime || opening.isClosed) return 0;
+  const prices: number[] = [];
+  for (
+    let minute = timeMinute(opening.openTime);
+    minute < timeMinute(opening.closeTime);
+    minute++
+  ) {
+    const rule = rules.find(
+      (item) =>
+        timeMinute(item.startTime) <= minute &&
+        timeMinute(item.endTime) > minute,
+    );
+    if (rule) prices.push(rule.pricePerHour.toNumber());
+  }
+  return prices.length ? Math.min(...prices) : 0;
+}
+
+function presentCourt(court: ScheduledCourt) {
+  return {
+    id: court.id,
+    name: court.name,
+    code: court.code,
+    courtType: court.courtType,
+    status: court.status,
+    surfaceType:
+      court.courtType === 'VIP'
+        ? 'Sân Pickleball trong nhà Cushion Pro'
+        : 'Sân Pickleball tiêu chuẩn',
+    features: [`Vệ sinh ${court.cleanupMinutes} phút sau lượt chơi`],
+    pricePerHour: startingPrice(court),
+    priceLabel: 'Giá từ trong ngày; giá chính xác theo khoảng đặt',
+    imageUrl:
+      court.courtType === 'VIP' ? '/courts/court-1.jpg' : '/courts/court-3.jpg',
+    rating: 0,
+    reviewCount: 0,
+    timezone: court.branch.timezone,
+    branchName: court.branch.name,
+    address: court.branch.address,
+    cleanupMinutes: court.cleanupMinutes,
+  };
+}
+
+function presentAvailability(
+  court: ScheduledCourt,
+  quote: ReturnType<typeof quoteCourt>,
+  now: Date,
+  occupiedUntil: Date,
+  conflict: boolean,
+  tooSoon: boolean,
+) {
+  return {
+    available: !conflict && !tooSoon,
+    reason: conflict
+      ? 'Khoảng sân đã được giữ, bao gồm thời gian vệ sinh.'
+      : tooSoon
+        ? 'Giờ bắt đầu phải cách hiện tại ít nhất 5 phút.'
+        : null,
+    serverNow: now.toISOString(),
+    timezone: court.branch.timezone,
+    cleanupMinutes: court.cleanupMinutes,
+    occupiedUntil: occupiedUntil.toISOString(),
+    totalAmount: quote.totalAmount.toNumber(),
+    currency: 'VND',
+    priceItems: quote.items.map((item) => ({
+      ...item,
+      pricePerHour: item.pricePerHour.toNumber(),
+      amount: item.amount.toNumber(),
+    })),
+  };
 }

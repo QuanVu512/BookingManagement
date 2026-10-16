@@ -27,7 +27,7 @@
     "test:debug": "node --inspect-brk --experimental-vm-modules ./node_modules/jest/bin/jest.js --config backend/jest.config.js --runInBand",
     "test:e2e": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js --config backend/jest.config.js --runTestsByPath backend/test/app.e2e-spec.ts",
     "test:auth:contract": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js --config backend/jest.config.js --runInBand --runTestsByPath backend/test/validation-response.e2e-spec.ts backend/test/frontend-auth-validation.spec.ts backend/test/frontend-network.spec.ts",
-    "test:auth:ui": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js --config backend/jest.frontend.config.js --runInBand",
+    "test:auth:ui": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js --config backend/jest.frontend.config.js --runInBand --runTestsByPath backend/test/frontend-auth-rendering.spec.tsx",
     "test:auth:phones": "node --test backend/test/auth-phone-migration.test.mjs",
     "prisma:generate": "prisma generate --config backend/prisma.config.ts",
     "prisma:migrate:dev": "prisma migrate dev --config backend/prisma.config.ts",
@@ -37,7 +37,11 @@
     "auth:phones:audit": "node --env-file=.env backend/scripts/audit-auth-phones.mjs",
     "infra:up": "docker compose --env-file .env -f infra/docker-compose.yml up -d postgres redis",
     "infra:down": "docker compose --env-file .env -f infra/docker-compose.yml down",
-    "infra:logs": "docker compose --env-file .env -f infra/docker-compose.yml logs -f"
+    "infra:logs": "docker compose --env-file .env -f infra/docker-compose.yml logs -f",
+    "test:frontend:ui": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js --config backend/jest.frontend.config.js --runInBand",
+    "test:booking:integration": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js --config backend/jest.config.js --runInBand --runTestsByPath backend/test/booking.integration.spec.ts",
+    "test:booking:ui": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js --config backend/jest.frontend.config.js --runInBand --runTestsByPath backend/test/frontend-booking-rendering.spec.tsx",
+    "seed:courts": "node backend/scripts/seed-courts.mjs"
   },
   "dependencies": {
     "@nestjs/bullmq": "~12.0.0",

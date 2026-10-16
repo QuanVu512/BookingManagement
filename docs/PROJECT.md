@@ -4,8 +4,8 @@ Next frontend và Nest modular monolith trong frontend/backend. Một DB Postgre
 
 Đặt khoảng linh hoạt, giữ5phút, khách có tài khoản chọn30%/100%, guest100% có tên/email/điện thoại, buffer vệ sinh tối thiểu15phút không tính phí. Hủy phạt10% tổng giá, phải có quote/consent.
 
-DB models/migration v1 đã tạo; trạng thái apply cần xem ở DB đích; workflows booking, payment, webhook, refund, email, check-in chưa implement. Trạng thái auth và API hiện có theo [BACKEND-ARCHITECTURE.md](BACKEND-ARCHITECTURE.md) và [SECURITY.md](SECURITY.md). Redis/BullMQ/Socket.IO chỉ plumbing.
+DB models/migrations đã tạo; trạng thái apply cần xem ở DB đích. [Booking MVP](BOOKING-MVP.md) đã có giữ chỗ HOLDING 5 phút, giá snapshot theo phút, expiry và hủy giữ chỗ trước starts_at/chưa check-in. Payment, webhook, refund, guest và check-in chưa implement. Trạng thái auth/email recovery theo [SECURITY.md](SECURITY.md). Core booking không dùng Redis lock/queue.
 
-OPEN: mốc hủy trước start hay trước check-in; check-in sớm/muộn và yêu cầu trả đủ; sân chủ động hủy/no-show/đổi lịch; rounding; merchant payout/phí/deadline hoàn; email provider. Không tự biến điểm mở thành hành vi.
+OPEN cho giai đoạn có thanh toán: mốc hủy CONFIRMED trước start hay trước check-in; check-in sớm/muộn và yêu cầu trả đủ; sân chủ động hủy/no-show/đổi lịch; rounding prepayment/phạt/refund; merchant payout/phí/deadline hoàn; email provider. MVP giữ chỗ đã chọn HALF_UP từng dòng VND rồi cộng tổng và chỉ hủy HOLDING trước start/chưa check-in theo plan đã được giao.
 
 Đọc ARCHITECTURE.md, DATABASE-DESIGN.md, TECH-STACK.md và OPERATIONS.md. Học liệu nằm trong guide/. Roadmap không tự cấp quyền implementation.

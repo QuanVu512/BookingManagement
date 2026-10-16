@@ -1,6 +1,6 @@
 # Quy trình nghiệp vụ và state machine
 
-Đây là tóm tắt thiết kế nghiệp vụ/schema. Module booking, payment và check-in hiện chưa có workflow backend; các trạng thái dưới đây không có nghĩa app đã thực thi chúng.
+Booking MVP đã triển khai HOLDING 5 phút, lazy expiry và hủy giữ chỗ chưa thanh toán theo owner, trước giờ bắt đầu và chưa check-in. Giá làm tròn từng dòng đến 1 VND rồi cộng tổng. Chi tiết tại [BOOKING-MVP.md](BOOKING-MVP.md). Payment/refund/check-in/guest và CONFIRMED vẫn là thiết kế; sơ đồ dưới đây không chứng minh các luồng đó đã được thực thi.
 
 ## Đặt sân và giữ lịch
 
@@ -28,7 +28,7 @@ Khi hủy hoặc hết hạn, thiết kế yêu cầu occupancy được giải 
 
 Thiết kế hiện chọn phí hủy khách bằng 10% tổng giá booking, hoàn phần tiền thực nhận còn lại; khách phải thấy quote và đồng ý trước khi áp dụng. `BookingCancellationRequest` theo dõi quote/consent, còn `RefundRequest` và `RefundAttempt` theo dõi nghĩa vụ và từng lần hoàn. Booking `CANCELLED` không đồng nghĩa tiền đã hoàn.
 
-Mốc hủy còn **OPEN**: trước giờ bắt đầu hay trước check-in. Cũng còn mở việc sân chủ động hủy, no-show, đổi lịch, check-in sớm/muộn, rounding và thời hạn/phí hoàn. Không suy diễn các quyết định này từ enum hoặc phần trăm mặc định.
+MVP chỉ hủy HOLDING trước giờ bắt đầu, chưa check-in và không thu phí vì chưa thu tiền. Với booking đã thanh toán/CONFIRMED, mốc hủy, sân chủ động hủy, no-show, đổi lịch, check-in sớm/muộn và rounding/thời hạn/phí hoàn vẫn **OPEN**. Không áp contract giữ chỗ này cho refund.
 
 ## Thanh toán và check-in
 

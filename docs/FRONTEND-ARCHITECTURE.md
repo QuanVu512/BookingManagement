@@ -34,11 +34,11 @@ URL lấy từ `NEXT_PUBLIC_API_URL`; dev/test mặc định `http://localhost:4
 
 Next config đặt nosniff/frame deny/no-referrer và CSP Report-Only với API origin tường minh. Chưa enforce CSP cho inline Next hydration/styles; cần browser evidence và nonce/hash trước rollout enforce. Không bật unsafe-eval production.
 
-Trang chính gọi `GET /api/courts`; backend hiện có fallback dữ liệu showcase khi query DB thất bại hoặc chưa có sân. Không xem fallback/UI là dữ liệu persistence đã xác nhận.
+Trang chính gọi `GET /api/courts`; không dùng fallback showcase. API lỗi hiển thị lỗi/thử lại, API trả `[]` hiển thị trống. Dữ liệu mẫu chỉ còn dùng trong pilot/fixture không được nối với luồng MVP chính.
 
-Mốc auth mặc định tắt link chi tiết sân bằng `NEXT_PUBLIC_COURT_DETAILS_ENABLED`. Chỉ bật giá trị `true` khi route `/courts/[courtId]` đã có trong bản phát hành; khi tắt, catalog dùng nút disabled với nhãn chức năng sắp ra mắt.
+Booking MVP bật link `/courts/[courtId]` mặc định; `NEXT_PUBLIC_COURT_DETAILS_ENABLED=false` tắt entry. Trang chi tiết dùng `useLiveBooking`/service booking cho quote/create, `/bookings` dùng `useMyBookings` để xem/hủy/reload/reconnect. Server quyết định giá, thời hạn và trạng thái. Không có thanh toán/CONFIRMED trong flow này.
 
-Trang chính hiển thị danh mục dự phòng từ đầu, sau đó dùng `loadCourtCatalog` để cập nhật dữ liệu API. Session lookup và catalog dùng deadline 1.200 ms; khi lỗi mạng/HTTP hoặc hết hạn, frontend kết thúc loading session ở trạng thái chưa đăng nhập và dùng catalog dự phòng. Caller có thể hủy request khi unmount. Session lookup cũ không ghi đè kết quả login/register/logout mới.
+Trang chính bắt đầu với danh sách trống/loading rồi tải `loadCourtCatalog`. Session lookup và catalog dùng deadline 1.200 ms; lỗi catalog được báo ra UI. Lỗi session khác 401 giữ trạng thái unknown theo SECURITY. Caller hủy request khi unmount; response cũ không ghi đè phiên mới. Mutation booking không tự retry; client giữ key khi kết quả không rõ và gửi lại cùng thông tin sau khi kiểm tra lịch.
 
 Catalog dùng `next/image` với `fill`, `sizes` và lazy loading mặc định. Hover/focus của card/ảnh dùng CSS, tắt chuyển động khi `prefers-reduced-motion: reduce`. Script `web:dev` chỉ định `--turbopack` và port 4001; không coi flag này là bằng chứng tăng tốc vì Next.js 16 đã mặc định dùng Turbopack.
 

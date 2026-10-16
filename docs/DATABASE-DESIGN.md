@@ -193,40 +193,40 @@ CHECK end_time > start_time, effective_to NULL hoặc >= effective_from. Không 
 
 ### bookings — đơn đặt sân, bao gồm khách vãng lai
 
-| Tên cột                      | Kiểu PostgreSQL          | Ràng buộc                   | Ý nghĩa                                                                |
-| ---------------------------- | ------------------------ | --------------------------- | ---------------------------------------------------------------------- |
-| id                           | UUID                     | PK                          | ID booking                                                             |
-| booking_code                 | VARCHAR(32)              | NN, UQ                      | Mã đơn hiển thị, không phải token truy cập                             |
-| user_id                      | UUID                     | NULL, FK → users.id         | NULL = khách vãng lai                                                  |
-| branch_id                    | UUID                     | NN, FK → branches.id        | Chi nhánh; hiện một giá trị                                            |
-| court_id                     | UUID                     | NN, FK → courts.id          | Sân đã chọn                                                            |
-| source                       | booking_source (ENUM)    | NN                          | CUSTOMER_WEB, STAFF_COUNTER                                            |
-| customer_name                | VARCHAR(150)             | NN                          | Snapshot tên người đặt                                                 |
-| customer_email               | VARCHAR(254)             | NN                          | Snapshot email gửi thông báo/check-in                                  |
-| customer_phone               | VARCHAR(20)              | NN                          | Snapshot điện thoại liên hệ                                            |
-| starts_at                    | TIMESTAMPTZ              | NN                          | Bắt đầu chơi                                                           |
-| ends_at                      | TIMESTAMPTZ              | NN                          | Kết thúc chơi                                                          |
-| cleanup_minutes              | SMALLINT                 | NN, DEFAULT 15, CHECK >= 15 | Snapshot khoảng vệ sinh tại lúc đặt                                    |
-| total_amount                 | NUMERIC(14,0)            | NN, CHECK > 0               | Tổng giá sân đã chốt                                                   |
-| prepayment_percent           | NUMERIC(5,2)             | NN                          | 30.00 hoặc 100.00                                                      |
-| required_prepayment_amount   | NUMERIC(14,0)            | NN, CHECK > 0               | Khoản cần nhận để xác nhận booking                                     |
-| currency                     | CHAR(3)                  | NN, DEFAULT VND             | Đồng tiền                                                              |
-| status                       | booking_status (ENUM)    | NN, DEFAULT HOLDING         | HOLDING, CONFIRMED, CHECKED_IN, COMPLETED, EXPIRED, CANCELLED, NO_SHOW |
-| hold_expires_at              | TIMESTAMPTZ              | NN                          | Deadline thanh toán khoản trả trước, giữ để audit kể cả đã xác nhận    |
-| confirmed_at                 | TIMESTAMPTZ              | NULL                        | Thời điểm xác nhận booking                                             |
-| cancellation_rule            | cancellation_rule (ENUM) | NN                          | BEFORE_START hoặc BEFORE_CHECKIN; giá trị còn cần chốt                 |
-| cancellation_deadline_at     | TIMESTAMPTZ              | NULL có điều kiện           | starts_at cho BEFORE_START; NULL nếu chỉ giới hạn bởi check-in         |
-| cancellation_penalty_percent | NUMERIC(5,2)             | NN, DEFAULT 10.00           | Snapshot phí hủy/tổng giá sân                                          |
-| policy_version               | VARCHAR(30)              | NN                          | Phiên bản điều khoản đã chốt                                           |
-| policy_accepted_at           | TIMESTAMPTZ              | NN                          | Khách đồng ý điều khoản khi đặt                                        |
-| cancelled_at                 | TIMESTAMPTZ              | NULL                        | Thời điểm hủy thực tế                                                  |
-| cancelled_by_user_id         | UUID                     | NULL, FK → users.id         | NULL cho guest/hệ thống; đối chiếu actor_type trong lịch sử            |
-| cancellation_reason          | TEXT                     | NULL                        | Lý do hủy                                                              |
-| created_by_user_id           | UUID                     | NULL, FK → users.id         | Nhân viên tạo tại quầy, nếu có                                         |
-| idempotency_key              | VARCHAR(100)             | NN, UQ                      | Tránh tạo hai đơn do gửi lại request                                   |
-| version                      | INTEGER                  | NN, DEFAULT 0, CHECK >= 0   | Kiểm soát sửa trạng thái đồng thời                                     |
-| created_at                   | TIMESTAMPTZ              | NN, DEFAULT NOW()           | Tạo                                                                    |
-| updated_at                   | TIMESTAMPTZ              | NN, DEFAULT NOW()           | Cập nhật                                                               |
+| Tên cột                      | Kiểu PostgreSQL          | Ràng buộc                              | Ý nghĩa                                                                    |
+| ---------------------------- | ------------------------ | -------------------------------------- | -------------------------------------------------------------------------- |
+| id                           | UUID                     | PK                                     | ID booking                                                                 |
+| booking_code                 | VARCHAR(32)              | NN, UQ                                 | Mã đơn hiển thị, không phải token truy cập                                 |
+| user_id                      | UUID                     | NULL, FK → users.id                    | NULL = khách vãng lai                                                      |
+| branch_id                    | UUID                     | NN, FK → branches.id                   | Chi nhánh; hiện một giá trị                                                |
+| court_id                     | UUID                     | NN, FK → courts.id                     | Sân đã chọn                                                                |
+| source                       | booking_source (ENUM)    | NN                                     | CUSTOMER_WEB, STAFF_COUNTER                                                |
+| customer_name                | VARCHAR(150)             | NN                                     | Snapshot tên người đặt                                                     |
+| customer_email               | VARCHAR(254)             | NN                                     | Snapshot email gửi thông báo/check-in                                      |
+| customer_phone               | VARCHAR(20)              | NN                                     | Snapshot điện thoại liên hệ                                                |
+| starts_at                    | TIMESTAMPTZ              | NN                                     | Bắt đầu chơi                                                               |
+| ends_at                      | TIMESTAMPTZ              | NN                                     | Kết thúc chơi                                                              |
+| cleanup_minutes              | SMALLINT                 | NN, DEFAULT 15, CHECK >= 15            | Snapshot khoảng vệ sinh tại lúc đặt                                        |
+| total_amount                 | NUMERIC(14,0)            | NN, CHECK > 0                          | Tổng giá sân đã chốt                                                       |
+| prepayment_percent           | NUMERIC(5,2)             | NN                                     | 30.00 hoặc 100.00                                                          |
+| required_prepayment_amount   | NUMERIC(14,0)            | NN, CHECK > 0                          | Khoản cần nhận để xác nhận booking                                         |
+| currency                     | CHAR(3)                  | NN, DEFAULT VND                        | Đồng tiền                                                                  |
+| status                       | booking_status (ENUM)    | NN, DEFAULT HOLDING                    | HOLDING, CONFIRMED, CHECKED_IN, COMPLETED, EXPIRED, CANCELLED, NO_SHOW     |
+| hold_expires_at              | TIMESTAMPTZ              | NN                                     | Deadline thanh toán khoản trả trước, giữ để audit kể cả đã xác nhận        |
+| confirmed_at                 | TIMESTAMPTZ              | NULL                                   | Thời điểm xác nhận booking                                                 |
+| cancellation_rule            | cancellation_rule (ENUM) | NN                                     | BEFORE_START hoặc BEFORE_CHECKIN; giá trị còn cần chốt                     |
+| cancellation_deadline_at     | TIMESTAMPTZ              | NULL có điều kiện                      | starts_at cho BEFORE_START; NULL nếu chỉ giới hạn bởi check-in             |
+| cancellation_penalty_percent | NUMERIC(5,2)             | NN, DEFAULT 10.00                      | Snapshot phí hủy/tổng giá sân                                              |
+| policy_version               | VARCHAR(30)              | NN                                     | Phiên bản điều khoản đã chốt                                               |
+| policy_accepted_at           | TIMESTAMPTZ              | NN                                     | Khách đồng ý điều khoản khi đặt                                            |
+| cancelled_at                 | TIMESTAMPTZ              | NULL                                   | Thời điểm hủy thực tế                                                      |
+| cancelled_by_user_id         | UUID                     | NULL, FK → users.id                    | NULL cho guest/hệ thống; đối chiếu actor_type trong lịch sử                |
+| cancellation_reason          | TEXT                     | NULL                                   | Lý do hủy                                                                  |
+| created_by_user_id           | UUID                     | NULL, FK → users.id                    | Nhân viên tạo tại quầy, nếu có                                             |
+| idempotency_key              | VARCHAR(100)             | NN, UQ(user_id, key); partial UQ guest | Tránh tạo hai đơn do gửi lại request theo tài khoản; migration booking MVP |
+| version                      | INTEGER                  | NN, DEFAULT 0, CHECK >= 0              | Kiểm soát sửa trạng thái đồng thời                                         |
+| created_at                   | TIMESTAMPTZ              | NN, DEFAULT NOW()                      | Tạo                                                                        |
+| updated_at                   | TIMESTAMPTZ              | NN, DEFAULT NOW()                      | Cập nhật                                                                   |
 
 Ràng buộc:
 
@@ -624,7 +624,7 @@ Giá và thông tin liên hệ trên booking là snapshot có chủ đích. Khô
 
 V1 có21 bảng nghiệp vụ và outbox_events,30 enum,38 FK,78 CHECK. Khóa ghép bảo đảm sân/chi nhánh booking, sân occupancy và QR booking check-in đồng nhất. Exclusion bảo vệ khoảng ACTIVE; vệ sinh tối thiểu15phút không tính phí.
 
-Workflow chưa được viết. Tổng receipt/refund qua nhiều row, phủ giờ chơi của price items, occupancy khớp thời gian booking, quyền nhân viên và state transitions cần application transaction khi implement. Không tự chọn rounding hoặc mốc hủy.
+Booking MVP đã có transaction giữ chỗ/giá/history/occupancy, expiry và hủy HOLDING. Quy tắc đã chốt cho phase này xem [BOOKING-MVP.md](BOOKING-MVP.md); các điểm OPEN ở trên vẫn áp dụng cho giai đoạn có thanh toán. Tổng receipt/refund qua nhiều row, quyền nhân viên và workflow payment/check-in còn chưa triển khai.
 
 Expression unique lower(email/username), partial unique một cancellation APPLIED, dedup webhook hợp lệ, một refund attempt đang chạy/UNKNOWN/SUCCEEDED, cùng chứng từ chi không ghi hai lần đều nằm trong SQL. Migration tùy chỉnh không được bỏ khi tạo v2.
 

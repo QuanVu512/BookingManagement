@@ -56,4 +56,6 @@ erDiagram
 
 `CourtOccupancy` là nơi bảo vệ khoảng sân; `occupiedUntil` đã gồm thời gian vệ sinh theo snapshot booking. Invariant tổng hợp nhiều dòng, như tổng tiền đã nhận/hoàn, vẫn cần transaction và logic ứng dụng.
 
+Booking MVP dùng unique `(userId, idempotencyKey)` qua migration `20261016090000_booking_user_idempotency`; guest vẫn có partial unique riêng. Exclusion hiện có được giữ nguyên. Luồng giá/snapshot/expiry/hủy xem [BOOKING-MVP.md](BOOKING-MVP.md).
+
 Schema/migration không chứng minh database đã được migrate, seed hoặc có dữ liệu. Dùng [PIPELINES.md](PIPELINES.md) và [OPERATIONS.md](OPERATIONS.md) cho lệnh; kiểm tra trạng thái ở môi trường được giao trước khi kết luận.

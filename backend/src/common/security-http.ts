@@ -11,7 +11,12 @@ export function securityHeaders(
   response.setHeader('Referrer-Policy', 'no-referrer');
   response.setHeader('X-Request-Id', randomUUID());
   const path = request.path.toLowerCase();
-  if (path === '/api/auth' || path.startsWith('/api/auth/')) {
+  if (
+    path === '/api/auth' ||
+    path.startsWith('/api/auth/') ||
+    path === '/api/bookings' ||
+    path.startsWith('/api/bookings/')
+  ) {
     response.setHeader('Cache-Control', 'no-store, private');
     response.setHeader('Pragma', 'no-cache');
   }

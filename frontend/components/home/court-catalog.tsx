@@ -183,7 +183,7 @@ export function CourtCatalog({ courts }: { courts: CourtItem[] }) {
                         color: 'var(--text-muted)',
                       }}
                     >
-                      Giá thuê sân
+                      Giá từ trong ngày
                     </div>
                     <div
                       style={{
@@ -192,17 +192,21 @@ export function CourtCatalog({ courts }: { courts: CourtItem[] }) {
                         color: 'var(--text-primary)',
                       }}
                     >
-                      {court.pricePerHour.toLocaleString('vi-VN')}
-                      <span
-                        style={{
-                          fontSize: '0.8rem',
-                          color: 'var(--text-secondary)',
-                          fontWeight: 400,
-                          marginLeft: '3px',
-                        }}
-                      >
-                        đ/giờ
-                      </span>
+                      {court.pricePerHour > 0
+                        ? court.pricePerHour.toLocaleString('vi-VN')
+                        : 'Chưa có giá'}
+                      {court.pricePerHour > 0 && (
+                        <span
+                          style={{
+                            fontSize: '0.8rem',
+                            color: 'var(--text-secondary)',
+                            fontWeight: 400,
+                            marginLeft: '3px',
+                          }}
+                        >
+                          đ/giờ
+                        </span>
+                      )}
                     </div>
                   </div>
 

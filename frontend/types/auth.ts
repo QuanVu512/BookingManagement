@@ -34,6 +34,10 @@ export interface UserProfile {
 }
 
 export interface CourtItem {
+  timezone?: string;
+  branchName?: string;
+  address?: string;
+  cleanupMinutes?: number;
   id: string;
   name: string;
   code: string;

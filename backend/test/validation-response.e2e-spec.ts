@@ -75,6 +75,11 @@ const DATABASE_USER = {
   roles: [{ role: 'CUSTOMER' }],
 };
 const PUBLIC_COURT_KEYS = [
+  'timezone',
+  'branchName',
+  'address',
+  'cleanupMinutes',
+  'priceLabel',
   'id',
   'name',
   'code',
@@ -312,24 +317,19 @@ describe('Auth/Courts HTTP validation and response contract (mock dependencies)'
     expect(response.headers.get('set-cookie')).toContain(`${AUTH_COOKIE}=;`);
   });
 
-  it.each(['empty database', 'unreachable database'])(
-    'preserves the fallback courts contract for %s',
-    async (scenario) => {
-      if (scenario === 'unreachable database') {
-        prismaMock.court.findMany.mockRejectedValue(
-          new Error('mock database unavailable'),
-        );
-      }
-      const response = await fetch(`${baseUrl}/api/courts`);
-      const body: unknown = await response.json();
-      expect(response.status).toBe(200);
-      expect(body).toMatchObject({ success: true, data: expect.any(Array) });
-      expect(getCourts(body)).toHaveLength(4);
-      for (const court of getCourts(body)) {
-        expect(Object.keys(court).sort()).toEqual(PUBLIC_COURT_KEYS);
-      }
-    },
-  );
+  it('returns an empty catalog for an empty database', async () => {
+    const response = await fetch(baseUrl + '/api/courts');
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ success: true, data: [] });
+  });
+  it('returns an HTTP error when the database is unavailable', async () => {
+    prismaMock.court.findMany.mockRejectedValue(
+      new Error('mock database unavailable'),
+    );
+    const response = await fetch(baseUrl + '/api/courts');
+    expect(response.status).toBe(500);
+    expect(await response.json()).not.toHaveProperty('data');
+  });
 
   it('maps database courts to public DTO fields without exposing relations', async () => {
     prismaMock.court.findMany.mockResolvedValue([
@@ -341,7 +341,13 @@ describe('Auth/Courts HTTP validation and response contract (mock dependencies)'
         status: 'ACTIVE',
         branchId: 'private-branch-id',
         cleanupMinutes: 15,
-        branch: { phone: 'private-phone' },
+        branch: {
+          phone: 'private-phone',
+          name: 'Test branch',
+          address: 'Public address',
+          timezone: 'Asia/Ho_Chi_Minh',
+          businessHours: [],
+        },
         priceRules: [],
       },
     ]);
@@ -353,7 +359,7 @@ describe('Auth/Courts HTTP validation and response contract (mock dependencies)'
     expect(courts[0]).toMatchObject({
       id: 'court-db-1',
       courtType: 'VIP',
-      pricePerHour: 250000,
+      pricePerHour: 0,
     });
   });
 

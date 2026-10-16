@@ -94,7 +94,7 @@ describe('Frontend read requests', () => {
   it('uses a shared 1200ms request deadline', () =>
     expect(READ_REQUEST_TIMEOUT_MS).toBe(1200));
 
-  it('falls back immediately when the backend connection fails', async () => {
+  it('reports catalog failure immediately when the backend connection fails', async () => {
     jest
       .spyOn(globalThis, 'fetch')
       .mockRejectedValue(new TypeError('mock network offline'));
@@ -102,9 +102,9 @@ describe('Frontend read requests', () => {
     expect(await getCurrentUser(new AbortController().signal)).toMatchObject({
       status: 'unknown',
     });
-    expect(await loadCourtCatalog(new AbortController().signal)).toBe(
-      FALLBACK_COURTS,
-    );
+    await expect(
+      loadCourtCatalog(new AbortController().signal),
+    ).rejects.toThrow();
     expect(performance.now() - start).toBeLessThan(300);
   });
 
@@ -113,10 +113,12 @@ describe('Frontend read requests', () => {
     const start = performance.now();
     const [user, courts] = await Promise.all([
       getCurrentUser(new AbortController().signal),
-      loadCourtCatalog(new AbortController().signal),
+      loadCourtCatalog(new AbortController().signal).catch(
+        (error: unknown) => error,
+      ),
     ]);
     expect(user).toMatchObject({ status: 'unknown' });
-    expect(courts).toBe(FALLBACK_COURTS);
+    expect(courts).toBeInstanceOf(DOMException);
     const elapsed = performance.now() - start;
     expect(elapsed).toBeGreaterThanOrEqual(READ_REQUEST_TIMEOUT_MS - 20);
     expect(elapsed).toBeLessThan(READ_REQUEST_TIMEOUT_MS * 2 + 300);
@@ -166,11 +168,20 @@ describe('Frontend read requests', () => {
   it.each([
     new Response('{}', { status: 503 }),
     new Response(JSON.stringify({ data: 'malformed' })),
-  ])('falls back on HTTP or malformed catalog failures', async (response) => {
+  ])('rejects HTTP or malformed catalog failures', async (response) => {
     jest.spyOn(globalThis, 'fetch').mockResolvedValue(response);
-    expect(await loadCourtCatalog(new AbortController().signal)).toBe(
-      FALLBACK_COURTS,
-    );
+    await expect(
+      loadCourtCatalog(new AbortController().signal),
+    ).rejects.toThrow();
+  });
+
+  it('keeps an empty API catalog empty', async () => {
+    jest
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(
+        new Response(JSON.stringify({ success: true, data: [] })),
+      );
+    expect(await loadCourtCatalog(new AbortController().signal)).toEqual([]);
   });
 
   it('treats an expired session as unauthenticated', async () => {
