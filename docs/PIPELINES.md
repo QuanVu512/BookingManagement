@@ -34,6 +34,21 @@ Workflow chạy khi push hoặc pull request:
 
 Workflow không deploy ứng dụng và không chứng minh DB ứng dụng/payment/provider hoạt động. URLs chỉ trỏ service containers CI; không fallback sang DATABASE_URL ứng dụng trong storage suite. Frontend build CI dùng HTTPS API placeholder, không chứng minh topology production. Actions checkout/setup-node được pin SHA; pin phải được xác minh với repository chính thức khi cập nhật. Scan errors/findings không được coi là clean. Dependency high chưa xử lý sẽ làm gate fail theo chủ đích.
 
+## Dependency overrides cho security gate
+
+`package.json` giới hạn override theo package cha đang kéo dependency có advisory; `package-lock.json` giữ phiên bản cài đặt cụ thể. Bản vá không thay ngưỡng `npm audit --audit-level=high` của CI.
+
+| Package cha      | Dependency được override | Phiên bản đã kiểm chứng |
+| ---------------- | ------------------------ | ----------------------- |
+| `@prisma/config` | `deepmerge-ts`           | `8.0.2`                 |
+| `prisma`         | `mysql2`                 | `3.24.6`                |
+| `@nestjs/mau`    | `undici`                 | `6.29.0`                |
+| `@nestjs/mau`    | `tmp`                    | `0.2.7`                 |
+
+Các override này xử lý advisory của dependency bắc cầu mà không nâng major Prisma hoặc Nest. Khi upstream đã cập nhật dependency, thử bỏ override rồi chạy lại `npm ci`, `npm audit --audit-level=high`, Prisma generate, lint, test và build API/frontend trước khi loại bỏ hẳn. Không dùng `npm audit fix --force` để tự động downgrade Jest hoặc thay major ngoài phạm vi bản vá.
+
+Audit ngày 2026-10-16 còn 20 cảnh báo moderate trong chuỗi Jest → `@istanbuljs/load-nyc-config` → `js-yaml` → `argparse` → `sprintf-js`; registry chưa có bản `sprintf-js` sửa [GHSA-hp3w-g68c-fv3c](https://github.com/advisories/GHSA-hp3w-g68c-fv3c). Không coi audit đạt ngưỡng high là không còn lỗ hổng; kiểm tra lại advisory khi cập nhật dependency.
+
 ## Pre-flight cho thay đổi
 
 - Chạy đúng lint/test/build cho vùng bị ảnh hưởng và báo riêng command, exit status, lỗi thuộc phạm vi nào.

@@ -104,5 +104,17 @@
   },
   "generate": {
     "backend/prisma.config.ts": true
+  },
+  "overrides": {
+    "@prisma/config": {
+      "deepmerge-ts": "^8.0.2"
+    },
+    "prisma": {
+      "mysql2": "^3.24.6"
+    },
+    "@nestjs/mau": {
+      "undici": "^6.29.0",
+      "tmp": "^0.2.7"
+    }
   }
 }
