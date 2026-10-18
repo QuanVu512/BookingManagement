@@ -1,0 +1,9 @@
+{
+  "asset": "court-overview-angle.jpg",
+  "method": "Built-in image_gen, alternate angle generated from the local reference",
+  "reference": "court-1.jpg",
+  "originalOutput": "C:/Users/Admin/.codex/generated_images/01a12f41-e315-79f2-bf9f-5f5a3bfad573/exec-5e0feb6b-e969-477f-94a7-482822ee9318.png",
+  "conversion": "PNG to JPEG with ffmpeg -q:v 3; no content edit",
+  "prompt": "Create ONE photorealistic alternate-angle photograph based closely on the supplied indoor pickleball facility reference. The reference is the identity of the same facility: corrugated metal roof and walls, dark steel beams and upright pillars, long bright white LED fixtures, blue and dark navy pickleball playing surfaces with white regulation pickleball lines and neutral grey outer lanes, bright yellow metal mesh fences separating the courts. Change camera only to an elevated oblique wide view from a corner looking down across EXACTLY FOUR full pickleball courts arranged two by two. Each of the four courts has ONE straight black net across its center, two non-volley kitchen zones bordering the net, correct clean white baselines and sidelines and center service lines. Preserve the venue materials, proportions, colors, lighting and plausible structure of the supplied reference. No tennis markings, no padel glass walls, no extra courts, no warped curved lines, no fake text signs, no graphic overlay, no invented luxury lounge. Wide landscape 16:9 architectural photography suitable as website gallery hero, sharp and natural, realistic straight geometry, uncluttered, no close people. Save generated image to a local file and report its local path.",
+  "review": "Visually inspected: four courts, metal roof, yellow dividers, blue surfaces and four nets. The gallery caption labels the generated viewpoint."
+}

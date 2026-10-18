@@ -1,64 +1,37 @@
-﻿'use client';
+'use client';
 import { useEffect, useRef, useState } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
-import { checkAvailability, createBooking } from '../services/bookings';
-import type { Availability, BookingRecord } from '../types/booking';
-import { initialBookingWindow, localInputToIso } from '../lib/booking-time';
+import { checkAvailability, createBooking } from '../api/booking-service';
+import type { BookingWindow, LiveBookingState } from '../model/booking';
+import { initialBookingWindow } from '../model/booking-time';
+import {
+  bookingRequestInput,
+  type RequestKeyState,
+} from './booking-request-intent';
 
-type BookingWindow = ReturnType<typeof initialBookingWindow>;
-interface LiveState {
-  window: BookingWindow;
-  quote?: Availability;
-  booking?: BookingRecord;
+interface InternalState extends LiveBookingState {
   owner?: string;
-  error: string;
-  busy: boolean;
-  canRetry?: boolean;
-}
-interface RequestState {
-  locked: boolean;
-  mounted: boolean;
-  fingerprint: string;
-  key: string;
 }
 interface BookingContext {
-  state: LiveState;
-  update: Dispatch<SetStateAction<LiveState>>;
-  request: RequestState;
+  state: InternalState;
+  update: Dispatch<SetStateAction<InternalState>>;
+  request: RequestKeyState & { locked: boolean; mounted: boolean };
   courtId: string;
   timezone: string;
   accountId?: string;
 }
+type BookingAction = 'quote' | 'create';
 
-function requestIdentity(context: BookingContext) {
-  const startsAt = localInputToIso(
-    context.state.window.start,
-    context.timezone,
+async function executeBooking(context: BookingContext, action: BookingAction) {
+  const input = bookingRequestInput(
+    {
+      accountId: context.accountId,
+      courtId: context.courtId,
+      timezone: context.timezone,
+      window: context.state.window,
+    },
+    context.request,
   );
-  const endsAt = localInputToIso(context.state.window.end, context.timezone);
-  const fingerprint = JSON.stringify([
-    context.accountId,
-    context.courtId,
-    startsAt,
-    endsAt,
-  ]);
-  if (context.request.fingerprint !== fingerprint) {
-    context.request.fingerprint = fingerprint;
-    context.request.key = crypto.randomUUID();
-  }
-  return {
-    policyAccepted: true as const,
-    courtId: context.courtId,
-    startsAt,
-    endsAt,
-    idempotencyKey: context.request.key,
-  };
-}
-async function executeBooking(
-  context: BookingContext,
-  action: 'quote' | 'create',
-) {
-  const input = requestIdentity(context);
   if (action === 'quote')
     return {
       quote: await checkAvailability(
@@ -70,7 +43,7 @@ async function executeBooking(
     };
   return { booking: await createBooking(input), quote: undefined };
 }
-async function runBooking(context: BookingContext, action: 'quote' | 'create') {
+async function runBooking(context: BookingContext, action: BookingAction) {
   if (context.request.locked) return;
   context.request.locked = true;
   context.update((previous) => ({ ...previous, busy: true, error: '' }));
@@ -94,7 +67,13 @@ async function runBooking(context: BookingContext, action: 'quote' | 'create') {
 function changeWindow(context: BookingContext, window: BookingWindow) {
   if (context.request.locked) return;
   context.request.fingerprint = '';
-  context.update({ window, busy: false, error: '', owner: context.accountId });
+  context.update({
+    window,
+    busy: false,
+    error: '',
+    canRetry: false,
+    owner: context.accountId,
+  });
 }
 
 export function useLiveBooking(
@@ -102,10 +81,11 @@ export function useLiveBooking(
   timezone: string,
   accountId?: string,
 ) {
-  const [state, update] = useState<LiveState>(() => ({
+  const [state, update] = useState<InternalState>(() => ({
     window: initialBookingWindow(timezone),
     busy: false,
     error: '',
+    canRetry: false,
     owner: accountId,
   }));
   const request = useRequestLifecycle();
@@ -120,11 +100,12 @@ export function useLiveBooking(
   return {
     ...visibleState(state, accountId),
     changeWindow: (window: BookingWindow) => changeWindow(context, window),
-    run: (action: 'quote' | 'create') => runBooking(context, action),
+    quoteAvailability: () => runBooking(context, 'quote'),
+    createHold: () => runBooking(context, 'create'),
   };
 }
 
-function visibleState(state: LiveState, accountId?: string) {
+function visibleState(state: InternalState, accountId?: string) {
   const visible = state.owner === accountId;
   return {
     window: state.window,
@@ -137,7 +118,7 @@ function visibleState(state: LiveState, accountId?: string) {
 }
 
 function useRequestLifecycle() {
-  const request = useRef<RequestState>({
+  const request = useRef<BookingContext['request']>({
     locked: false,
     mounted: true,
     fingerprint: '',
@@ -154,7 +135,7 @@ function useRequestLifecycle() {
 function setBookingFailure(
   context: BookingContext,
   reason: unknown,
-  action: 'quote' | 'create',
+  action: BookingAction,
 ) {
   const error =
     reason instanceof Error &&

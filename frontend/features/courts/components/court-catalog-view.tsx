@@ -2,10 +2,10 @@
 
 import Link from 'next/link';
 import Image from 'next/image';
-import type { CourtItem } from '../../types/auth';
-import { COURT_DETAILS_ENABLED } from '../../constants/features';
+import type { CourtItem } from '../model/court';
+import { COURT_DETAILS_ENABLED } from '../../../constants/features';
 
-export function CourtCatalog({ courts }: { courts: CourtItem[] }) {
+export function CourtCatalogView({ courts }: { courts: CourtItem[] }) {
   return (
     <section
       id="courts-catalog"

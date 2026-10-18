@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { CourtDetailPage } from '../../../components/court-detail/court-detail-page';
+import { BookingScreen } from './booking-screen';
 import '../../../public/booking-live.css';
 
 export const metadata: Metadata = {
@@ -13,5 +13,5 @@ export default async function CourtPage({
   params: Promise<{ courtId: string }>;
 }) {
   const { courtId } = await params;
-  return <CourtDetailPage courtId={courtId} />;
+  return <BookingScreen courtId={courtId} />;
 }

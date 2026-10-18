@@ -33,20 +33,8 @@ export interface UserProfile {
   isStaffOrAdmin: boolean;
 }
 
-export interface CourtItem {
-  timezone?: string;
-  branchName?: string;
-  address?: string;
-  cleanupMinutes?: number;
-  id: string;
-  name: string;
-  code: string;
-  courtType: 'VIP' | 'STANDARD';
-  status: 'ACTIVE' | 'INACTIVE';
-  surfaceType: string;
-  features: string[];
-  pricePerHour: number;
-  imageUrl: string;
-  rating: number;
-  reviewCount: number;
-}
+export type {
+  CourtItem,
+  CourtStatus,
+  CourtType,
+} from '../features/courts/model/court';

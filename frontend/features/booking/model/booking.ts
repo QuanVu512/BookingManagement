@@ -44,3 +44,15 @@ export interface BookingInput {
   endsAt: string;
   idempotencyKey: string;
 }
+export interface BookingWindow {
+  start: string;
+  end: string;
+}
+export interface LiveBookingState {
+  window: BookingWindow;
+  busy: boolean;
+  error: string;
+  quote?: Availability;
+  booking?: BookingRecord;
+  canRetry: boolean;
+}

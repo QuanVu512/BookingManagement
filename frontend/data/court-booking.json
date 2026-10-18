@@ -1,0 +1,162 @@
+{
+  "brand": "SMASH ARENA",
+  "club": "CLB Thể Thao Phù Đổng",
+  "address": "Ngõ 80 Đường Phù Đổng — Cầu Trạc, Xã Phù Đổng, Hà Nội",
+  "rating": 4.9,
+  "reviewCount": 148,
+  "voucherCode": "PICKLEPASS10",
+  "voucherRate": 0.1,
+  "maximumQuantity": 99,
+  "defaultSlotId": "18-19",
+  "primePrices": { "PRO-01": 320000 },
+  "gallery": [
+    {
+      "src": "/courts/court-overview-angle.jpg",
+      "alt": "Góc cao bao quát bốn sân Pickleball mái tôn, mặt sân xanh và hàng rào vàng",
+      "caption": "Toàn cảnh 4 sân · Góc nhìn tạo từ ảnh tham chiếu"
+    },
+    {
+      "src": "/courts/court-2.jpg",
+      "alt": "Cận cảnh lưới thi đấu cùng vợt và bóng Pickleball",
+      "caption": "Cận lưới, vợt & bóng"
+    },
+    {
+      "src": "/courts/court-3.jpg",
+      "alt": "Trận đấu Pickleball tại sân trong nhà có hàng rào vàng",
+      "caption": "Không khí thi đấu"
+    },
+    {
+      "src": "/courts/court-4.jpg",
+      "alt": "Góc phối cảnh nghiêng của sân Pickleball mái tôn",
+      "caption": "Phối cảnh sân"
+    }
+  ],
+  "products": [
+    {
+      "id": "dasani",
+      "name": "Nước suối Dasani 500ml",
+      "description": "Nước uống tinh khiết · Chai 500ml",
+      "image": "/products/dasani.png",
+      "price": 10000,
+      "unit": "/chai",
+      "badge": "Ướp lạnh"
+    },
+    {
+      "id": "pocari",
+      "name": "Pocari Sweat 500ml",
+      "description": "Thức uống bổ sung ion · Chai 500ml",
+      "image": "/products/pocari.png",
+      "price": 22000,
+      "unit": "/chai",
+      "badge": "Bù ion"
+    },
+    {
+      "id": "paddle",
+      "name": "Thuê vợt Carbon T700 Pro X",
+      "description": "Raw Carbon T700 · Ảnh SLK HALO minh họa",
+      "image": "/products/paddle-carbon.jpg",
+      "price": 45000,
+      "unit": "/buổi",
+      "badge": "Carbon T700"
+    },
+    {
+      "id": "franklin",
+      "name": "Set 3 bóng Franklin X-40",
+      "description": "Bóng ngoài trời · 40 lỗ · Set 3 quả",
+      "image": "/products/franklin-balls.png",
+      "price": 20000,
+      "unit": "/set thuê",
+      "badge": "Set 3 quả"
+    }
+  ],
+  "slots": [
+    {
+      "id": "06-07",
+      "start": "06:00",
+      "end": "07:00",
+      "period": "morning",
+      "isPrime": false,
+      "isBooked": false
+    },
+    {
+      "id": "07-08",
+      "start": "07:00",
+      "end": "08:00",
+      "period": "morning",
+      "isPrime": false,
+      "isBooked": true
+    },
+    {
+      "id": "08-09",
+      "start": "08:00",
+      "end": "09:00",
+      "period": "morning",
+      "isPrime": false,
+      "isBooked": false
+    },
+    {
+      "id": "09-10",
+      "start": "09:00",
+      "end": "10:00",
+      "period": "morning",
+      "isPrime": false,
+      "isBooked": true
+    },
+    {
+      "id": "10-11",
+      "start": "10:00",
+      "end": "11:00",
+      "period": "morning",
+      "isPrime": false,
+      "isBooked": false
+    },
+    {
+      "id": "11-12",
+      "start": "11:00",
+      "end": "12:00",
+      "period": "morning",
+      "isPrime": false,
+      "isBooked": false
+    },
+    {
+      "id": "17-18",
+      "start": "17:00",
+      "end": "18:00",
+      "period": "evening",
+      "isPrime": true,
+      "isBooked": false
+    },
+    {
+      "id": "18-19",
+      "start": "18:00",
+      "end": "19:00",
+      "period": "evening",
+      "isPrime": true,
+      "isBooked": false
+    },
+    {
+      "id": "19-20",
+      "start": "19:00",
+      "end": "20:00",
+      "period": "evening",
+      "isPrime": true,
+      "isBooked": false
+    },
+    {
+      "id": "20-21",
+      "start": "20:00",
+      "end": "21:00",
+      "period": "evening",
+      "isPrime": true,
+      "isBooked": false
+    },
+    {
+      "id": "21-22",
+      "start": "21:00",
+      "end": "22:00",
+      "period": "evening",
+      "isPrime": true,
+      "isBooked": false
+    }
+  ]
+}

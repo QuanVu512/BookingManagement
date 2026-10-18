@@ -1,7 +1,7 @@
 ﻿import Link from 'next/link';
 import { SportyHeader } from '../../components/home/sporty-header';
 import { AuthModal } from '../../components/auth/auth-modal';
-import { MyBookingsView } from '../../components/booking/my-bookings-view';
+import { MyBookingsPanel } from '../../features/booking/components/my-bookings-panel';
 import '../../public/booking-live.css';
 
 export default function MyBookingsPage() {
@@ -15,7 +15,7 @@ export default function MyBookingsPage() {
           Trạng thái lấy từ máy chủ, cập nhật mỗi 15 giây. Giữ chỗ hết hạn sau 5
           phút; chưa có thanh toán.
         </p>
-        <MyBookingsView />
+        <MyBookingsPanel />
       </main>
       <AuthModal />
     </>

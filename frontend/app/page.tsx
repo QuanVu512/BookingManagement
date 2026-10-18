@@ -2,10 +2,10 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { useCourtCatalog } from '../hooks/use-court-catalog';
+import { useCourtCatalog } from '../features/courts/hooks/use-court-catalog';
 import { SportyHeader } from '../components/home/sporty-header';
 import { HeroSection } from '../components/home/hero-section';
-import { CourtCatalog } from '../components/home/court-catalog';
+import { CourtCatalogView } from '../features/courts/components/court-catalog-view';
 import { ScaleupStorePreview } from '../components/home/scaleup-store-preview';
 import { FacilitiesSection } from '../components/home/facilities-section';
 import { SportyFooter } from '../components/home/sporty-footer';
@@ -40,7 +40,7 @@ export default function HomePage() {
             <p>Chưa có sân đang hoạt động.</p>
           )}
         </div>
-        <CourtCatalog courts={courts} />
+        <CourtCatalogView courts={courts} />
         <FacilitiesSection />
         <ScaleupStorePreview />
       </main>

@@ -1,0 +1,22 @@
+{
+  "dasani.png": {
+    "page": "https://www.coca-cola.com/vn/vi/brands/dasani",
+    "image": "https://www.coca-cola.com/content/dam/onexp/vn/home-image/dasani/prod-desktop.png",
+    "subject": "Dasani nước tinh khiết 500ml"
+  },
+  "pocari.png": {
+    "page": "https://www.pharmacity.vn/nuoc-uong-bo-sung-ion-va-chat-dien-giai-pocari-sweat-500ml.html",
+    "image": "https://prod-cdn.pharmacity.io/e-com/images/ecommerce/20241107092025-0-P06434_1.png?versionId=H9e.it_1KERTaJEOrxwp_NhIL9KTgXXN",
+    "subject": "Pocari Sweat 500ml"
+  },
+  "paddle-carbon.jpg": {
+    "page": "https://www.selkirk.com/products/slk-halo-power-pickleball-paddle",
+    "image": "https://cdn.shopify.com/s/files/1/0152/5763/2822/files/HALO_POWER_XL_13mm_GRAY_01_5c3e690d-1dce-4749-825c-e8a33353379c.jpg?v=1724172822",
+    "subject": "SLK HALO Power, Raw Carbon T700; ảnh minh họa cho danh mục thuê Pro X"
+  },
+  "franklin-balls.png": {
+    "page": "https://www.target.com/p/-/A-53019478",
+    "image": "https://target.scene7.com/is/image/Target/GUEST_73b6663e-d40d-4c6b-87bd-b90f02944cf5?wid=1000&hei=1000&fmt=png",
+    "subject": "Ảnh sản phẩm thực tế set 3 bóng Franklin X-40 Optic Yellow 40 lỗ"
+  }
+}

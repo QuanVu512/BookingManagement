@@ -1,15 +1,28 @@
-﻿'use client';
+'use client';
 import Link from 'next/link';
-import { useAuthActions, useAuthSession } from '../../context/auth-context';
-import { useLiveBooking } from '../../hooks/use-live-booking';
 import {
   bookingTime,
   BOOKING_STATUS_LABELS,
   formatVnd,
-} from '../../lib/booking-time';
-import type { Availability, BookingRecord } from '../../types/booking';
+} from '../model/booking-time';
+import type {
+  Availability,
+  BookingRecord,
+  BookingWindow,
+  LiveBookingState,
+} from '../model/booking';
 
-type LiveState = ReturnType<typeof useLiveBooking>;
+interface LiveBookingViewProps {
+  state: LiveBookingState;
+  timezone: string;
+  authenticated: boolean;
+  showSignIn: boolean;
+  signInLabel: string;
+  onChangeWindow: (window: BookingWindow) => void;
+  onQuote: () => void;
+  onCreate: () => void;
+  onSignIn: () => void;
+}
 
 function Quote({ quote }: { quote: Availability }) {
   return (
@@ -59,18 +72,24 @@ function TimeInput({
     </label>
   );
 }
-function TimeFields({ state }: { state: LiveState }) {
+function TimeFields({
+  state,
+  onChangeWindow,
+}: {
+  state: LiveBookingState;
+  onChangeWindow: (window: BookingWindow) => void;
+}) {
   return (
     <>
       <TimeInput
         label="Bắt đầu"
         value={state.window.start}
-        onChange={(start) => state.changeWindow({ ...state.window, start })}
+        onChange={(start) => onChangeWindow({ ...state.window, start })}
       />
       <TimeInput
         label="Kết thúc"
         value={state.window.end}
-        onChange={(end) => state.changeWindow({ ...state.window, end })}
+        onChange={(end) => onChangeWindow({ ...state.window, end })}
       />
     </>
   );
@@ -86,24 +105,26 @@ function BookingConsent() {
 function BookingFields({
   state,
   authenticated,
+  onChangeWindow,
+  onQuote,
+  onCreate,
 }: {
-  state: LiveState;
+  state: LiveBookingState;
   authenticated: boolean;
+  onChangeWindow: (window: BookingWindow) => void;
+  onQuote: () => void;
+  onCreate: () => void;
 }) {
   return (
     <form
       onSubmit={(event) => {
         event.preventDefault();
-        void state.run('create');
+        onCreate();
       }}
     >
       <fieldset disabled={state.busy}>
-        <TimeFields state={state} />
-        <button
-          type="button"
-          className="btn btn-secondary"
-          onClick={() => void state.run('quote')}
-        >
+        <TimeFields state={state} onChangeWindow={onChangeWindow} />
+        <button type="button" className="btn btn-secondary" onClick={onQuote}>
           Kiểm tra lịch & giá
         </button>
         <BookingConsent />
@@ -116,7 +137,7 @@ function HoldSubmitButton({
   state,
   authenticated,
 }: {
-  state: LiveState;
+  state: LiveBookingState;
   authenticated: boolean;
 }) {
   return (
@@ -141,9 +162,11 @@ function BookingResult({ booking }: { booking: BookingRecord }) {
 function BookingFeedback({
   state,
   authenticated,
+  onCreate,
 }: {
-  state: LiveState;
+  state: LiveBookingState;
   authenticated: boolean;
+  onCreate: () => void;
 }) {
   return (
     <>
@@ -158,7 +181,7 @@ function BookingFeedback({
         <button
           className="btn btn-secondary"
           disabled={state.busy || !authenticated}
-          onClick={() => void state.run('create')}
+          onClick={onCreate}
         >
           Kiểm tra lại yêu cầu giữ chỗ
         </button>
@@ -168,36 +191,31 @@ function BookingFeedback({
     </>
   );
 }
-function BookingSignIn() {
-  const session = useAuthSession();
-  const { openAuthModal, refreshSession } = useAuthActions();
-  if (session.isLoading || session.isAuthenticated) return null;
+function BookingSignIn({
+  label,
+  onClick,
+}: {
+  label: string;
+  onClick: () => void;
+}) {
   return (
-    <button
-      className="btn btn-secondary"
-      onClick={() =>
-        session.status === 'unknown' ? void refreshSession() : openAuthModal()
-      }
-    >
-      {session.status === 'unknown'
-        ? 'Kiểm tra lại phiên đăng nhập'
-        : 'Đăng nhập để giữ sân'}
+    <button className="btn btn-secondary" onClick={onClick}>
+      {label}
     </button>
   );
 }
-export function LiveBookingForm({
-  courtId,
+
+export function LiveBookingView({
+  state,
   timezone,
-}: {
-  courtId: string;
-  timezone: string;
-}) {
-  const session = useAuthSession();
-  const state = useLiveBooking(
-    courtId,
-    timezone,
-    session.isAuthenticated ? session.user?.id : undefined,
-  );
+  authenticated,
+  showSignIn,
+  signInLabel,
+  onChangeWindow,
+  onQuote,
+  onCreate,
+  onSignIn,
+}: LiveBookingViewProps) {
   return (
     <section className="booking-panel" aria-label="Đặt sân">
       <h2>Chọn khoảng chơi</h2>
@@ -205,9 +223,19 @@ export function LiveBookingForm({
         Giờ theo {timezone}. Thời lượng linh hoạt theo phút, bắt đầu sau ít nhất
         5 phút.
       </p>
-      <BookingFields state={state} authenticated={session.isAuthenticated} />
-      <BookingFeedback state={state} authenticated={session.isAuthenticated} />
-      <BookingSignIn />
+      <BookingFields
+        state={state}
+        authenticated={authenticated}
+        onChangeWindow={onChangeWindow}
+        onQuote={onQuote}
+        onCreate={onCreate}
+      />
+      <BookingFeedback
+        state={state}
+        authenticated={authenticated}
+        onCreate={onCreate}
+      />
+      {showSignIn && <BookingSignIn label={signInLabel} onClick={onSignIn} />}
       <p>
         Giai đoạn này chỉ giữ chỗ, không thu tiền hoặc chuyển sang CONFIRMED.
       </p>
