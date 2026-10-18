@@ -21,7 +21,48 @@ import { RedisModule } from '../src/infrastructure/redis/redis.module.js';
 import { AuthMailService } from '../src/modules/auth/services/auth-mail.service.js';
 import { REQUEST_VALIDATION_OPTIONS } from '../src/constants/validation.constants.js';
 import { securityHeaders } from '../src/common/security-http.js';
-import { isBooking } from '../../frontend/services/bookings.js';
+
+interface BookingPayload {
+  id: string;
+  bookingCode: string;
+  courtId: string;
+  courtName: string;
+  timezone: string;
+  startsAt: string;
+  endsAt: string;
+  holdExpiresAt: string;
+  status: string;
+  totalAmount: number;
+  currency: string;
+  priceItems: { amount: number }[];
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function isBooking(value: unknown): value is BookingPayload {
+  if (!isRecord(value)) return false;
+  return (
+    [
+      'id',
+      'bookingCode',
+      'courtId',
+      'courtName',
+      'timezone',
+      'startsAt',
+      'endsAt',
+      'holdExpiresAt',
+      'status',
+      'currency',
+    ].every((key) => typeof value[key] === 'string') &&
+    typeof value.totalAmount === 'number' &&
+    Array.isArray(value.priceItems) &&
+    value.priceItems.every(
+      (item) => isRecord(item) && typeof item.amount === 'number',
+    )
+  );
+}
 
 const databaseUrl = process.env.BOOKING_DATABASE_TEST_URL;
 const redisUrl = process.env.BOOKING_REDIS_TEST_URL;

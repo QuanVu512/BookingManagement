@@ -1,0 +1,186 @@
+{
+  "description": "Shared Vietnamese phone normalization corpus. The TypeScript helper, the read-only audit CLI and the PostgreSQL migration function must all produce the same result for every case.",
+  "source": "Regex from backend/prisma/migrations/20261013090000_normalize_auth_phone/migration.sql, derived from libphonenumber-js 1.13.15 Vietnam metadata.",
+  "notes": [
+    "JSON has no undefined value; specs assert undefined separately.",
+    "0896123456 is an allocated 089 (Viettel) range. 0891234567 is not allocated and is therefore rejected, verified against libphonenumber-js/max 1.13.15.",
+    "Separators (space, dash, dot) are intentionally rejected by the DTO contract; normalization never strips them."
+  ],
+  "cases": [
+    {
+      "category": "mobile",
+      "input": "0912345678",
+      "expected": "+84912345678"
+    },
+    {
+      "category": "mobile",
+      "input": " 0912345678 ",
+      "expected": "+84912345678"
+    },
+    {
+      "category": "mobile",
+      "input": "+84912345678",
+      "expected": "+84912345678"
+    },
+    {
+      "category": "mobile",
+      "input": "0321234567",
+      "expected": "+84321234567"
+    },
+    {
+      "category": "mobile",
+      "input": "0301234567",
+      "expected": "+84301234567"
+    },
+    {
+      "category": "mobile",
+      "input": "0511234567",
+      "expected": "+84511234567"
+    },
+    {
+      "category": "mobile",
+      "input": "0896123456",
+      "expected": "+84896123456"
+    },
+    {
+      "category": "fixed",
+      "input": "02431234567",
+      "expected": "+842431234567"
+    },
+    {
+      "category": "fixed",
+      "input": "02838123456",
+      "expected": "+842838123456"
+    },
+    {
+      "category": "fixed",
+      "input": "02363123456",
+      "expected": "+842363123456"
+    },
+    {
+      "category": "fixed",
+      "input": "+842431234567",
+      "expected": "+842431234567"
+    },
+    {
+      "category": "special",
+      "input": "018001234",
+      "expected": "+8418001234"
+    },
+    {
+      "category": "special",
+      "input": "019001234",
+      "expected": "+8419001234"
+    },
+    {
+      "category": "separator",
+      "input": "0912-345-678",
+      "expected": null
+    },
+    {
+      "category": "separator",
+      "input": "0912.345.678",
+      "expected": null
+    },
+    {
+      "category": "separator",
+      "input": "0912 345 678",
+      "expected": null
+    },
+    {
+      "category": "international",
+      "input": "+12025550123",
+      "expected": null
+    },
+    {
+      "category": "international",
+      "input": "+819012345678",
+      "expected": null
+    },
+    {
+      "category": "legacy-mobile",
+      "input": "0123456789",
+      "expected": null
+    },
+    {
+      "category": "unallocated",
+      "input": "02001234567",
+      "expected": null
+    },
+    {
+      "category": "unallocated",
+      "input": "02171234567",
+      "expected": null
+    },
+    {
+      "category": "unallocated",
+      "input": "0521234567",
+      "expected": null
+    },
+    {
+      "category": "unallocated",
+      "input": "0891234567",
+      "expected": null
+    },
+    {
+      "category": "unallocated",
+      "input": "0992123456",
+      "expected": null
+    },
+    {
+      "category": "prefix",
+      "input": "84912345678",
+      "expected": null
+    },
+    {
+      "category": "prefix",
+      "input": "+840912345678",
+      "expected": null
+    },
+    {
+      "category": "length",
+      "input": "091234567",
+      "expected": null
+    },
+    {
+      "category": "length",
+      "input": "09123456789",
+      "expected": null
+    },
+    {
+      "category": "empty",
+      "input": "",
+      "expected": null
+    },
+    {
+      "category": "empty",
+      "input": "   ",
+      "expected": null
+    },
+    {
+      "category": "non-string",
+      "input": null,
+      "expected": null
+    },
+    {
+      "category": "non-string",
+      "input": 912345678,
+      "expected": null
+    },
+    {
+      "category": "non-string",
+      "input": true,
+      "expected": null
+    },
+    {
+      "category": "non-string",
+      "input": {},
+      "expected": null
+    },
+    {
+      "category": "non-string",
+      "input": [],
+      "expected": null
+    }
+  ]
+}

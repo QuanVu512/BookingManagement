@@ -7,8 +7,8 @@ const rootDir = dirname(fileURLToPath(import.meta.url));
 const config = {
   rootDir,
   testEnvironment: 'node',
-  roots: ['<rootDir>/src', '<rootDir>/test'],
-  testMatch: ['**/*.spec.ts', '**/*.e2e-spec.ts'],
+  roots: ['<rootDir>/src', '<rootDir>/test', '<rootDir>/prisma'],
+  testMatch: ['**/*.spec.ts', '**/*.e2e-spec.ts', '**/*.spec.mjs'],
   transform: {
     '^.+\\.ts$': [
       'ts-jest',

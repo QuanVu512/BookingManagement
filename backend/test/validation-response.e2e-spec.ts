@@ -40,8 +40,13 @@ import { AuthRedisStore } from '../src/modules/auth/services/auth-redis.store.js
 import { LoginDto } from '../src/modules/auth/dto/login.dto.js';
 import { RegisterDto } from '../src/modules/auth/dto/register.dto.js';
 import { JwtAuthGuard } from '../src/modules/auth/guards/jwt-auth.guard.js';
-import { CourtsController } from '../src/modules/courts/courts.controller.js';
 import { CourtsService } from '../src/modules/courts/courts.service.js';
+import { GetActiveCourtDetailUseCase } from '../src/modules/courts/application/get-active-court-detail.use-case.js';
+import { ListActiveCourtsUseCase } from '../src/modules/courts/application/list-active-courts.use-case.js';
+import { PrismaCourtReader } from '../src/modules/courts/infrastructure/prisma-court-reader.js';
+import { CourtReader } from '../src/modules/courts/ports/court-reader.js';
+import { CourtResponsePresenter } from '../src/modules/courts/presentation/court-response.presenter.js';
+import { CourtsController } from '../src/modules/courts/presentation/courts.controller.js';
 
 const USER_ID = '00000000-0000-4000-8000-000000000001';
 const AUTH_COOKIE = 'access_token';
@@ -103,7 +108,10 @@ describe('Auth/Courts HTTP validation and response contract (mock dependencies)'
       findFirst: jest.fn<() => Promise<unknown>>(),
       findUnique: jest.fn<() => Promise<unknown>>(),
     },
-    court: { findMany: jest.fn<() => Promise<unknown>>() },
+    court: {
+      findMany: jest.fn<() => Promise<unknown>>(),
+      findFirst: jest.fn<() => Promise<unknown>>(),
+    },
     $transaction:
       jest.fn<
         (
@@ -148,7 +156,11 @@ describe('Auth/Courts HTTP validation and response contract (mock dependencies)'
             revoke: async () => undefined,
           },
         },
+        ListActiveCourtsUseCase,
+        GetActiveCourtDetailUseCase,
+        CourtResponsePresenter,
         CourtsService,
+        { provide: CourtReader, useClass: PrismaCourtReader },
         AuthCsrfService,
         AuthCsrfGuard,
         {
@@ -198,6 +210,7 @@ describe('Auth/Courts HTTP validation and response contract (mock dependencies)'
     prismaMock.user.findFirst.mockReset().mockResolvedValue(DATABASE_USER);
     prismaMock.user.findUnique.mockResolvedValue(DATABASE_USER);
     prismaMock.court.findMany.mockReset().mockResolvedValue([]);
+    prismaMock.court.findFirst.mockReset().mockResolvedValue(null);
     createUser.mockResolvedValue(DATABASE_USER);
     prismaMock.$transaction.mockImplementation(async (callback) =>
       callback({ user: { create: createUser } }),
@@ -361,6 +374,56 @@ describe('Auth/Courts HTTP validation and response contract (mock dependencies)'
       courtType: 'VIP',
       pricePerHour: 0,
     });
+  });
+
+  it('returns the active court detail with no-store and no private relations', async () => {
+    const courtId = '00000000-0000-4000-8000-000000000010';
+    prismaMock.court.findFirst.mockResolvedValue({
+      id: courtId,
+      name: 'Database Court',
+      code: 'VIP-01',
+      courtType: 'VIP',
+      status: 'ACTIVE',
+      branchId: 'private-branch-id',
+      cleanupMinutes: 15,
+      branch: {
+        phone: 'private-phone',
+        name: 'Test branch',
+        address: 'Public address',
+        timezone: 'Asia/Ho_Chi_Minh',
+        businessHours: [],
+      },
+      priceRules: [],
+    });
+    const response = await fetch(`${baseUrl}/api/courts/${courtId}`);
+    expect(response.status).toBe(200);
+    expect(response.headers.get('cache-control')).toBe('no-store');
+    const body = (await response.json()) as {
+      success: boolean;
+      data: Record<string, unknown>;
+    };
+    expect(body.success).toBe(true);
+    expect(Object.keys(body.data).sort()).toEqual(PUBLIC_COURT_KEYS);
+    expect(body.data).toMatchObject({ id: courtId, pricePerHour: 0 });
+    expect(body.data).not.toHaveProperty('branch');
+    expect(body.data).not.toHaveProperty('priceRules');
+  });
+
+  it('returns 404 for an inactive or missing court detail', async () => {
+    const response = await fetch(
+      `${baseUrl}/api/courts/00000000-0000-4000-8000-000000000011`,
+    );
+    expect(response.status).toBe(404);
+    expect(await response.json()).toMatchObject({
+      statusCode: 404,
+      message: 'Không tìm thấy sân đang hoạt động.',
+    });
+  });
+
+  it('rejects a non-UUID detail before querying persistence', async () => {
+    const response = await fetch(`${baseUrl}/api/courts/not-a-uuid`);
+    expect(response.status).toBe(400);
+    expect(prismaMock.court.findFirst).not.toHaveBeenCalled();
   });
 
   it('documents the exact success schemas for every existing endpoint', () => {
