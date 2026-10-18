@@ -15,11 +15,13 @@ Frontend dùng Next.js App Router trong `frontend/`, React và TypeScript. Phiê
 | `frontend/hooks/use-auth-form.ts`, `frontend/lib/auth-validation.ts` | State form, validation/chuẩn hóa và khóa submit trùng               |
 | `frontend/types/`                                                    | Kiểu dữ liệu frontend                                               |
 
+Feature có nhiều luồng độc lập ưu tiên cách tổ chức của Booking trong `frontend/features/<feature>/`: `components/`, `hooks/`, `api/`, `model/`. Panel/container ghép session, hook và view; view nhận props/callback; hook sở hữu state/interaction có cohesion; API service chỉ sở hữu HTTP và response contract. Không gom toàn bộ feature vào một service hoặc chuyển nguyên khối đó thành một hook tổng. Chỉ tách thêm component khi có trách nhiệm/dependency rõ, không tạo folder rỗng hoặc store toàn cục để đủ mẫu.
+
 `AuthProvider` được đặt ở root layout. Những component dùng hook/state, event handler hoặc `AuthContext` phải là client component (`'use client'`); giữ component server khi không cần tương tác phía browser.
 
 Auth state tách thành `useAuthSession`, `useAuthDialog` và `useAuthActions`. Header/dashboard chỉ đăng ký session và action ổn định; thay đổi trạng thái modal/guest không khiến Header render lại. `useAuth` vẫn cung cấp API kết hợp cho consumer cần cả ba nhóm.
 
-Client kiểm tra sơ bộ email (dot-atom/quoted local part, domain DNS) và số Việt Nam (`03/05/07/08/09`, `02`, dạng `0…` hoặc `+84…`) bằng regex; không import `class-validator` hoặc metadata số điện thoại toàn cầu vào bundle. Đây không phải bộ phân tích toàn bộ RFC 5322 hay danh sách đầu số được cấp phát. Backend vẫn xác thực hợp lệ cuối cùng bằng DTO và thư viện chuyên dụng. Form tự focus ô đầu, khóa input bằng fieldset khi gửi, hiển thị spinner và dùng khóa đồng bộ để ngăn submit trùng trước khi React cập nhật state.
+Client kiểm tra sơ bộ email (dot-atom/quoted local part, domain DNS) và số Việt Nam (`03/05/07/08/09`, `02`, dạng `0…` hoặc `+84…`) bằng regex; không import `class-validator` hoặc metadata số điện thoại toàn cầu vào bundle. Đây không phải bộ phân tích toàn bộ RFC 5322 hay danh sách đầu số được cấp phát. Backend vẫn xác thực hợp lệ cuối cùng bằng DTO và regex đồng bộ với migration SQL. Form tự focus ô đầu, khóa input bằng fieldset khi gửi, hiển thị spinner và dùng khóa đồng bộ để ngăn submit trùng trước khi React cập nhật state.
 
 ## State và API
 
@@ -36,7 +38,7 @@ Next config đặt nosniff/frame deny/no-referrer và CSP Report-Only với API 
 
 Trang chính gọi `GET /api/courts`; không dùng fallback showcase. API lỗi hiển thị lỗi/thử lại, API trả `[]` hiển thị trống. Dữ liệu mẫu chỉ còn dùng trong pilot/fixture không được nối với luồng MVP chính.
 
-Booking MVP bật link `/courts/[courtId]` mặc định; `NEXT_PUBLIC_COURT_DETAILS_ENABLED=false` tắt entry. Trang chi tiết dùng `useLiveBooking`/service booking cho quote/create, `/bookings` dùng `useMyBookings` để xem/hủy/reload/reconnect. Server quyết định giá, thời hạn và trạng thái. Không có thanh toán/CONFIRMED trong flow này.
+Booking MVP bật link `/courts/[courtId]` mặc định; `NEXT_PUBLIC_COURT_DETAILS_ENABLED=false` tắt entry. Route `/courts/[courtId]` dùng `BookingScreen` để điều phối court detail và feature `frontend/features/booking/`: API/contract, hooks state và panel/view nằm trong feature; view chỉ render props. Trang `/bookings` dùng `MyBookingsPanel` cho xem/hủy/reload/reconnect. Server quyết định giá, thời hạn và trạng thái. Không có thanh toán/CONFIRMED trong flow này.
 
 Trang chính bắt đầu với danh sách trống/loading rồi tải `loadCourtCatalog`. Session lookup và catalog dùng deadline 1.200 ms; lỗi catalog được báo ra UI. Lỗi session khác 401 giữ trạng thái unknown theo SECURITY. Caller hủy request khi unmount; response cũ không ghi đè phiên mới. Mutation booking không tự retry; client giữ key khi kết quả không rõ và gửi lại cùng thông tin sau khi kiểm tra lịch.
 

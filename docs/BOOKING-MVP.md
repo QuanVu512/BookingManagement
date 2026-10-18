@@ -41,7 +41,7 @@ Client lấy token từ `GET /api/auth/csrf`, gửi credentials và `X-CSRF-Toke
 
 ## Seed và demo
 
-`npm run seed:courts` yêu cầu `DATABASE_URL` tường minh, tạo riêng chi nhánh `MVP-DEMO`, 4 sân UUID ổn định, giờ 06:00–23:00 mỗi ngày và 4 PriceRule. Dữ liệu demo được lưu thật trong DB; script không tạo tài khoản và không ghi đè dữ liệu hiện có, chạy lại không nhân bản. Chỉ chạy vào DB development/test đã chọn. Khi chạy local, có thể dùng `node --env-file=backend/.env backend/scripts/seed-courts.mjs` nếu URL nằm trong file đó.
+`npm run seed:courts` yêu cầu `DATABASE_URL` tường minh, tạo riêng chi nhánh `MVP-DEMO`, 4 sân UUID ổn định, giờ 06:00–23:00 mỗi ngày và 4 PriceRule. Dữ liệu demo được lưu thật trong DB; script không tạo tài khoản và không ghi đè dữ liệu hiện có, chạy lại không nhân bản. Chỉ chạy vào DB development/test đã chọn. Khi chạy local, có thể dùng `node --env-file=backend/.env node_modules/prisma/build/index.js db seed --config backend/prisma.config.ts` nếu URL nằm trong file đó.
 
 UI `/` → `/courts/<UUID>` → `/bookings`: đăng nhập tài khoản đã verified, kiểm tra khoảng và giá, chấp thuận điều khoản giữ chỗ rồi tạo HOLDING. Booking của tôi cập nhật mỗi 15 giây và khi reconnect; nút tải lại lấy trạng thái server. API lỗi hiển thị lỗi, không thay bằng sân mẫu. Dashboard có nhãn DEMO cho toàn bộ số liệu minh họa. Link chi tiết sân bật mặc định; `NEXT_PUBLIC_COURT_DETAILS_ENABLED=false` có thể tắt entry.
 

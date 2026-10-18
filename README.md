@@ -53,6 +53,8 @@ Auth có thu hồi JWT, CSRF, xác minh email và recovery; xem contract và gi�
 ```powershell
 npm run lint
 npm test
+npm run test:backend
+npm run test:frontend
 npm run test:auth:contract
 npm run test:frontend:ui
 npm run test:auth:ui
@@ -64,6 +66,8 @@ npm run build
 npm run build:web
 ```
 
-`npm run test:frontend:ui` chạy toàn bộ test rendering React/Next.js qua `backend/jest.frontend.config.js`. Đặt test tại `backend/test/` với tên `frontend-<feature>-rendering.spec.tsx` để được tự động nhận diện. `test:auth:ui` và `test:booking:ui` dùng cùng config nhưng chỉ chạy suite tương ứng để debug hoặc dùng trong từng bước CI. Config hiện chỉ tìm test trong `backend/test/`; nếu đặt test tại `frontend/`, cần cập nhật `roots` hoặc di chuyển config.
+`npm test` chạy lần lượt `test:backend` và `test:frontend`, không cần DB, Redis hay backend server. Backend unit dùng `backend/jest.unit.config.js`, loại các suite `*.integration.spec.ts`; frontend dùng cấu hình độc lập `frontend/jest.config.js`, nhận `frontend/__tests__/**/*.spec.ts[x]`. Rendering specs dựng JSDOM, network tests mock fetch. `test:frontend:ui` chạy các rendering specs; `test:auth:ui` và `test:booking:ui` giữ alias theo feature. `test:auth:contract` chạy HTTP Nest và validation/network frontend qua hai cấu hình riêng.
+
+Các lệnh cần storage tách riêng: `test:auth:storage`, `test:booking:integration`, `test:e2e`. `test:auth:phones` chạy Jest unit audit và migration/CLI opt-in trên DB loopback riêng `auth_validation_test` qua `AUTH_MIGRATION_TEST_URL`; đặt `AUTH_MIGRATION_REQUIRE_STORAGE=true` để buộc chạy phần DB (CI luôn bật). Suite này tạo lại bảng users, tuyệt đối không dùng DB ứng dụng.
 
 Auth suites có các mức mock và storage thật; booking integration dùng HTTP/guards/PostgreSQL/Redis thật với URL test riêng. CI chạy migration vào DB test, booking integration, lint/unit/auth checks và build. Build cần `DATABASE_URL` để đọc Prisma config và sinh client, nhưng không kết nối hoặc migrate DB. CI không deploy.

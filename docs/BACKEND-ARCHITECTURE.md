@@ -5,16 +5,22 @@ Backend là một NestJS modular monolith trong `backend/src/`, kết nối mộ
 ## Luồng và ownership
 
 ```text
-HTTP Controller → Service/use case → PrismaService → PostgreSQL
-                                      ├→ Redis
-                                      └→ BullMQ (plumbing hiện có)
+HTTP Controller → Application use case → Port ← Infrastructure adapter
+                                                     ├→ PostgreSQL/Prisma
+                                                     ├→ Redis
+                                                     └→ BullMQ (plumbing hiện có)
 ```
 
-- **Controller** nhận HTTP, DTO và chuyển việc cho service. Contract HTTP cần được giữ ổn định với frontend.
-- **Service** điều phối use case và transaction cần thiết.
+- **Controller / presenter** nhận HTTP/DTO, gọi use case tương ứng và map response/error. Contract HTTP cần được giữ ổn định với frontend.
+- **Use case / interactor** điều phối một mục tiêu nghiệp vụ, policy, port và transaction boundary. Module mới ưu tiên các hành động có tên rõ như create hold, cancel hold hoặc list my bookings; không dùng một service tổng chứa mọi luồng của miền.
+- **Port / adapter** tách contract cần cho nghiệp vụ khỏi Prisma/Redis/SDK; module là nơi nối provider. Mũi tên `adapter → port` thể hiện dependency source vào contract, còn lời gọi runtime qua implementation được DI cung cấp.
+- **Service chuyên biệt / facade** vẫn phù hợp khi sở hữu một năng lực cohesive hoặc giữ tương thích caller; facade chỉ ủy quyền tới component/use case. Các use case độc lập không bị buộc đi qua một service trung tâm.
 - Auth facade không nhận Express Response hoặc gọi trực tiếp Prisma/Argon/JWT: `AccountStore`, `PasswordHasher`, `SessionTokenSigner` nối adapter qua AuthModule; cookie presenter sở hữu HTTP cookie. `application/auth-results.ts` định nghĩa kết quả login; account/password/signing ports nằm trong `ports/`. Đây là refactor từng lát, recovery/session service vẫn có trách nhiệm orchestration và persistence riêng; chưa di chuyển toàn module sang domain thuần.
 - **Prisma** cung cấp truy vấn và model từ schema. Hiện chưa có lớp repository riêng cho mọi module; không tạo abstraction repository chỉ để bọc một lời gọi Prisma.
-- Module khác dùng API public/service của module sở hữu; không sửa persistence của miền khác tùy tiện. Invariant xuyên miền phải nằm trong use case có quyền điều phối và cùng transaction client.
+- Module khác dùng contract/API public do module sở hữu công bố; không deep-import adapter/private helper hoặc sửa persistence của miền khác tùy tiện. Invariant xuyên miền phải nằm trong use case có quyền điều phối và cùng transaction boundary.
+- Booking sở hữu use case create/availability/list/cancel và `BookingStore` cho aggregate/transaction; Courts export `CourtScheduleReader` cho schedule/pricing và không import ngược Booking. `TransactionContext` là alias tường minh của Prisma transaction client, được truyền từ `BookingStore.withTransaction` sang `CourtScheduleReader` để giữ một transaction PostgreSQL.
+
+Booking là mẫu tổ chức module theo `application/`, `ports/`, `infrastructure/`, `presentation/`. Implementation hiện còn import NestJS/HTTP DTO trong use case và Prisma transaction alias qua port; cấu trúc folder chưa chứng minh lõi độc lập framework. Module mới tách application input/result/error khỏi transport và giữ type hạ tầng sau adapter. Các coupling hiện có chỉ được refactor trong task có scope tương ứng, bảo toàn transaction/API.
 
 ## Module
 
@@ -35,7 +41,7 @@ HTTP Controller → Service/use case → PrismaService → PostgreSQL
 - `infrastructure/queue/`: BullMQ connection lấy cấu hình Redis host/port/password.
 - `modules/notifications/`: Socket.IO realtime scaffold chưa được nạp bởi AppModule. Chỉ bật lại sau khi có handshake auth/Origin/room ownership và test tương ứng.
 
-Redis/BullMQ/Socket.IO có mặt trong scaffold nhưng không đồng nghĩa đã có worker, distributed lock hoặc nghiệp vụ retry chạy. Hiện chưa có module-owned repository hoặc worker xử lý outbox được xác nhận trong source.
+Redis/BullMQ/Socket.IO có mặt trong scaffold nhưng không đồng nghĩa đã có worker, distributed lock hoặc nghiệp vụ retry chạy. Booking có persistence port `BookingStore` và adapter `PrismaBookingStore`; không suy từ đó rằng mọi module đã có repository hoặc worker xử lý outbox.
 
 ## Transaction và dữ liệu
 

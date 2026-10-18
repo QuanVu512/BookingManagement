@@ -35,6 +35,8 @@ jobs:
       BOOKING_DATABASE_TEST_URL: postgresql://auth_test:disposable_test_only@127.0.0.1:5432/booking_mvp_test
       BOOKING_REDIS_TEST_URL: redis://127.0.0.1:6379
       BOOKING_REQUIRE_STORAGE: 'true'
+      AUTH_MIGRATION_TEST_URL: postgresql://auth_test:disposable_test_only@127.0.0.1:5432/auth_validation_test
+      AUTH_MIGRATION_REQUIRE_STORAGE: 'true'
       NEXT_PUBLIC_API_URL: https://api.example.test
     steps:
       - name: Check out source
@@ -58,6 +60,10 @@ jobs:
         run: |
           psql "$DATABASE_URL" -c 'CREATE DATABASE booking_mvp_test'
           DATABASE_URL="$BOOKING_DATABASE_TEST_URL" npm run prisma:migrate:deploy
+      - name: Create isolated phone migration test database
+        run: psql "$DATABASE_URL" -c 'CREATE DATABASE auth_validation_test'
+      - name: Auth storage integration
+        run: npm run test:auth:storage
       - name: Booking PostgreSQL integration (UTC runner)
         run: |
           TZ=UTC npm run test:booking:integration
@@ -66,7 +72,7 @@ jobs:
       - name: Dependency and focused source security gates
         run: |
           npm audit --audit-level=high
-          node backend/scripts/security-source-check.mjs
+          node tools/security-source-check.mjs
 
       - name: Lint
         run: npm run lint
@@ -77,6 +83,7 @@ jobs:
       - name: Auth HTTP, frontend and phone audit checks
         run: |
           npm run test:auth:contract
+          npm run test:auth:security
           npm run test:auth:ui
           npm run test:auth:phones
 

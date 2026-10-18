@@ -12,6 +12,7 @@
 ## Nghiệp vụ và vận hành
 
 - [Workflows và state machines](WORKFLOWS.md) — thiết kế và các quyết định còn mở.
+- [Tiến độ & Phân chia Worktree](ROADMAP-WORKTREE-STREAMS.md) — tổng kết module hiện có, module còn thiếu và ranh giới chia Git worktree.
 - [Pipelines](PIPELINES.md) — build, test, lint, CI và migration.
 
 ## Tài liệu tham chiếu

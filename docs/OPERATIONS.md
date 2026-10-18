@@ -34,9 +34,11 @@ Khi dùng Neon, giữ connection parameters/TLS mà provider cấp và chọn đ
 
 ## Tiền kiểm chuẩn hóa điện thoại Auth
 
-Migration [`20261013090000_normalize_auth_phone`](../backend/prisma/migrations/20261013090000_normalize_auth_phone/migration.sql) chuẩn hóa `users.phone` về `+84…` theo metadata VN của `libphonenumber-js` 1.13.15. Trước khi deploy, chọn đúng `DATABASE_URL` trong môi trường đích và chạy `npm run auth:phones:audit`. Script chỉ đọc dữ liệu; output có số lượng và ID bản ghi lỗi/trùng, không in số điện thoại hoặc credential. Exit 1 nghĩa là cần xử lý dữ liệu trước khi migrate.
+Migration [`20261013090000_normalize_auth_phone`](../backend/prisma/migrations/20261013090000_normalize_auth_phone/migration.sql) chuẩn hóa `users.phone` về `+84…` bằng regex trích từ metadata VN của `libphonenumber-js` 1.13.15; TypeScript helper và audit CLI dùng cùng biểu thức với hàm SQL. Trước khi deploy, chọn đúng `DATABASE_URL` trong môi trường đích và chạy `npm run auth:phones:audit`. Script chỉ đọc dữ liệu; output có số lượng và ID bản ghi lỗi/trùng, không in số điện thoại hoặc credential. Exit 1 nghĩa là cần xử lý dữ liệu trước khi migrate.
 
 Không tự gộp, vô hiệu hóa tài khoản hoặc thêm hậu tố vào điện thoại khi collision. Sau khi xử lý có quyết định của người quản lý dữ liệu, chạy lại tiền kiểm. Backend tra cứu dạng nội địa và quốc tế trong giai đoạn chuyển đổi; tài khoản mới lưu dạng quốc tế.
+
+Entrypoint duy nhất là [`backend/prisma/audit-auth-phones.mjs`](../backend/prisma/audit-auth-phones.mjs). Lệnh dùng `DATABASE_URL` đã truyền qua môi trường, không tự nạp `.env`; nếu cần nạp file đã chọn, dùng `node --env-file=backend/.env backend/prisma/audit-auth-phones.mjs`. Kiểm thử Jest dùng `npm run test:auth:phones`; phần migration/CLI chỉ chạy trên DB loopback riêng `auth_validation_test` qua `AUTH_MIGRATION_TEST_URL`, không dùng URL ứng dụng. CI đặt `AUTH_MIGRATION_REQUIRE_STORAGE=true` để thiếu URL phải thất bại.
 
 Migration kiểm tra lại dữ liệu/collision trong transaction trước khi update, giữ nguyên số chuẩn và chạy lại không thay đổi kết quả. Migration giữ write lock ngắn trên `users` để ngăn ghi đồng thời giữa kiểm tra và update; lock timeout 5 giây và statement timeout 30 giây. Cần cửa sổ bảo trì phù hợp và backup đã kiểm chứng trước khi apply lên DB thật.
 

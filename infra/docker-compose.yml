@@ -18,6 +18,23 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+  test-database:
+    image: postgres:16.11-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-pickleball}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-local_dev_password}
+      POSTGRES_DB: ${POSTGRES_DB:-pickleball}
+    ports:
+      - '127.0.0.1:${TEST_POSTGRES_PORT:-5435}:5432'
+    volumes:
+      - test_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
   redis:
     image: redis:7.4.11-alpine
@@ -31,7 +48,20 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
-
+  test-redis:
+    image: redis:7.4.11-alpine
+    command: ['redis-server', '--appendonly', 'yes']
+    ports:
+      - '127.0.0.1:6381:6379'
+    volumes:
+      - test_redis_data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 10
 volumes:
   postgres_data:
   redis_data:
+  test_postgres_data:
+  test_redis_data:
