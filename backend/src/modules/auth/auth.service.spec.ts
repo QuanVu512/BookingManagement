@@ -359,7 +359,7 @@ describe('AuthService.register', () => {
   const configServiceMock = { get: jest.fn<(...args: unknown[]) => unknown>() };
   let service: AuthController;
 
-  afterEach(() => jest.restoreAllMocks());
+  afterEach(() => {jest.restoreAllMocks()});
 
   beforeEach(async () => {
     jest.clearAllMocks();

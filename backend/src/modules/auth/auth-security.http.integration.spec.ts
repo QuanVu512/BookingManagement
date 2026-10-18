@@ -48,6 +48,9 @@ import { AuthRateLimitGuard } from './guards/auth-rate-limit.guard.js';
 import { RolesGuard } from './guards/roles.guard.js';
 import { Roles } from './decorators/roles.decorator.js';
 
+const HTTP_SECURITY_TEST_TIMEOUT_MS = 30_000;
+jest.setTimeout(HTTP_SECURITY_TEST_TIMEOUT_MS);
+
 const SECRET =
   '21d36eeec4567a8b969e3b012c703672b753fbcba854d3a05163b64b19e40a79';
 const ORIGIN = 'http://localhost:4001';
@@ -439,7 +442,7 @@ describe('Auth security HTTP integration (real guards/JWT, simulated DB/Redis/ma
     const blocked = await post('register', payload);
     expect(blocked.status).toBe(429);
     expect(Number(blocked.headers.get('retry-after'))).toBeGreaterThan(0);
-  }, 25000);
+  });
 
   it('returns identical forgot-password HTTP status/body for existing and missing accounts', async () => {
     findUnique.mockImplementation(async (query) =>

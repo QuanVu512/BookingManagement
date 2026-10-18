@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { CourtStatus, CourtType } from '../../../enums/index.js';
+import { CourtStatus, CourtType } from '../../../../enums/index.js';
 
 export class PublicCourtDto {
   @ApiProperty({ description: 'UUID sân từ database' })

@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { BookingStatus } from '../../../enums/index.js';
+import { BookingStatus } from '../../../../enums/index.js';
 
 export class BookingPriceItemDto {
   @ApiProperty({ format: 'date-time' }) startsAt!: string;

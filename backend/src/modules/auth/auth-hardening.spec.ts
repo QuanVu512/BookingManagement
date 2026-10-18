@@ -19,7 +19,7 @@ import { METHOD_METADATA, GUARDS_METADATA } from '@nestjs/common/constants';
 import { JwtAuthGuard } from './guards/jwt-auth.guard.js';
 import { resolvePublicApiOrigin } from '../../../../frontend/constants/public-origin.mjs';
 
-afterEach(() => jest.restoreAllMocks());
+afterEach(() => {jest.restoreAllMocks()});
 
 describe('Auth hardening contracts', () => {
   it('uses a valid precomputed dummy Argon2id hash', async () => {
