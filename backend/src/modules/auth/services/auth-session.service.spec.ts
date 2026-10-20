@@ -22,6 +22,7 @@ const USER = {
   username: 'customer',
   status: 'ACTIVE',
   tokenVersion: 3,
+  emailVerifiedAt: new Date('2026-01-01T00:00:00Z'),
   roles: [{ role: Role.STAFF }],
 };
 
@@ -105,7 +106,8 @@ describe('Server-side session validation', () => {
     { ...USER, status: 'SUSPENDED' },
     { ...USER, status: 'CLOSED' },
     { ...USER, tokenVersion: 4 },
-  ])('rejects deleted/disabled/version-changed accounts', async (user) => {
+    { ...USER, emailVerifiedAt: null },
+  ])('rejects deleted/disabled/unverified/version-changed accounts', async (user) => {
     prisma.user.findUnique.mockResolvedValue(user);
     const token = await jwt.signAsync(sessions.claims(USER.id, 3));
     await expect(

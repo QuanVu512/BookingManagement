@@ -162,7 +162,6 @@ function AuthModalDialog() {
                   : 'Đăng nhập và tiếp tục'}
             </button>
           </form>
-          <p>Mật khẩu 12–128 ký tự; có thể dùng Unicode và khoảng trắng.</p>
           <p>
             <a href="/auth/forgot-password">Quên mật khẩu?</a> ·{' '}
             <a href="/auth/resend-verification">Gửi lại email xác minh</a>

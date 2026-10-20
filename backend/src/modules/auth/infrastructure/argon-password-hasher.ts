@@ -1,7 +1,11 @@
-import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import argon from 'argon2';
 import { PasswordHasher } from '../ports/password-hasher.js';
-import { AUTH_HASH_CONCURRENCY } from '../constants/auth-validation.constants.js';
+import {
+  AUTH_ERROR_CODES,
+  AUTH_HASH_CONCURRENCY,
+} from '../constants/auth-validation.constants.js';
+import { authError } from '../helpers/auth-error.js';
 
 @Injectable()
 export class ArgonPasswordHasher extends PasswordHasher {
@@ -18,9 +22,10 @@ export class ArgonPasswordHasher extends PasswordHasher {
     operation: () => Promise<Result>,
   ): Promise<Result> {
     if (this.active >= AUTH_HASH_CONCURRENCY)
-      throw new HttpException(
-        'Authentication capacity exceeded.',
-        HttpStatus.TOO_MANY_REQUESTS,
+      throw authError(
+        429,
+        AUTH_ERROR_CODES.authRateLimited,
+        'Quá nhiều yêu cầu xác thực. Vui lòng thử lại sau.',
       );
     this.active++;
     try {

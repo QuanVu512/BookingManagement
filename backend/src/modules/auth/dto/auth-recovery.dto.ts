@@ -54,3 +54,22 @@ export class ResetPasswordDto extends AuthTokenDto {
   @MatchesPassword({ message: AUTH_VALIDATION_MESSAGES.confirmPassword })
   confirmPassword!: string;
 }
+
+export class EmailOtpVerifyDto {
+  @ApiProperty({ minLength: 64, maxLength: 64, writeOnly: true })
+  @IsString()
+  @Matches(AUTH_RANDOM_TOKEN_PATTERN)
+  challengeId!: string;
+
+  @ApiProperty({ minLength: 6, maxLength: 6, example: '012345' })
+  @IsString()
+  @Matches(/^[0-9]{6}$/, { message: 'Mã xác minh phải gồm 6 chữ số.' })
+  code!: string;
+}
+
+export class EmailOtpActivateDto {
+  @ApiProperty({ minLength: 64, maxLength: 64, writeOnly: true })
+  @IsString()
+  @Matches(AUTH_RANDOM_TOKEN_PATTERN)
+  challengeId!: string;
+}

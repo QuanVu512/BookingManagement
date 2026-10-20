@@ -22,6 +22,7 @@ export class AuthRequestError extends Error {
     message: string,
     readonly status?: number,
     readonly transient = false,
+    readonly code?: string,
   ) {
     super(message);
   }
@@ -62,6 +63,9 @@ function getErrorMessage(body: unknown): string {
     return body.message.join('\n');
   return AUTH_ERROR_MESSAGE;
 }
+function getErrorCode(body: unknown): string | undefined {
+  return isRecord(body) && typeof body.code === 'string' ? body.code : undefined;
+}
 async function readResponse(response: Response): Promise<unknown> {
   if (!response.ok) {
     const body: unknown = await response.json().catch(() => null);
@@ -69,6 +73,7 @@ async function readResponse(response: Response): Promise<unknown> {
       getErrorMessage(body),
       response.status,
       response.status >= 500,
+      getErrorCode(body),
     );
   }
   try {

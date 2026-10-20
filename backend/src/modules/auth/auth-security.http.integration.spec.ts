@@ -534,11 +534,15 @@ describe('Auth security HTTP integration (real guards/JWT, simulated DB/Redis/ma
       password: 'synthetic valid password',
     });
     expect(success.status).toBe(200);
+    jest.spyOn(argon, 'verify').mockResolvedValueOnce(false);
     const failure = await post('login', {
       username: ACCOUNT.username,
       password: 'bad',
     });
-    expect(failure.status).toBe(400);
+    // RF-02: short legacy passwords are valid input and must reach the
+    // hasher; a wrong credential is rejected as generic 401, not 400.
+    expect(failure.status).toBe(401);
+    expect(argon.verify).toHaveBeenCalledWith(ACCOUNT.passwordHash, 'bad');
     expect(auditRecord.mock.calls.map(([event]) => event.outcome)).toEqual([
       'success',
       'denied',

@@ -32,12 +32,27 @@ describe('Frontend auth validation', () => {
       }),
     ).toEqual({});
   });
-  it.each(['a'.repeat(11), 'a'.repeat(129), '😀'.repeat(129)])(
-    'rejects password outside backend boundaries: %s',
+  it.each(['a'.repeat(11), 'a'.repeat(128), 'a'.repeat(129), '😀'.repeat(128)])(
+    'accepts legacy/login passphrases without creation policy: %s',
     (password) => {
-      expect(getLoginErrors('customer', password)).toHaveProperty('password');
+      expect(getLoginErrors('customer', password)).toEqual({});
     },
   );
+  it('rejects empty login passwords and passwords beyond 1024 UTF-8 bytes', () => {
+    expect(getLoginErrors('customer', '')).toHaveProperty('password');
+    expect(getLoginErrors('customer', '😀'.repeat(256))).toEqual({});
+    expect(getLoginErrors('customer', `${'😀'.repeat(256)}a`)).toHaveProperty(
+      'password',
+    );
+    expect(getLoginErrors('customer', 'a'.repeat(1024))).toEqual({});
+    expect(getLoginErrors('customer', 'a'.repeat(1025))).toHaveProperty(
+      'password',
+    );
+  });
+  it('keeps the raw login password untouched (no trim, no normalization)', () => {
+    const raw = '  mật khẩu legacy 😀  ';
+    expect(getLoginErrors('customer', raw)).toEqual({});
+  });
   it('accepts Unicode names, corporate email and valid national phones', () => {
     expect(getRegistrationErrors(VALID_FORM)).toEqual({});
   });

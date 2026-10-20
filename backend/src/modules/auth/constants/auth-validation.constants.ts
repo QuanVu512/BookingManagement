@@ -12,6 +12,9 @@ export const LOGIN_IDENTIFIER_MAX_LENGTH = AUTH_FIELD_MAX_LENGTH.email;
 export const USERNAME_MIN_LENGTH = 8;
 export const PASSWORD_MIN_LENGTH = 12;
 export const PASSWORD_MAX_LENGTH = 128;
+// Login accepts any non-empty raw password within a fixed byte budget.
+// Creation/reset policy (12–128 code points) stays in PASSWORD_* above.
+export const LOGIN_PASSWORD_MAX_BYTES = 1024;
 export const USERNAME_PATTERN = /^(?=.*[A-Za-z])[A-Za-z0-9]+$/;
 export const VIETNAM_PHONE_INPUT_PATTERN = /^(?:0|\+84)[0-9]+$/;
 export const AUTH_COOKIE_NAME = 'access_token';
@@ -40,7 +43,26 @@ export const AUTH_RATE_LIMITS = {
   registerIp: { limit: 5, seconds: 3600 },
   recoveryIp: { limit: 5, seconds: 60 },
   tokenIp: { limit: 10, seconds: 60 },
+  otpVerifyIp: { limit: 20, seconds: 300 },
+  otpActivateIp: { limit: 20, seconds: 300 },
 } as const;
+
+export const AUTH_OTP = {
+  codeDigits: 6,
+  ttlSeconds: 600,
+  maxAttempts: 5,
+  resendCooldownSeconds: 60,
+  activationWindowSeconds: 120,
+  activationLeaseSeconds: 5,
+  activationPerProofPerMinute: 10,
+  verifyAccountFailures: 10,
+  verifyAccountWindowSeconds: 1800,
+} as const;
+
+export const AUTH_OTP_COOKIE_NAME = 'auth_email_verification';
+export const AUTH_OTP_COOKIE_PATH = '/api/auth';
+export const AUTH_OTP_REDIS_NAMESPACE = 'booking:auth:v2:email-otp';
+export const AUTH_OTP_HMAC_SECRET_PATTERN = /^[a-f0-9]{64}$/i;
 export const AUTH_RECIPIENT_LIMIT = {
   limit: 3,
   seconds: 3600,
@@ -62,4 +84,17 @@ export const AUTH_VALIDATION_MESSAGES = {
   password: 'Mật khẩu cần 12–128 ký tự; hỗ trợ Unicode và khoảng trắng.',
   phone: 'Vui lòng nhập số điện thoại Việt Nam hợp lệ dạng 0… hoặc +84….',
   confirmPassword: 'Mật khẩu xác nhận không khớp.',
+  loginPassword: 'Vui lòng nhập mật khẩu.',
+} as const;
+
+export const AUTH_ERROR_CODES = {
+  invalidCredentials: 'INVALID_CREDENTIALS',
+  emailVerificationRequired: 'EMAIL_VERIFICATION_REQUIRED',
+  invalidLoginInput: 'INVALID_LOGIN_INPUT',
+  invalidRegistrationInput: 'INVALID_REGISTRATION_INPUT',
+  sessionExpired: 'SESSION_EXPIRED',
+  authRateLimited: 'AUTH_RATE_LIMITED',
+  authUnavailable: 'AUTH_UNAVAILABLE',
+  csrfRejected: 'CSRF_REJECTED',
+  accountConflict: 'ACCOUNT_CONFLICT',
 } as const;
