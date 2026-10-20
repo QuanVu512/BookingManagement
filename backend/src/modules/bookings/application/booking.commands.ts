@@ -8,6 +8,7 @@ export interface QuoteAvailabilityQuery {
 export interface CreateHoldCommand extends QuoteAvailabilityQuery {
   userId: string;
   idempotencyKey: string;
+  prepaymentPercent?: 30 | 100;
 }
 
 export interface CancelHoldCommand {

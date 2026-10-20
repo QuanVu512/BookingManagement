@@ -78,11 +78,11 @@ export class CreateHoldUseCase {
       command.idempotencyKey,
     );
     if (!existing) return null;
-    const percent = input.prepaymentPercent ?? 100;
+    const percent = command.prepaymentPercent ?? 100;
     if (
-      existing.courtId !== input.courtId ||
-      existing.startsAt.getTime() !== Date.parse(input.startsAt) ||
-      existing.endsAt.getTime() !== Date.parse(input.endsAt) ||
+      existing.courtId !== command.courtId ||
+      existing.startsAt.getTime() !== Date.parse(command.startsAt) ||
+      existing.endsAt.getTime() !== Date.parse(command.endsAt) ||
       (existing.prepaymentPercent !== undefined &&
         existing.prepaymentPercent !== percent)
     )
@@ -110,10 +110,10 @@ export class CreateHoldUseCase {
       transaction,
     );
     const quote = this.schedule.quote(court, startsAt, endsAt);
-    const customer = await store.loadCustomer(transaction, userId);
+    const customer = await store.loadCustomer(transaction, command.userId);
     // E2: snapshot immutable percent; thiếu → default 100 (rollout MIG-10);
     // required = half-up 30% hoặc toàn phần, tính từ tổng server.
-    const percent = input.prepaymentPercent ?? 100;
+    const percent = command.prepaymentPercent ?? 100;
     const required =
       percent === 30
         ? Math.floor((quote.totalAmount * 30 + 50) / 100)

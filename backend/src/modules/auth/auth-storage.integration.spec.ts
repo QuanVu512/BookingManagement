@@ -202,6 +202,10 @@ liveDescribe(
       );
     });
     it('allows one concurrent reset across separate tokens via a PostgreSQL version compare-and-update', async () => {
+      await prisma.user.update({
+        where: { id },
+        data: { emailVerifiedAt: new Date() },
+      });
       const oldPayload = {
         ...sessions.claims(id, 0),
         exp: Math.floor(Date.now() / 1000) + 900,

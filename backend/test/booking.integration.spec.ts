@@ -19,6 +19,7 @@ import { BookingExpiryModule } from '../src/modules/bookings/booking-expiry.modu
 import {
   BOOKING_EXPIRY_JOB,
   BOOKING_EXPIRY_QUEUE,
+  MAX_BOOKING_EXPIRY_INTERVAL_MS,
 } from '../src/modules/bookings/booking.constants.js';
 import { BookingsModule } from '../src/modules/bookings/bookings.module.js';
 import { CourtsModule } from '../src/modules/courts/courts.module.js';
@@ -133,9 +134,11 @@ storageDescribe(
                 REDIS_HOST: redisConnection.host,
                 REDIS_PORT: String(redisConnection.port),
                 REDIS_PASSWORD: redisConnection.password,
-                // Keep the real scheduler out of the way; the worker itself is
+                // Use the longest supported interval; the worker itself is
                 // triggered explicitly by the integration test.
-                BOOKING_EXPIRY_INTERVAL_MS: '3600000',
+                BOOKING_EXPIRY_INTERVAL_MS: String(
+                  MAX_BOOKING_EXPIRY_INTERVAL_MS,
+                ),
                 BOOKING_EXPIRY_BATCH_SIZE: '10',
                 JWT_SECRET: randomBytes(32).toString('hex'),
                 WEB_ORIGIN: ORIGIN,
@@ -273,10 +276,28 @@ storageDescribe(
         instant('09:15'),
       );
       expect(stored.totalAmount.toNumber()).toBe(100001);
+      expect(stored.prepaymentPercent.toNumber()).toBe(100);
+      expect(stored.requiredPrepaymentAmount.toNumber()).toBe(100001);
       expect((await availability()).status).toBe(200);
       expect(await (await availability()).json()).toMatchObject({
         data: { available: false },
       });
+    });
+    it('persists a 30 percent prepayment and rejects a changed percentage on replay', async () => {
+      const payload = { ...input(), prepaymentPercent: 30 };
+      const booking = await create(payload);
+      const stored = await prisma.booking.findUniqueOrThrow({
+        where: { id: booking.id },
+      });
+      expect(stored.prepaymentPercent.toNumber()).toBe(30);
+      expect(stored.requiredPrepaymentAmount.toNumber()).toBe(30000);
+      expect((await create(payload)).id).toBe(booking.id);
+      const conflict = await http('bookings', 'POST', {
+        ...payload,
+        prepaymentPercent: 100,
+      });
+      expect(conflict.status).toBe(409);
+      expect(await prisma.booking.count({ where: { courtId } })).toBe(1);
     });
     it.each([
       ['08:00', '09:00'],

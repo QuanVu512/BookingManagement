@@ -63,6 +63,7 @@ export class BookingsController {
             startsAt: input.startsAt,
             endsAt: input.endsAt,
             idempotencyKey: input.idempotencyKey,
+            prepaymentPercent: input.prepaymentPercent,
           }),
         ),
       };

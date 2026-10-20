@@ -14,7 +14,7 @@ import {
   BOOKING_POLICY_VERSION,
   HOLD_DURATION_MS,
 } from '../../bookings/booking.constants.js';
-import { isExclusionConflictError } from '../../bookings/booking-errors.js';
+import { isExclusionConflictError } from '../../bookings/domain/booking-errors.js';
 import { PAYMENT_TRANSACTION_OPTIONS } from '../payment.constants.js';
 import { prepaymentAmountFor } from '../domain/money.js';
 
