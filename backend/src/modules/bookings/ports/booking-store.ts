@@ -1,6 +1,6 @@
 import type { TransactionContext } from '../../../infrastructure/prisma/transaction-context.js';
 
-export interface BookingScope {
+export interface ExpiryScope {
   courtId?: string;
   userId?: string;
   id?: string;
@@ -113,11 +113,16 @@ export abstract class BookingStore {
     idempotencyKey: string,
   ): Promise<ReplayBooking | null>;
 
+  /**
+   * Conditionally transitions expired HOLDING bookings and releases their
+   * occupancy. Returns how many bookings this call actually transitioned.
+   */
   abstract expireEligibleHolds(
     transaction: TransactionContext,
-    scope: BookingScope,
+    scope: ExpiryScope,
     now: Date,
-  ): Promise<void>;
+    limit?: number,
+  ): Promise<number>;
 
   abstract loadCustomer(
     transaction: TransactionContext,
@@ -162,10 +167,16 @@ export abstract class BookingStore {
     bookingId: string,
   ): Promise<StoredBooking>;
 
-  abstract hasActiveOccupancyConflict(
+  /**
+   * Read-only conflict check. An ACTIVE occupancy whose booking is a HOLDING
+   * past its holdExpiresAt no longer blocks a new window, even before the
+   * background worker has persisted the expiry.
+   */
+  abstract hasEffectiveOccupancyConflict(
     transaction: TransactionContext,
     courtId: string,
     startsAt: Date,
     occupiedUntil: Date,
+    now: Date,
   ): Promise<boolean>;
 }

@@ -1,6 +1,6 @@
 # Pickleball Booking
 
-Next.js frontend và NestJS modular monolith. Backend dùng một PostgreSQL database do DATABASE_URL chọn; Redis/BullMQ cho tác vụ nền và Socket.IO cho realtime. Root package.json/package-lock.json quản lý dependency chung.
+Next.js frontend và NestJS modular monolith. Backend dùng một PostgreSQL database do DATABASE_URL chọn, với PostgreSQL exclusion constraint bảo vệ lịch sân. Redis phục vụ session, thu hồi token (`tokenVersion`), CSRF và rate limiting; BullMQ dùng cùng Redis và chạy worker dọn hold booking hết hạn. Socket.IO hiện là scaffold realtime chưa nối vào luồng booking; frontend cập nhật availability và booking bằng HTTP polling. Root package.json/package-lock.json quản lý dependency chung.
 
 ## Tài liệu hệ thống
 
@@ -29,7 +29,7 @@ Build API sinh client rồi compile; không tự migrate DB. DB có bảng/dữ 
 
 ## Booking MVP
 
-Luồng hiện tại: catalog từ PostgreSQL → kiểm tra giá/lịch → giữ sân `HOLDING` 5 phút → xem/hủy booking của mình. Giá đến từ `PriceRule`; snapshot, history và occupancy được ghi atomically; PostgreSQL exclusion constraint bảo vệ cả buffer vệ sinh. Chưa có thanh toán hoặc booking `CONFIRMED`, guest, refund hay check-in. Dashboard được ghi nhãn DEMO.
+Luồng hiện tại: catalog từ PostgreSQL → kiểm tra giá/lịch → giữ sân `HOLDING` 5 phút → xem/hủy booking của mình. Giá đến từ `PriceRule`; snapshot, history và occupancy được ghi atomically; PostgreSQL exclusion constraint bảo vệ cả buffer vệ sinh. GET availability chỉ đọc và coi hold quá hạn là không chặn lịch; worker BullMQ dọn hold hết hạn theo định kỳ, còn create/cancel tự đối soát trong transaction. Chưa có thanh toán hoặc booking `CONFIRMED`, guest, refund hay check-in. Dashboard được ghi nhãn DEMO.
 
 Sau migration/generate, chạy seed vào **DB development/test đã chọn**:
 

@@ -1,43 +1,49 @@
+import { Injectable } from '@nestjs/common';
 import {
-  ConflictException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+  BookingConflictError,
+  BookingNotFoundError,
+} from '../domain/booking-errors.js';
 import {
   BookingStore,
   type CancellationTarget,
   type StoredBooking,
 } from '../ports/booking-store.js';
+import type { CancelHoldCommand } from './booking.commands.js';
 
 @Injectable()
 export class CancelHoldUseCase {
   constructor(private readonly bookings: BookingStore) {}
 
-  execute(userId: string, bookingId: string): Promise<StoredBooking> {
+  execute(command: CancelHoldCommand): Promise<StoredBooking> {
     return this.bookings.withTransaction(async (transaction, store) => {
       const lookup = await store.loadCancellationLookup(
         transaction,
-        bookingId,
-        userId,
+        command.bookingId,
+        command.userId,
       );
-      if (!lookup) throw new NotFoundException('Không tìm thấy booking.');
+      if (!lookup) throw new BookingNotFoundError('Không tìm thấy booking.');
       const { booking, now } = lookup;
       if (isFinalHoldStatus(booking.status))
-        return store.readBooking(transaction, bookingId);
+        return store.readBooking(transaction, command.bookingId);
       assertCancellable(booking, now);
       const changed = await store.markCancelled(
         transaction,
-        bookingId,
-        userId,
+        command.bookingId,
+        command.userId,
         booking.version,
         now,
       );
       if (!changed)
-        throw new ConflictException(
+        throw new BookingConflictError(
           'Trạng thái booking đã thay đổi. Hãy tải lại.',
         );
-      await store.releaseCancelled(transaction, bookingId, userId, now);
-      return store.readBooking(transaction, bookingId);
+      await store.releaseCancelled(
+        transaction,
+        command.bookingId,
+        command.userId,
+        now,
+      );
+      return store.readBooking(transaction, command.bookingId);
     });
   }
 }
@@ -52,7 +58,7 @@ function assertCancellable(booking: CancellationTarget, now: Date) {
     booking.startsAt <= now ||
     booking.hasCheckin
   )
-    throw new ConflictException(
+    throw new BookingConflictError(
       'Chỉ hủy giữ chỗ chưa check-in và chưa đến giờ bắt đầu.',
     );
 }

@@ -9,10 +9,17 @@ import {
 } from '@jest/globals';
 import { Test } from '@nestjs/testing';
 import { ConfigModule } from '@nestjs/config';
+import { getQueueToken } from '@nestjs/bullmq';
 import { JwtService } from '@nestjs/jwt';
 import { ValidationPipe } from '@nestjs/common';
 import type { INestApplication } from '@nestjs/common';
+import { QueueEvents, type Queue } from 'bullmq';
 import { randomBytes, randomUUID } from 'node:crypto';
+import { BookingExpiryModule } from '../src/modules/bookings/booking-expiry.module.js';
+import {
+  BOOKING_EXPIRY_JOB,
+  BOOKING_EXPIRY_QUEUE,
+} from '../src/modules/bookings/booking.constants.js';
 import { BookingsModule } from '../src/modules/bookings/bookings.module.js';
 import { CourtsModule } from '../src/modules/courts/courts.module.js';
 import { PrismaModule } from '../src/infrastructure/prisma/prisma.module.js';
@@ -91,6 +98,8 @@ storageDescribe(
     let base: string;
     let tokenA: string;
     let tokenB: string;
+    let expiryQueue: Queue;
+    let queueEvents: QueueEvents;
     let csrf = '';
     let cookie = '';
     beforeAll(async () => {
@@ -104,6 +113,13 @@ storageDescribe(
         throw new Error(
           'Only loopback booking_mvp_test and explicit test Redis are allowed.',
         );
+      const redisConnection = {
+        host: redis.hostname,
+        port: Number(redis.port || '6379'),
+        password: redis.password
+          ? decodeURIComponent(redis.password)
+          : undefined,
+      };
       const module = await Test.createTestingModule({
         imports: [
           ConfigModule.forRoot({
@@ -114,6 +130,13 @@ storageDescribe(
                 NODE_ENV: 'test',
                 DATABASE_URL: databaseUrl,
                 REDIS_URL: redisUrl,
+                REDIS_HOST: redisConnection.host,
+                REDIS_PORT: String(redisConnection.port),
+                REDIS_PASSWORD: redisConnection.password,
+                // Keep the real scheduler out of the way; the worker itself is
+                // triggered explicitly by the integration test.
+                BOOKING_EXPIRY_INTERVAL_MS: '3600000',
+                BOOKING_EXPIRY_BATCH_SIZE: '10',
                 JWT_SECRET: randomBytes(32).toString('hex'),
                 WEB_ORIGIN: ORIGIN,
               }),
@@ -123,6 +146,7 @@ storageDescribe(
           RedisModule,
           CourtsModule,
           BookingsModule,
+          BookingExpiryModule,
         ],
       })
         .overrideProvider(AuthMailService)
@@ -134,6 +158,12 @@ storageDescribe(
       await app.listen(0, '127.0.0.1');
       base = await app.getUrl();
       prisma = app.get(PrismaService);
+      expiryQueue = app.get<Queue>(getQueueToken(BOOKING_EXPIRY_QUEUE));
+      queueEvents = new QueueEvents(BOOKING_EXPIRY_QUEUE, {
+        connection: redisConnection,
+      });
+      await queueEvents.waitUntilReady();
+      await expiryQueue.drain();
       const jwt = app.get(JwtService);
       tokenA = jwt.sign({ sub: userA, jti: randomUUID(), tokenVersion: 0 });
       tokenB = jwt.sign({ sub: userB, jti: randomUUID(), tokenVersion: 0 });
@@ -166,6 +196,7 @@ storageDescribe(
       });
     });
     afterAll(async () => {
+      await queueEvents?.close();
       if (prisma) {
         await clearBookings(prisma);
         await prisma.priceRule.deleteMany({ where: { courtId } });
@@ -389,13 +420,37 @@ storageDescribe(
         ).state,
       ).toBe('ACTIVE');
     });
-    it('expires on availability and retry returns the current EXPIRED booking', async () => {
+    it('quotes an expired hold as available without mutating stored state', async () => {
       const payload = input();
       const booking = await create(payload);
       await ageHold(booking.id);
-      expect(await (await availability()).json()).toMatchObject({
+
+      const response = await availability();
+      expect(response.status).toBe(200);
+      expect(await response.json()).toMatchObject({
         data: { available: true },
       });
+      expect(
+        (
+          await prisma.booking.findUniqueOrThrow({
+            where: { id: booking.id },
+          })
+        ).status,
+      ).toBe('HOLDING');
+      expect(
+        await prisma.bookingStatusHistory.count({
+          where: { bookingId: booking.id, toStatus: 'EXPIRED' },
+        }),
+      ).toBe(0);
+      expect(
+        (
+          await prisma.courtOccupancy.findUniqueOrThrow({
+            where: { bookingId: booking.id },
+          })
+        ).state,
+      ).toBe('ACTIVE');
+
+      // The write path still reconciles before accepting a retry.
       expect((await create(payload)).status).toBe('EXPIRED');
       expect((await create()).status).toBe('HOLDING');
       expect(
@@ -403,6 +458,45 @@ storageDescribe(
           where: { bookingId: booking.id, toStatus: 'EXPIRED' },
         }),
       ).toBe(1);
+    });
+    it('lets the BullMQ worker expire the hold once and release occupancy', async () => {
+      const booking = await create();
+      await ageHold(booking.id);
+
+      const first = await expiryQueue.add(BOOKING_EXPIRY_JOB, {});
+      await first.waitUntilFinished(queueEvents, 15_000);
+
+      expect(
+        (
+          await prisma.booking.findUniqueOrThrow({
+            where: { id: booking.id },
+          })
+        ).status,
+      ).toBe('EXPIRED');
+      expect(
+        (
+          await prisma.courtOccupancy.findUniqueOrThrow({
+            where: { bookingId: booking.id },
+          })
+        ).state,
+      ).toBe('RELEASED');
+      expect(
+        await prisma.bookingStatusHistory.count({
+          where: { bookingId: booking.id, toStatus: 'EXPIRED' },
+        }),
+      ).toBe(1);
+
+      const second = await expiryQueue.add(BOOKING_EXPIRY_JOB, {});
+      await second.waitUntilFinished(queueEvents, 15_000);
+
+      expect(
+        await prisma.bookingStatusHistory.count({
+          where: { bookingId: booking.id, toStatus: 'EXPIRED' },
+        }),
+      ).toBe(1);
+      expect(await (await availability()).json()).toMatchObject({
+        data: { available: true },
+      });
     });
     it('expires at the write boundary even without a preceding availability read', async () => {
       const booking = await create();
