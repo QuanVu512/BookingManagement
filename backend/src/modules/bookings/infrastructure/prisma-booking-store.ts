@@ -71,10 +71,24 @@ export class PrismaBookingStore extends BookingStore {
     userId: string,
     idempotencyKey: string,
   ): Promise<ReplayBooking | null> {
-    return transaction.booking.findUnique({
+    const row = await transaction.booking.findUnique({
       where: { userId_idempotencyKey: { userId, idempotencyKey } },
-      select: { id: true, courtId: true, startsAt: true, endsAt: true },
+      select: {
+        id: true,
+        courtId: true,
+        startsAt: true,
+        endsAt: true,
+        prepaymentPercent: true,
+      },
     });
+    if (!row) return null;
+    return {
+      id: row.id,
+      courtId: row.courtId,
+      startsAt: row.startsAt,
+      endsAt: row.endsAt,
+      prepaymentPercent: row.prepaymentPercent.toNumber(),
+    };
   }
 
   // Conditional update owns the transition. Concurrent readers/cancellations
@@ -142,7 +156,7 @@ export class PrismaBookingStore extends BookingStore {
         ...draft,
         source: 'CUSTOMER_WEB',
         status: 'HOLDING',
-        prepaymentPercent: 100,
+        prepaymentPercent: draft.prepaymentPercent,
         cancellationRule: 'BEFORE_START',
       },
     });
@@ -307,6 +321,8 @@ function toStoredBooking(booking: BookingWithPresentation): StoredBooking {
     holdExpiresAt: booking.holdExpiresAt,
     status: booking.status,
     totalAmount: booking.totalAmount.toNumber(),
+    prepaymentPercent: booking.prepaymentPercent.toNumber(),
+    requiredPrepaymentAmount: booking.requiredPrepaymentAmount.toNumber(),
     currency: booking.currency,
     priceItems: booking.priceItems.map((item) => ({
       priceRuleId: item.priceRuleId,

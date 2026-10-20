@@ -544,6 +544,35 @@ model BookingPriceItem {
   @@map("booking_price_items")
 }
 
+model PaymentAuditLog {
+  /// ID audit (append-only: code chỉ create + read, không update/delete)
+  id String @id(map: "payment_audit_logs_pkey") @default(dbgenerated("gen_random_uuid()")) @map("id") @db.Uuid
+  /// SYSTEM, CUSTOMER, GUEST, STAFF
+  actorType ActorType @map("actor_type")
+  /// Người thao tác nếu có tài khoản
+  actorUserId String? @map("actor_user_id") @db.Uuid
+  /// create/approve/reject/execute/reveal/reconcile/lookup/issue-token/allocate/balance
+  action String @map("action") @db.VarChar(50)
+  /// payment_request/receipt/refund_request/refund_attempt/booking
+  entityType String @map("entity_type") @db.VarChar(50)
+  /// ID entity bị tác động
+  entityId String @map("entity_id") @db.Uuid
+  /// Booking liên quan (nếu có) để tra cứu
+  bookingId String? @map("booking_id") @db.Uuid
+  /// SHA-256 IP caller (không lưu IP thô)
+  ipHash String? @map("ip_hash") @db.Char(64)
+  /// Kết quả: OK/DENIED/FAILED
+  result String @map("result") @db.VarChar(20)
+  /// Chi tiết đã lọc secret/PII thô
+  detail Json? @map("detail") @db.JsonB
+  /// Thời điểm ghi
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([entityType, entityId], map: "payment_audit_logs_entity_type_entity_id_idx")
+  @@index([bookingId, createdAt], map: "payment_audit_logs_booking_id_created_at_idx")
+  @@map("payment_audit_logs")
+}
+
 model BookingStatusHistory {
   /// ID lịch sử
   id String @id(map: "booking_status_history_pkey") @default(dbgenerated("gen_random_uuid()")) @map("id") @db.Uuid
@@ -702,6 +731,12 @@ model PaymentRequest {
   providerPaymentLinkId String? @map("provider_payment_link_id") @db.VarChar(100)
   /// URL thanh toán nếu có
   checkoutUrl String? @map("checkout_url") @db.Text
+  /// Chuỗi VietQR/EMVCo từ create response đã xác minh (M-03, MIG-09)
+  vietQrPayload String? @map("viet_qr_payload") @db.Text
+  /// Tên tài khoản nhận từ create response (M-03)
+  providerAccountName String? @map("provider_account_name") @db.VarChar(150)
+  /// Mã BIN ngân hàng nhận từ create response (M-03)
+  providerBin String? @map("provider_bin") @db.VarChar(10)
   /// CREATING, PENDING, PARTIALLY_PAID, PAID, CANCELLED, EXPIRED, FAILED
   status PaymentRequestStatus @default(CREATING) @map("status")
   /// Deadline link/hold; thu tại quầy có thể không cần

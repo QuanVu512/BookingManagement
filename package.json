@@ -19,7 +19,7 @@
     "start:dev": "npm run prisma:generate && cd backend && nest start --watch",
     "start:debug": "npm run prisma:generate && cd backend && nest start --debug --watch",
     "start:prod": "node backend/dist/main.js",
-    "web:dev": "next dev frontend --turbopack --hostname 0.0.0.0 --port 4001",
+    "web:dev": "next dev frontend --hostname 0.0.0.0 --port 4001",
     "web:start": "next start frontend --hostname 0.0.0.0 --port 4001",
     "test": "npm run test:backend && npm run test:frontend",
     "test:watch": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js --config backend/jest.unit.config.js --watch",
@@ -35,6 +35,8 @@
     "test:booking:integration": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js --config backend/jest.config.js --runInBand --runTestsByPath backend/test/booking.integration.spec.ts",
     "test:booking:ui": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js --config frontend/jest.config.js --runInBand --runTestsByPath frontend/__tests__/frontend-booking-rendering.spec.tsx",
     "seed:courts": "prisma db seed --config backend/prisma.config.ts",
+    "seed:admin": "node backend/prisma/seed.mjs --mode=admin",
+    "seed:all": "node backend/prisma/seed.mjs --mode=all",
     "prisma:generate": "prisma generate --config backend/prisma.config.ts",
     "prisma:migrate:dev": "prisma migrate dev --config backend/prisma.config.ts",
     "prisma:studio": "prisma studio --config backend/prisma.config.ts",
@@ -82,6 +84,7 @@
     "class-transformer": "^0.5.1",
     "class-validator": "^0.15.1",
     "dotenv": "~18.0.6",
+    "ioredis": "^6.0.0",
     "next": "~16.4.0",
     "nodemailer": "~10.1.1",
     "passport": "~0.7.0",
@@ -96,6 +99,7 @@
   },
   "devDependencies": {
     "@nestjs/cli": "~12.0.8",
+    "@nestjs/mau": "~0.2.8",
     "@nestjs/schematics": "~12.0.6",
     "@nestjs/testing": "~12.1.2",
     "@types/bcrypt": "~6.0.0",
@@ -118,8 +122,7 @@
     "prisma": "~7.10.0",
     "source-map-support": "~0.5.21",
     "ts-jest": "~29.4.14",
-    "typescript": "~6.0.3",
-    "@nestjs/mau": "~0.2.8"
+    "typescript": "~6.0.3"
   },
   "generate": {
     "backend/prisma.config.ts": true

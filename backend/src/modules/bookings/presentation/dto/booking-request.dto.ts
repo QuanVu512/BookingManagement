@@ -1,5 +1,13 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { Equals, IsISO8601, IsUUID, Matches } from 'class-validator';
+import {
+  Equals,
+  IsIn,
+  IsInt,
+  IsISO8601,
+  IsOptional,
+  IsUUID,
+  Matches,
+} from 'class-validator';
 
 export class BookingWindowDto {
   @ApiProperty({
@@ -33,4 +41,16 @@ export class CreateBookingDto extends BookingWindowDto {
   })
   @Matches(/^[A-Za-z0-9_-]{8,100}$/)
   idempotencyKey!: string;
+
+  @ApiProperty({
+    description:
+      '30 hoặc 100. Client cũ thiếu field → server default 100 (rollout, MIG-10).',
+    enum: [30, 100],
+    required: false,
+    default: 100,
+  })
+  @IsOptional()
+  @IsInt()
+  @IsIn([30, 100])
+  prepaymentPercent?: 30 | 100;
 }
