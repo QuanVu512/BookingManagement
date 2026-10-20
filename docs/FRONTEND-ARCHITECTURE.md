@@ -8,7 +8,7 @@ Frontend dùng Next.js App Router trong `frontend/`, React và TypeScript. Phiê
 | -------------------------------------------------------------------- | ------------------------------------------------------------------- |
 | `frontend/app/`                                                      | Route `/`, `/dashboard`, layout và stylesheet toàn cục              |
 | `frontend/components/auth/`                                          | Modal auth và xác nhận tiếp tục ở chế độ guest                      |
-| `frontend/components/booking/`                                       | UI modal đặt sân                                                    |
+| `frontend/features/courts/`, `frontend/features/booking/`            | Luồng chọn sân, availability, giữ chỗ và booking của tôi            |
 | `frontend/components/home/`                                          | Header, catalog sân và các khối trang chủ                           |
 | `frontend/context/auth-context.tsx`                                  | Auth state, trạng thái modal, guest session và các lời gọi auth API |
 | `frontend/services/auth.ts`, `frontend/services/courts.ts`           | Gọi HTTP, kiểm tra response và timeout/fallback cho các request đọc |
