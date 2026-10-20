@@ -18,7 +18,7 @@ export function createFakeBookingStore() {
   );
   const findReplay = jest.fn<BookingStore['findReplay']>(async () => null);
   const expireEligibleHolds = jest.fn<BookingStore['expireEligibleHolds']>(
-    async () => undefined,
+    async () => 0,
   );
   const loadCustomer = jest.fn<BookingStore['loadCustomer']>(async () => ({
     id: 'user',
@@ -44,8 +44,8 @@ export function createFakeBookingStore() {
   const readBooking = jest.fn<BookingStore['readBooking']>(async () =>
     storedBooking(),
   );
-  const hasActiveOccupancyConflict = jest.fn<
-    BookingStore['hasActiveOccupancyConflict']
+  const hasEffectiveOccupancyConflict = jest.fn<
+    BookingStore['hasEffectiveOccupancyConflict']
   >(async () => false);
   const store: BookingStore = {
     withTransaction: async <Result>(
@@ -65,7 +65,7 @@ export function createFakeBookingStore() {
     markCancelled,
     releaseCancelled,
     readBooking,
-    hasActiveOccupancyConflict,
+    hasEffectiveOccupancyConflict,
   };
   return {
     store,
@@ -81,7 +81,7 @@ export function createFakeBookingStore() {
       markCancelled,
       releaseCancelled,
       readBooking,
-      hasActiveOccupancyConflict,
+      hasEffectiveOccupancyConflict,
     },
   };
 }

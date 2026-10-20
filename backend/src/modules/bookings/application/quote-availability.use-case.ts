@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { CourtScheduleReader } from '../../courts/application/court-schedule-reader.js';
 import { HOLD_DURATION_MS, MINUTE_MS } from '../booking.constants.js';
-import type { BookingWindowDto } from '../presentation/dto/booking-request.dto.js';
 import { BookingStore } from '../ports/booking-store.js';
+import type { QuoteAvailabilityQuery } from './booking.commands.js';
 
 export interface AvailabilityPriceItem {
   startsAt: Date;
@@ -31,25 +31,30 @@ export class QuoteAvailabilityUseCase {
     private readonly schedule: CourtScheduleReader,
   ) {}
 
-  execute(
-    courtId: string,
-    window: BookingWindowDto,
-  ): Promise<AvailabilityView> {
+  /**
+   * Read-only quote: it never transitions a hold. A HOLDING row past its
+   * deadline is already treated as non-blocking by the store query, so the
+   * request can safely run before the background worker catches up.
+   */
+  execute(query: QuoteAvailabilityQuery): Promise<AvailabilityView> {
     return this.bookings.withTransaction(async (transaction, store) => {
       const now = await store.databaseNow(transaction);
-      await store.expireEligibleHolds(transaction, { courtId }, now);
-      const court = await this.schedule.getActiveSchedule(courtId, transaction);
-      const startsAt = new Date(window.startsAt);
-      const endsAt = new Date(window.endsAt);
+      const court = await this.schedule.getActiveSchedule(
+        query.courtId,
+        transaction,
+      );
+      const startsAt = new Date(query.startsAt);
+      const endsAt = new Date(query.endsAt);
       const quote = this.schedule.quote(court, startsAt, endsAt);
       const occupiedUntil = new Date(
         endsAt.getTime() + court.cleanupMinutes * MINUTE_MS,
       );
-      const conflict = await store.hasActiveOccupancyConflict(
+      const conflict = await store.hasEffectiveOccupancyConflict(
         transaction,
-        courtId,
+        query.courtId,
         startsAt,
         occupiedUntil,
+        now,
       );
       const tooSoon = startsAt.getTime() - now.getTime() < HOLD_DURATION_MS;
       return {

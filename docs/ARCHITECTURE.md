@@ -82,9 +82,9 @@ Nest -> PostgreSQL (DATABASE_URL)
 Nest -> Redis cache / lock / BullMQ
 ```
 
-Khởi đầu API và worker có thể ở cùng backend process, nhưng worker chưa được implement. Sau này tách worker process từ cùng codebase khi cần; điều đó chưa bắt buộc tách domain thành microservices hay DB riêng.
+API và worker booking expiry hiện chạy cùng backend process. Các worker email/retry/outbox khác chưa được implement. Sau này có thể tách worker process từ cùng codebase khi cần; điều đó chưa bắt buộc tách domain thành microservices hay DB riêng.
 
-BullMQ là queue cho task như expire hold/email/retry; RabbitMQ là message broker thường dùng liên hệ thống; gRPC là RPC protocol; Jest là test runner/assertions; Socket.IO phục vụ sự kiện realtime cho browser. Các công cụ giải quyết các nhu cầu khác nhau. RabbitMQ/gRPC là bài học mở rộng, không phải dependency bắt buộc của monolith.
+BullMQ là queue cho task như expire hold/email/retry; hiện mới có worker expire hold, email/retry còn là thiết kế. RabbitMQ là message broker thường dùng liên hệ thống; gRPC là RPC protocol; Jest là test runner/assertions; Socket.IO phục vụ sự kiện realtime cho browser. Các công cụ giải quyết các nhu cầu khác nhau. RabbitMQ/gRPC là bài học mở rộng, không phải dependency bắt buộc của monolith.
 
 ## Ràng buộc và phạm vi
 

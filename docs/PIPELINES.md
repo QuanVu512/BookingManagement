@@ -73,7 +73,7 @@ Audit ngày 2026-10-16 còn 20 cảnh báo moderate trong chuỗi Jest → `@ist
 
 ## Pre-flight cho thay đổi
 
-Booking MVP có suite `npm run test:booking:integration`. CI tạo DB `booking_mvp_test` riêng, migrate bằng `BOOKING_DATABASE_TEST_URL`, dùng `BOOKING_REDIS_TEST_URL` cho JWT/CSRF và `BOOKING_REQUIRE_STORAGE=true` để không bỏ qua storage. Core booking không dùng Redis lock/queue; auth vẫn cần Redis. Seed: `npm run seed:courts` với DATABASE_URL tường minh. Cách chạy PostgreSQL test riêng và contract tại [BOOKING-MVP.md](BOOKING-MVP.md).
+Booking MVP có suite `npm run test:booking:integration`. CI tạo DB `booking_mvp_test` riêng, migrate bằng `BOOKING_DATABASE_TEST_URL`, dùng `BOOKING_REDIS_TEST_URL` cho JWT/CSRF và BullMQ worker, và `BOOKING_REQUIRE_STORAGE=true` để không bỏ qua storage. Booking không dùng Redis lock; BullMQ chạy worker expiry, auth vẫn cần Redis cho session/CSRF. Seed: `npm run seed:courts` với DATABASE_URL tường minh. Cách chạy PostgreSQL test riêng và contract tại [BOOKING-MVP.md](BOOKING-MVP.md).
 
 - Chạy đúng lint/test/build cho vùng bị ảnh hưởng và báo riêng command, exit status, lỗi thuộc phạm vi nào.
 - Với schema, xem diff cả `schema.prisma` và migration SQL; bảo toàn constraint thủ công. Kiểm tra trạng thái DB đích trước khi kết luận migration đã apply.

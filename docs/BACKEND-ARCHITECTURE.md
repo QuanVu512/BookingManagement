@@ -8,7 +8,7 @@ Backend là một NestJS modular monolith trong `backend/src/`, kết nối mộ
 HTTP Controller → Application use case → Port ← Infrastructure adapter
                                                      ├→ PostgreSQL/Prisma
                                                      ├→ Redis
-                                                     └→ BullMQ (plumbing hiện có)
+                                                     └→ BullMQ (booking expiry worker)
 ```
 
 - **Controller / presenter** nhận HTTP/DTO, gọi use case tương ứng và map response/error. Contract HTTP cần được giữ ổn định với frontend.
@@ -18,9 +18,9 @@ HTTP Controller → Application use case → Port ← Infrastructure adapter
 - Auth facade không nhận Express Response hoặc gọi trực tiếp Prisma/Argon/JWT: `AccountStore`, `PasswordHasher`, `SessionTokenSigner` nối adapter qua AuthModule; cookie presenter sở hữu HTTP cookie. `application/auth-results.ts` định nghĩa kết quả login; account/password/signing ports nằm trong `ports/`. Đây là refactor từng lát, recovery/session service vẫn có trách nhiệm orchestration và persistence riêng; chưa di chuyển toàn module sang domain thuần.
 - **Prisma** cung cấp truy vấn và model từ schema. Hiện chưa có lớp repository riêng cho mọi module; không tạo abstraction repository chỉ để bọc một lời gọi Prisma.
 - Module khác dùng contract/API public do module sở hữu công bố; không deep-import adapter/private helper hoặc sửa persistence của miền khác tùy tiện. Invariant xuyên miền phải nằm trong use case có quyền điều phối và cùng transaction boundary.
-- Booking sở hữu use case create/availability/list/cancel và `BookingStore` cho aggregate/transaction; Courts export `CourtScheduleReader` cho schedule/pricing và không import ngược Booking. `TransactionContext` là alias tường minh của Prisma transaction client, được truyền từ `BookingStore.withTransaction` sang `CourtScheduleReader` để giữ một transaction PostgreSQL.
+- Booking sở hữu use case create/availability/list/cancel, `ExpireEligibleHoldsUseCase` và `BookingStore` cho aggregate/transaction; Courts export `CourtScheduleReader` cho schedule/pricing và không import ngược Booking. `TransactionContext` là alias tường minh của Prisma transaction client, được truyền từ `BookingStore.withTransaction` sang `CourtScheduleReader` để giữ một transaction PostgreSQL. `BookingsModule` export `BookingStore`; `BookingExpiryModule` riêng nối BullMQ worker/scheduler nên module HTTP và unit test không phụ thuộc Redis.
 
-Booking là mẫu tổ chức module theo `application/`, `ports/`, `infrastructure/`, `presentation/`. Implementation hiện còn import NestJS/HTTP DTO trong use case và Prisma transaction alias qua port; cấu trúc folder chưa chứng minh lõi độc lập framework. Module mới tách application input/result/error khỏi transport và giữ type hạ tầng sau adapter. Các coupling hiện có chỉ được refactor trong task có scope tương ứng, bảo toàn transaction/API.
+Booking là mẫu tổ chức module theo `application/`, `ports/`, `infrastructure/`, `presentation/`. Application nhận command/query nội bộ và ném typed error trong `domain/booking-errors.ts`; controller/presenter sở hữu DTO và map error sang HTTP exception. Use case vẫn dùng `@nestjs/common` cho DI/logger và `TransactionContext` alias Prisma qua port, nên lõi chưa độc lập hoàn toàn framework. Module mới giữ application input/result/error tách khỏi transport và type hạ tầng sau adapter; chỉ refactor coupling trong task có scope tương ứng, bảo toàn transaction/API.
 
 ## Module
 
@@ -29,7 +29,7 @@ Booking là mẫu tổ chức module theo `application/`, `ports/`, `infrastruct
 | `auth`          | Controller/service login, register, session lookup, logout; JWT strategy và guards       |
 | `users`         | Scaffold controller/service; chức năng còn hạn chế                                       |
 | `courts`        | Danh sách/chi tiết ACTIVE, giá từ PriceRule, availability theo khoảng có buffer          |
-| `bookings`      | HOLDING 5 phút, lazy expiry, idempotency, list/cancel theo owner; transaction PostgreSQL |
+| `bookings`      | HOLDING 5 phút, expiry qua worker + self-heal write path, idempotency, list/cancel theo owner; transaction PostgreSQL |
 | `payments`      | Module boundary rỗng; chưa có provider/webhook/refund workflow                           |
 | `check-in`      | Module boundary rỗng; chưa có check-in workflow                                          |
 | `notifications` | Realtime gateway/module; chưa có pipeline gửi email hoàn chỉnh                           |
@@ -39,9 +39,10 @@ Booking là mẫu tổ chức module theo `application/`, `ports/`, `infrastruct
 - `infrastructure/prisma/`: Prisma module/service; service mở kết nối khi khởi động và đóng khi shutdown.
 - `infrastructure/redis/`: Redis client dùng `REDIS_URL`.
 - `infrastructure/queue/`: BullMQ connection lấy cấu hình Redis host/port/password.
+- `modules/bookings/booking-expiry.module.ts`: đăng ký queue `booking-expiry`, processor và scheduler định kỳ; processor đóng worker/queue khi shutdown. `BookingsModule` không import BullMQ.
 - `modules/notifications/`: Socket.IO realtime scaffold chưa được nạp bởi AppModule. Chỉ bật lại sau khi có handshake auth/Origin/room ownership và test tương ứng.
 
-Redis/BullMQ/Socket.IO có mặt trong scaffold nhưng không đồng nghĩa đã có worker, distributed lock hoặc nghiệp vụ retry chạy. Booking có persistence port `BookingStore` và adapter `PrismaBookingStore`; không suy từ đó rằng mọi module đã có repository hoặc worker xử lý outbox.
+BullMQ hiện có worker expiry cho booking; các worker email/retry/outbox khác và distributed lock vẫn chưa chạy. Socket.IO vẫn là scaffold. Booking có persistence port `BookingStore` và adapter `PrismaBookingStore`; không suy từ đó rằng mọi module đã có repository hoặc worker xử lý outbox.
 
 ## Transaction và dữ liệu
 

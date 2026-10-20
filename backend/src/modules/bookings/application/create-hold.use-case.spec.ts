@@ -1,11 +1,9 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
-import {
-  BadRequestException,
-  ConflictException,
-  Logger,
-  ServiceUnavailableException,
-} from '@nestjs/common';
 import { CreateHoldUseCase } from './create-hold.use-case.js';
+import {
+  BookingConflictError,
+  BookingValidationError,
+} from '../domain/booking-errors.js';
 import {
   courtQuote,
   courtSchedule,
@@ -17,12 +15,12 @@ import {
 const { schedule, mocks: scheduleMocks } = createFakeScheduleReader();
 const { store, mocks } = createFakeBookingStore();
 const useCase = new CreateHoldUseCase(store, schedule);
-const input = {
+const command = {
+  userId: 'user',
   courtId: 'court',
   startsAt: '2035-01-08T08:00:00+07:00',
   endsAt: '2035-01-08T09:00:00+07:00',
   idempotencyKey: 'key-12345678',
-  policyAccepted: true as const,
 };
 
 describe('CreateHoldUseCase', () => {
@@ -37,12 +35,12 @@ describe('CreateHoldUseCase', () => {
   });
 
   it('serializes the request, expires the court, and persists one aggregate', async () => {
-    const result = await useCase.execute('user', input);
+    const result = await useCase.execute(command);
     expect(result.id).toBe('booking');
     expect(mocks.lockIdempotency).toHaveBeenCalledWith(
       expect.anything(),
       'user',
-      input.idempotencyKey,
+      command.idempotencyKey,
     );
     expect(mocks.expireEligibleHolds).toHaveBeenCalledWith(
       expect.anything(),
@@ -70,12 +68,12 @@ describe('CreateHoldUseCase', () => {
     mocks.findReplay.mockResolvedValue({
       id: 'existing',
       courtId: 'court',
-      startsAt: new Date(input.startsAt),
-      endsAt: new Date(input.endsAt),
+      startsAt: new Date(command.startsAt),
+      endsAt: new Date(command.endsAt),
     });
     const replayed = storedBooking({ id: 'existing', status: 'EXPIRED' });
     mocks.readBooking.mockResolvedValue(replayed);
-    await expect(useCase.execute('user', input)).resolves.toBe(replayed);
+    await expect(useCase.execute(command)).resolves.toBe(replayed);
     expect(mocks.expireEligibleHolds).toHaveBeenCalledWith(
       expect.anything(),
       { id: 'existing' },
@@ -88,19 +86,19 @@ describe('CreateHoldUseCase', () => {
     mocks.findReplay.mockResolvedValue({
       id: 'existing',
       courtId: 'other-court',
-      startsAt: new Date(input.startsAt),
-      endsAt: new Date(input.endsAt),
+      startsAt: new Date(command.startsAt),
+      endsAt: new Date(command.endsAt),
     });
-    await expect(useCase.execute('user', input)).rejects.toBeInstanceOf(
-      ConflictException,
+    await expect(useCase.execute(command)).rejects.toBeInstanceOf(
+      BookingConflictError,
     );
     expect(mocks.createHoldAggregate).not.toHaveBeenCalled();
   });
 
   it('rejects starts earlier than the five-minute hold boundary', async () => {
     mocks.databaseNow.mockResolvedValue(new Date('2035-01-08T00:58:00Z'));
-    await expect(useCase.execute('user', input)).rejects.toBeInstanceOf(
-      BadRequestException,
+    await expect(useCase.execute(command)).rejects.toBeInstanceOf(
+      BookingValidationError,
     );
   });
 
@@ -108,16 +106,14 @@ describe('CreateHoldUseCase', () => {
     mocks.createHoldAggregate.mockRejectedValue(
       new Error('23P01 court_occupancies_no_active_overlap'),
     );
-    await expect(useCase.execute('user', input)).rejects.toBeInstanceOf(
-      ConflictException,
+    await expect(useCase.execute(command)).rejects.toBeInstanceOf(
+      BookingConflictError,
     );
   });
 
-  it('maps unexpected persistence failure to a retryable service error', async () => {
-    jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
-    mocks.createHoldAggregate.mockRejectedValue(new Error('connection lost'));
-    await expect(useCase.execute('user', input)).rejects.toBeInstanceOf(
-      ServiceUnavailableException,
-    );
+  it('rethrows unexpected persistence failures for the presenter to map', async () => {
+    const failure = new Error('connection lost');
+    mocks.createHoldAggregate.mockRejectedValue(failure);
+    await expect(useCase.execute(command)).rejects.toBe(failure);
   });
 });

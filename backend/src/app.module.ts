@@ -9,6 +9,7 @@ import { AppService } from './app.service.js';
 import { AuthModule } from './modules/auth/auth.module.js';
 import { UserModule } from './modules/users/user.module.js';
 import { CourtsModule } from './modules/courts/courts.module.js';
+import { BookingExpiryModule } from './modules/bookings/booking-expiry.module.js';
 import { BookingsModule } from './modules/bookings/bookings.module.js';
 import { PaymentsModule } from './modules/payments/payments.module.js';
 import { CheckInModule } from './modules/check-in/check-in.module.js';
@@ -34,6 +35,7 @@ export const { ObserveModule, ObserveInstrument } = createObserveModule();
     UserModule,
     CourtsModule,
     BookingsModule,
+    BookingExpiryModule,
     PaymentsModule,
     CheckInModule,
     PrismaModule,

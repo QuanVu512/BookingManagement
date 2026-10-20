@@ -20,5 +20,6 @@ import { BookingsController } from './presentation/bookings.controller.js';
     CancelHoldUseCase,
     { provide: BookingStore, useClass: PrismaBookingStore },
   ],
+  exports: [BookingStore],
 })
 export class BookingsModule {}

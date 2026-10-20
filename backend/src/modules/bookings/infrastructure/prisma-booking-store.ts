@@ -12,9 +12,9 @@ import {
   type BookingDraft,
   type BookingPage,
   type BookingPriceLine,
-  type BookingScope,
   type CancellationLookup,
   type CustomerSnapshot,
+  type ExpiryScope,
   type ReplayBooking,
   type StoredBooking,
 } from '../ports/booking-store.js';
@@ -81,14 +81,17 @@ export class PrismaBookingStore extends BookingStore {
   // cannot add a second history entry or release a newly created occupancy.
   async expireEligibleHolds(
     transaction: TransactionContext,
-    scope: BookingScope,
+    scope: ExpiryScope,
     now: Date,
-  ): Promise<void> {
+    limit?: number,
+  ): Promise<number> {
     const expired = await transaction.booking.findMany({
       where: { ...scope, status: 'HOLDING', holdExpiresAt: { lte: now } },
       select: { id: true },
       orderBy: { id: 'asc' },
+      ...(limit === undefined ? {} : { take: limit }),
     });
+    let transitioned = 0;
     for (const booking of expired) {
       const changed = await transaction.booking.updateMany({
         where: {
@@ -99,6 +102,7 @@ export class PrismaBookingStore extends BookingStore {
         data: { status: 'EXPIRED', version: { increment: 1 } },
       });
       if (!changed.count) continue;
+      transitioned += 1;
       await transaction.courtOccupancy.updateMany({
         where: { bookingId: booking.id, state: 'ACTIVE' },
         data: { state: 'RELEASED', releasedAt: now },
@@ -113,6 +117,7 @@ export class PrismaBookingStore extends BookingStore {
         },
       });
     }
+    return transitioned;
   }
 
   async loadCustomer(
@@ -276,18 +281,30 @@ export class PrismaBookingStore extends BookingStore {
     );
   }
 
-  async hasActiveOccupancyConflict(
+  async hasEffectiveOccupancyConflict(
     transaction: TransactionContext,
     courtId: string,
     startsAt: Date,
     occupiedUntil: Date,
+    now: Date,
   ): Promise<boolean> {
+    // CourtOccupancy has no holdExpiresAt; expiry lives on Booking. Joining the
+    // relation keeps an out-of-date ACTIVE row from blocking a read-only quote.
     const conflict = await transaction.courtOccupancy.findFirst({
       where: {
         courtId,
         state: 'ACTIVE',
         occupiedFrom: { lt: occupiedUntil },
         occupiedUntil: { gt: startsAt },
+        OR: [
+          { bookingId: null },
+          { booking: { is: { status: { not: 'HOLDING' } } } },
+          {
+            booking: {
+              is: { status: 'HOLDING', holdExpiresAt: { gt: now } },
+            },
+          },
+        ],
       },
       select: { id: true },
     });

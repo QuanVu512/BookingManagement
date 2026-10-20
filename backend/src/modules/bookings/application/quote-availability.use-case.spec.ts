@@ -10,26 +10,31 @@ import {
 const { schedule, mocks: scheduleMocks } = createFakeScheduleReader();
 const { store, mocks } = createFakeBookingStore();
 const useCase = new QuoteAvailabilityUseCase(store, schedule);
-const window = {
+const query = {
+  courtId: 'court',
   startsAt: '2035-01-08T08:00:00+07:00',
   endsAt: '2035-01-08T09:00:00+07:00',
 };
+const now = new Date('2035-01-08T00:00:00Z');
 
 describe('QuoteAvailabilityUseCase', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mocks.databaseNow.mockResolvedValue(new Date('2035-01-08T00:00:00Z'));
-    mocks.hasActiveOccupancyConflict.mockResolvedValue(false);
+    mocks.databaseNow.mockResolvedValue(now);
+    mocks.hasEffectiveOccupancyConflict.mockResolvedValue(false);
     scheduleMocks.getActiveSchedule.mockResolvedValue(courtSchedule());
     scheduleMocks.quote.mockReturnValue(courtQuote());
   });
 
-  it('expires holds before quoting the same court-specific window', async () => {
-    const result = await useCase.execute('court', window);
-    expect(mocks.expireEligibleHolds).toHaveBeenCalledWith(
+  it('quotes the window without mutating stored holds', async () => {
+    const result = await useCase.execute(query);
+    expect(mocks.expireEligibleHolds).not.toHaveBeenCalled();
+    expect(mocks.hasEffectiveOccupancyConflict).toHaveBeenCalledWith(
       expect.anything(),
-      { courtId: 'court' },
-      expect.any(Date),
+      'court',
+      new Date(query.startsAt),
+      new Date(new Date(query.endsAt).getTime() + 15 * 60_000),
+      now,
     );
     expect(scheduleMocks.getActiveSchedule).toHaveBeenCalledWith(
       'court',
@@ -50,22 +55,16 @@ describe('QuoteAvailabilityUseCase', () => {
     });
   });
 
-  it('reports the occupancy and cleanup-buffer conflict', async () => {
-    mocks.hasActiveOccupancyConflict.mockResolvedValue(true);
-    const result = await useCase.execute('court', window);
+  it('reports an effective occupancy conflict, including the cleanup buffer', async () => {
+    mocks.hasEffectiveOccupancyConflict.mockResolvedValue(true);
+    const result = await useCase.execute(query);
     expect(result.available).toBe(false);
     expect(result.reason).toContain('thời gian vệ sinh');
-    expect(mocks.hasActiveOccupancyConflict).toHaveBeenCalledWith(
-      expect.anything(),
-      'court',
-      new Date(window.startsAt),
-      new Date(new Date(window.endsAt).getTime() + 15 * 60_000),
-    );
   });
 
   it('rejects windows starting inside the five-minute boundary', async () => {
     mocks.databaseNow.mockResolvedValue(new Date('2035-01-08T00:56:00Z'));
-    const result = await useCase.execute('court', window);
+    const result = await useCase.execute(query);
     expect(result.available).toBe(false);
     expect(result.reason).toContain('5 phút');
   });

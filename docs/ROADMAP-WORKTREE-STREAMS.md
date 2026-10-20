@@ -44,7 +44,7 @@ flowchart TD
    - API `GET /api/courts`, giao diện Catalog trang chủ và trang chi tiết sân `/courts/[courtId]`.
 3. **Giữ chỗ lõi (Booking MVP - Phase 1):**
    - Giữ sân trạng thái `HOLDING` trong 5 phút; PostgreSQL Exclusion Constraint ngăn chặn tuyệt đối đặt trùng lịch (kể cả 15 phút dọn sân).
-   - Idempotency key chống tạo trùng đơn; lazy expiry tự động giải phóng lịch khi hết hạn.
+   - Idempotency key chống tạo trùng đơn; worker BullMQ dọn hold hết hạn (kèm self-heal ở write path) tự động giải phóng lịch.
    - Hủy giữ chỗ chưa thanh toán do chính chủ thực hiện trước giờ bắt đầu.
    - Frontend quản lý đặt chỗ tại `/bookings` (xem danh sách, hủy giữ chỗ).
 

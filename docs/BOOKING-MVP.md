@@ -1,6 +1,6 @@
 # Booking MVP: giữ chỗ 5 phút
 
-Next.js gọi NestJS qua cookie session và CSRF; NestJS dùng Prisma transaction trên PostgreSQL. Không có Redis lock hoặc booking job. Redis hiện vẫn cần cho session revocation, CSRF và auth throttling. Chưa có thanh toán, refund, guest booking, check-in, email booking hoặc chuyển sang `CONFIRMED`.
+Next.js gọi NestJS qua cookie session và CSRF; NestJS dùng Prisma transaction trên PostgreSQL. Booking không dùng Redis lock: PostgreSQL transaction và exclusion constraint là lớp bảo vệ chính. BullMQ chạy worker dọn hold hết hạn trong tiến trình API; Redis cũng phục vụ session revocation, CSRF và auth throttling. Chưa có thanh toán, refund, guest booking, check-in, email booking hoặc chuyển sang `CONFIRMED`.
 
 ## Contract HTTP
 
@@ -10,7 +10,7 @@ Response thành công là `{ success: true, data }`. Lỗi dùng `{ statusCode, 
 | ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------- |
 | `GET /api/courts`                                          | Danh sách sân và chi nhánh ACTIVE. `pricePerHour` là giá thấp nhất áp dụng trong giờ mở cửa hôm nay theo timezone chi nhánh; `0` nghĩa chưa có giá hôm nay. Danh sách rỗng trả `[]`; DB lỗi không trả fixture.                                                                                   | Public     |
 | `GET /api/courts/:id`                                      | Một sân ACTIVE, `timezone`, `branchName`, `address`, `cleanupMinutes`; sân/chi nhánh tắt trả 404. Ảnh và mô tả loại sân là trình bày minh họa theo loại sân.                                                                                                                                     | Public     |
-| `GET /api/courts/:id/availability?startsAt=...&endsAt=...` | Kiểm tra một khoảng phút linh hoạt. Trả `available`, `reason`, `serverNow`, `timezone`, `cleanupMinutes`, `occupiedUntil`, `totalAmount`, `currency`, `priceItems`. `available=false` khi vướng occupancy/buffer hoặc quá sát giờ; ngoài giờ/thiếu giá trả 400. Kết quả không đặt khóa giữ lịch. | Public     |
+| `GET /api/courts/:id/availability?startsAt=...&endsAt=...` | Kiểm tra một khoảng phút linh hoạt. Trả `available`, `reason`, `serverNow`, `timezone`, `cleanupMinutes`, `occupiedUntil`, `totalAmount`, `currency`, `priceItems`. `available=false` khi vướng occupancy/buffer hoặc quá sát giờ; ngoài giờ/thiếu giá trả 400. Endpoint chỉ đọc, không chuyển trạng thái hay release occupancy; hold quá hạn được coi là không chặn lịch. | Public     |
 | `POST /api/bookings`                                       | Body ví dụ bên dưới. 201 cho cả tạo mới và replay; replay trả trạng thái hiện tại.                                                                                                                                                                                                               | JWT + CSRF |
 | `GET /api/bookings/me?cursor=<UUID>`                       | Tối đa 50 booking của tài khoản, mới nhất trước; response thêm `nextCursor` hoặc null. Không có endpoint đọc booking người khác.                                                                                                                                                                 | JWT        |
 | `PATCH /api/bookings/:id/cancel`                           | 200 trả booking hiện tại sau hủy; repeat trên CANCELLED/EXPIRED giữ nguyên. Sai owner/không tồn tại trả 404, trạng thái khác HOLDING/chưa đủ điều kiện trả 409.                                                                                                                                  | JWT + CSRF |
@@ -34,7 +34,9 @@ Client lấy token từ `GET /api/auth/csrf`, gửi credentials và `X-CSRF-Toke
 ## Transaction, expiry và giá
 
 - Tạo booking, price items, history và occupancy cùng transaction; constraint `court_occupancies_no_active_overlap` bảo vệ `[startsAt, endsAt + cleanupMinutes)` khi ACTIVE. Bắt SQLSTATE `23P01`/tên constraint thành 409; lỗi DB khác trả 503 với thông báo chung, không log query chứa liên hệ khách.
-- Lazy expiry tại availability, POST trước khi insert và GET booking của tôi: conditional transition HOLDING → EXPIRED khi `holdExpiresAt <= DB clock`, ghi đúng một history và RELEASED occupancy cùng transaction. Hủy cũng kiểm tra expiry trước. Không có cron bảo đảm cập nhật đúng giây khi không có request; hold quá hạn không được trả như lịch còn giữ trên các boundary này.
+- Availability chỉ đọc: query conflict join `Booking` và coi occupancy của HOLDING có `holdExpiresAt <= DB clock` là không còn hiệu lực, nên không trả lịch bận sai trong lúc chờ worker.
+- Worker BullMQ `booking-expiry` chạy định kỳ (mặc định 15 giây, batch 100; cấu hình `BOOKING_EXPIRY_INTERVAL_MS`/`BOOKING_EXPIRY_BATCH_SIZE`) và dùng conditional transition HOLDING → EXPIRED khi `holdExpiresAt <= DB clock`, ghi đúng một history và RELEASED occupancy trong cùng transaction. Scheduler có id cố định nên nhiều instance dùng chung một lịch; job retry 3 lần và transition là idempotent.
+- POST trước khi insert, GET booking của tôi và hủy vẫn tự đối soát expiry theo owner/court trong transaction để không phụ thuộc độ trễ worker. Write path và worker cùng conditional update nên không tạo history thứ hai.
 - `PriceRule` phải phủ kín khoảng chơi; lọc isActive, weekday ISO 1–7, ngày hiệu lực inclusive theo timezone chi nhánh. Priority lớn thắng; hòa priority chọn UUID nhỏ theo thứ tự ổn định. Gộp đoạn liên tiếp cùng rule rồi làm tròn từng dòng HALF_UP tới 1 VND và cộng tổng bằng Decimal.
 - Policy `mvp-hold-v1`: chỉ hủy HOLDING của mình trước giờ chơi và chưa check-in; không thu hoặc hoàn tiền. Snapshot `prepaymentPercent=100`/required amount chỉ đáp ứng schema, không chứng minh đã thu tiền. Không áp chính sách hủy/hoàn CONFIRMED trong phase này.
 - Migration mới chỉ đổi idempotency booking thành khóa ghép; giữ partial unique cho guest hiện có và giữ nguyên exclusion constraint. Không migrate DB ứng dụng tự động.
@@ -47,7 +49,7 @@ UI `/` → `/courts/<UUID>` → `/bookings`: đăng nhập tài khoản đã ver
 
 ## PostgreSQL integration
 
-Suite `backend/test/booking.integration.spec.ts` dùng HTTP thật với JWT/CSRF/session guards thật, PostgreSQL và Redis thật. Chỉ mock gửi mail (suite không gửi mail/đăng ký/charge). Bắt buộc URL riêng `booking_mvp_test` trên loopback; không fallback sang DATABASE_URL ứng dụng.
+Suite `backend/test/booking.integration.spec.ts` dùng HTTP thật với JWT/CSRF/session guards thật, PostgreSQL, Redis và worker BullMQ thật. Chỉ mock gửi mail (suite không gửi mail/đăng ký/charge). Bắt buộc URL riêng `booking_mvp_test` trên loopback; không fallback sang DATABASE_URL ứng dụng. Suite đặt interval scheduler rất lớn và tự đẩy job để kiểm tra worker, nên không phụ thuộc tick định kỳ.
 
 ```powershell
 # Khởi tạo một lần; không dùng volume dev hoặc cổng dev.
@@ -65,6 +67,6 @@ npm run test:booking:integration
 
 Đợi `pg_isready` trước migrate. Suite dọn đúng fixture theo UUID; test fault-injection tạo và xóa trigger riêng trong DB test, cần quyền DDL ở DB này. Không chạy song song nhiều bản suite trên cùng DB. `BOOKING_REQUIRE_STORAGE=true` khiến thiếu URL là FAIL; chạy Jest mặc định không tự chạy suite này. CI tạo DB `booking_mvp_test` riêng trong service PostgreSQL và dùng Redis disposable cho auth.
 
-Test cover: atomic snapshot/rollback với trigger lỗi, overlap/buffer/biên liền kề, JWT/CSRF/ownership, cancel/rebook, expiry đọc/ghi/retry, concurrent idempotency/mismatch/cross-user, split pricing/gap, inactive và validation. Unit pricing chạy qua `npm test` và không phụ thuộc timezone OS.
+Test cover: atomic snapshot/rollback với trigger lỗi, overlap/buffer/biên liền kề, JWT/CSRF/ownership, cancel/rebook, availability read-only, expiry qua write path và worker BullMQ (transition/release/history một lần), concurrent idempotency/mismatch/cross-user, split pricing/gap, inactive và validation. Unit pricing chạy qua `npm test` và không phụ thuộc timezone OS.
 
 `npm run test:booking:ui` chạy regression React/JSDOM cho double submit, kết quả request cũ sau đổi account, malformed response và mất phản hồi sau POST. Nút “Kiểm tra lại yêu cầu giữ chỗ” replay đúng key cũ kể cả khi availability đã thành occupied; không tự tạo booking mới. Browser thực vẫn cần kiểm tra riêng responsive, loading/error/empty và luồng đặt/hủy/reload.

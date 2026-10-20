@@ -27,6 +27,10 @@ import {
   BookingResponseDto,
   MyBookingsResponseDto,
 } from './dto/booking-response.dto.js';
+import {
+  rethrowBookingHttpError,
+  rethrowCreateHoldHttpError,
+} from './booking-error.presenter.js';
 import { presentBooking } from './booking-response.presenter.js';
 
 @Controller('api/bookings')
@@ -49,10 +53,22 @@ export class BookingsController {
     @CurrentUser('userId') userId: string,
     @Body() input: CreateBookingDto,
   ) {
-    return {
-      success: true,
-      data: presentBooking(await this.createHold.execute(userId, input)),
-    };
+    try {
+      return {
+        success: true,
+        data: presentBooking(
+          await this.createHold.execute({
+            userId,
+            courtId: input.courtId,
+            startsAt: input.startsAt,
+            endsAt: input.endsAt,
+            idempotencyKey: input.idempotencyKey,
+          }),
+        ),
+      };
+    } catch (error: unknown) {
+      return rethrowCreateHoldHttpError(error);
+    }
   }
 
   @Get('me')
@@ -77,9 +93,15 @@ export class BookingsController {
     @CurrentUser('userId') userId: string,
     @Param('id', ParseUUIDPipe) id: string,
   ) {
-    return {
-      success: true,
-      data: presentBooking(await this.cancelHold.execute(userId, id)),
-    };
+    try {
+      return {
+        success: true,
+        data: presentBooking(
+          await this.cancelHold.execute({ userId, bookingId: id }),
+        ),
+      };
+    } catch (error: unknown) {
+      return rethrowBookingHttpError(error);
+    }
   }
 }

@@ -1,6 +1,9 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
-import { ConflictException, NotFoundException } from '@nestjs/common';
 import { CancelHoldUseCase } from './cancel-hold.use-case.js';
+import {
+  BookingConflictError,
+  BookingNotFoundError,
+} from '../domain/booking-errors.js';
 import {
   createFakeBookingStore,
   storedBooking,
@@ -8,6 +11,7 @@ import {
 
 const { store, mocks } = createFakeBookingStore();
 const useCase = new CancelHoldUseCase(store);
+const command = { userId: 'user', bookingId: 'booking' };
 const now = new Date('2035-01-08T00:00:00Z');
 const target = {
   status: 'HOLDING',
@@ -29,18 +33,31 @@ describe('CancelHoldUseCase', () => {
 
   it('hides bookings owned by another account', async () => {
     mocks.loadCancellationLookup.mockResolvedValue(null);
-    await expect(useCase.execute('user', 'booking')).rejects.toBeInstanceOf(
-      NotFoundException,
+    await expect(useCase.execute(command)).rejects.toBeInstanceOf(
+      BookingNotFoundError,
     );
     expect(mocks.markCancelled).not.toHaveBeenCalled();
   });
 
-  it('returns an already final booking without another transition', async () => {
+  it('returns an already expired booking with its stored state', async () => {
     mocks.loadCancellationLookup.mockResolvedValue({
       booking: { ...target, status: 'EXPIRED' },
       now,
     });
-    await expect(useCase.execute('user', 'booking')).resolves.toMatchObject({
+    mocks.readBooking.mockResolvedValue(storedBooking({ status: 'EXPIRED' }));
+    await expect(useCase.execute(command)).resolves.toMatchObject({
+      status: 'EXPIRED',
+    });
+    expect(mocks.markCancelled).not.toHaveBeenCalled();
+    expect(mocks.releaseCancelled).not.toHaveBeenCalled();
+  });
+
+  it('returns an already cancelled booking without another transition', async () => {
+    mocks.loadCancellationLookup.mockResolvedValue({
+      booking: { ...target, status: 'CANCELLED' },
+      now,
+    });
+    await expect(useCase.execute(command)).resolves.toMatchObject({
       status: 'CANCELLED',
     });
     expect(mocks.markCancelled).not.toHaveBeenCalled();
@@ -48,7 +65,7 @@ describe('CancelHoldUseCase', () => {
   });
 
   it('cancels conditionally, then releases occupancy and appends history', async () => {
-    await useCase.execute('user', 'booking');
+    await useCase.execute(command);
     expect(mocks.markCancelled).toHaveBeenCalledWith(
       expect.anything(),
       'booking',
@@ -66,8 +83,8 @@ describe('CancelHoldUseCase', () => {
 
   it('reports a stale version instead of overwriting a concurrent change', async () => {
     mocks.markCancelled.mockResolvedValue(0);
-    await expect(useCase.execute('user', 'booking')).rejects.toBeInstanceOf(
-      ConflictException,
+    await expect(useCase.execute(command)).rejects.toBeInstanceOf(
+      BookingConflictError,
     );
     expect(mocks.releaseCancelled).not.toHaveBeenCalled();
   });
@@ -81,8 +98,8 @@ describe('CancelHoldUseCase', () => {
     ['not holding', { ...target, status: 'CONFIRMED' }],
   ])('refuses cancellation when the booking is %s', async (_case, booking) => {
     mocks.loadCancellationLookup.mockResolvedValue({ booking, now });
-    await expect(useCase.execute('user', 'booking')).rejects.toBeInstanceOf(
-      ConflictException,
+    await expect(useCase.execute(command)).rejects.toBeInstanceOf(
+      BookingConflictError,
     );
     expect(mocks.markCancelled).not.toHaveBeenCalled();
   });

@@ -27,7 +27,11 @@ export class BookingAvailabilityController {
     return {
       success: true,
       data: presentAvailability(
-        await this.quoteAvailability.execute(id, window),
+        await this.quoteAvailability.execute({
+          courtId: id,
+          startsAt: window.startsAt,
+          endsAt: window.endsAt,
+        }),
       ),
     };
   }
