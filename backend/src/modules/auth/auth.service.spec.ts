@@ -130,11 +130,22 @@ describe('AuthService.login', () => {
     expect(jwtServiceMock.signAsync).not.toHaveBeenCalled();
   });
 
-  it('rejects a password beyond maximum before Argon verification', async () => {
+  it('accepts legacy short/long passwords up to the 1024-byte budget before Argon verification', async () => {
     const verify = jest.spyOn(argon, 'verify');
     await expect(
       service.login(
         { username: 'customer', password: 'a'.repeat(129) },
+        createResponseMock(),
+      ),
+    ).rejects.toBeInstanceOf(UnauthorizedException);
+    expect(verify).toHaveBeenCalled();
+  });
+
+  it('rejects a password beyond 1024 UTF-8 bytes before Argon verification', async () => {
+    const verify = jest.spyOn(argon, 'verify');
+    await expect(
+      service.login(
+        { username: 'customer', password: 'a'.repeat(1025) },
         createResponseMock(),
       ),
     ).rejects.toBeInstanceOf(BadRequestException);

@@ -1,0 +1,42 @@
+.page {
+  padding: 32px 0 64px;
+  max-width: 760px;
+}
+
+.back {
+  display: inline-block;
+  margin-bottom: 16px;
+}
+
+.page h1 {
+  margin-bottom: 20px;
+}
+
+.panel {
+  border: 1px solid var(--border-subtle);
+  border-radius: 16px;
+  padding: 20px;
+  background: var(--bg-pill);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: minmax(140px, 220px) 1fr;
+  gap: 12px 20px;
+  margin: 0;
+}
+
+.grid dt {
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+.grid dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.note {
+  margin-top: 16px;
+  color: var(--text-secondary);
+}

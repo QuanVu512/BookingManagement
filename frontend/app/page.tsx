@@ -1,7 +1,6 @@
 'use client';
 
 import React from 'react';
-import Link from 'next/link';
 import { useCourtCatalog } from '../features/courts/hooks/use-court-catalog';
 import { SportyHeader } from '../components/home/sporty-header';
 import { HeroSection } from '../components/home/hero-section';
@@ -24,9 +23,6 @@ export default function HomePage() {
       <main style={{ flex: 1 }}>
         <HeroSection />
         <div className="container" role="status">
-          <Link className="btn btn-secondary" href="/bookings">
-            Booking của tôi
-          </Link>
           {loading && <p>Đang tải danh mục sân…</p>}
           {error && (
             <p>

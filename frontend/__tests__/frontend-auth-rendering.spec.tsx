@@ -28,6 +28,7 @@ for (const [name, value] of Object.entries({
 }
 jest.unstable_mockModule('next/navigation', () => ({
   useRouter: () => ({ push: jest.fn(), prefetch: jest.fn() }),
+  usePathname: () => '/',
 }));
 const { createRoot } = await import('react-dom/client');
 const { AuthProvider, useAuth } = await import('../context/auth-context.js');

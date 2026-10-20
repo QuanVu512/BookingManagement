@@ -133,6 +133,8 @@ export function storedBooking(
     holdExpiresAt: new Date('2035-01-08T00:05:00Z'),
     status: 'HOLDING',
     totalAmount: 100001,
+    prepaymentPercent: 100,
+    requiredPrepaymentAmount: 100001,
     currency: 'VND',
     priceItems: [
       {

@@ -15,6 +15,7 @@ import { AuthOneTimeTokenService } from './services/auth-one-time-token.service.
 import { AuthRateLimitGuard } from './guards/auth-rate-limit.guard.js';
 import { AuthRateLimitService } from './services/auth-rate-limit.service.js';
 import { CompromisedPasswordService } from './services/compromised-password.service.js';
+import { EmailOtpService } from './services/email-otp.service.js';
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
@@ -49,6 +50,7 @@ import { AuthCsrfGuard } from './guards/auth-csrf.guard.js';
     AuthRateLimitService,
     AuthRateLimitGuard,
     CompromisedPasswordService,
+    EmailOtpService,
     AuthService,
     { provide: SessionTokenSigner, useClass: JwtSessionTokenSigner },
     { provide: AccountStore, useClass: PrismaAccountStore },

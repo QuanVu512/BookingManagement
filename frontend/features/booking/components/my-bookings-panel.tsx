@@ -2,8 +2,13 @@
 import { useAuthActions, useAuthSession } from '../../../context/auth-context';
 import { useMyBookings } from '../hooks/use-my-bookings';
 import { MyBookingsView } from './my-bookings-view';
+import { PaymentHistoryPanel } from './payment-history-panel';
 
-export function MyBookingsPanel() {
+export function MyBookingsPanel({
+  initialTab = 'bookings',
+}: {
+  initialTab?: 'bookings' | 'payments';
+}) {
   const session = useAuthSession();
   const actions = useAuthActions();
   const accountId = session.isAuthenticated ? session.user?.id : undefined;
@@ -12,6 +17,11 @@ export function MyBookingsPanel() {
     session.status === 'unknown'
       ? void actions.refreshSession()
       : actions.openAuthModal();
+  if (initialTab === 'payments' && session.isAuthenticated) {
+    return (
+      <PaymentHistoryPanel accountId={accountId} bookings={feed.bookings} />
+    );
+  }
   return (
     <MyBookingsView
       sessionLoading={session.isLoading}

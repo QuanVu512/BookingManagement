@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
 import { fileURLToPath } from 'node:url';
-import { APP_GUARD } from '@nestjs/core';
+import { APP_FILTER, APP_GUARD } from '@nestjs/core';
 import { ConfigModule } from '@nestjs/config';
 import { createObserveModule } from '@nestjs/observe';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
@@ -16,6 +16,7 @@ import { CheckInModule } from './modules/check-in/check-in.module.js';
 import { PrismaModule } from './infrastructure/prisma/prisma.module.js';
 import { QueueModule } from './infrastructure/queue/queue.module.js';
 import { RedisModule } from './infrastructure/redis/redis.module.js';
+import { AuthErrorEnvelopeFilter } from './common/filters/auth-error-envelope.filter.js';
 
 export const { ObserveModule, ObserveInstrument } = createObserveModule();
 
@@ -51,6 +52,10 @@ export const { ObserveModule, ObserveInstrument } = createObserveModule();
     {
       provide: APP_GUARD,
       useClass: ThrottlerGuard,
+    },
+    {
+      provide: APP_FILTER,
+      useClass: AuthErrorEnvelopeFilter,
     },
   ],
 })

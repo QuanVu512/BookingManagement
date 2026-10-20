@@ -30,8 +30,7 @@ export class AuthMailService {
     purpose: AuthTokenPurpose,
     email: string,
     token: string,
-  ): Promise<void> {
-    const link = `${this.webOrigin}/auth/${purpose}#token=${token}`;
+  ): Promise<void> {    const link = `${this.webOrigin}/auth/${purpose}#token=${token}`;
     const subject =
       purpose === 'verify-email'
         ? 'Xác minh email Booking'
@@ -41,6 +40,18 @@ export class AuthMailService {
       to: email,
       subject,
       text: `${subject}\n\n${link}\n\nNếu bạn không gửi yêu cầu này, hãy bỏ qua email.`,
+      disableFileAccess: true,
+      disableUrlAccess: true,
+    });
+  }
+
+  /** OTP delivery: 6 digits only, no links, never logged. */
+  async sendEmailOtp(email: string, code: string): Promise<void> {
+    await this.deliver({
+      from: this.from,
+      to: email,
+      subject: 'Mã xác minh email Booking',
+      text: `Mã xác minh email của bạn là: ${code}\n\nMã có hiệu lực trong 10 phút. Nếu bạn không yêu cầu, hãy bỏ qua email này.`,
       disableFileAccess: true,
       disableUrlAccess: true,
     });

@@ -1,12 +1,14 @@
 import {
   Injectable,
-  ServiceUnavailableException,
-  UnauthorizedException,
 } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service.js';
 import { Role, UserStatus } from '../../../enums/index.js';
-import { AUTH_REDIS_NAMESPACE } from '../constants/auth-validation.constants.js';
+import {
+  AUTH_ERROR_CODES,
+  AUTH_REDIS_NAMESPACE,
+} from '../constants/auth-validation.constants.js';
+import { authError } from '../helpers/auth-error.js';
 import { AuthRedisStore } from './auth-redis.store.js';
 
 export interface AuthTokenPayload {
@@ -41,16 +43,17 @@ export class AuthSessionService {
       !isAuthTokenPayload(payload) ||
       payload.exp <= Math.floor(Date.now() / 1000)
     )
-      throw new UnauthorizedException();
+      throw authError(401, AUTH_ERROR_CODES.sessionExpired, 'Phiên đăng nhập không hợp lệ hoặc đã hết hạn.');
     if (await this.store.get(this.revokedKey(payload.jti)))
-      throw new UnauthorizedException();
+      throw authError(401, AUTH_ERROR_CODES.sessionExpired, 'Phiên đăng nhập không hợp lệ hoặc đã hết hạn.');
     const user = await this.currentAccount(payload.sub);
     if (
       !user ||
       user.status !== UserStatus.ACTIVE ||
+      !user.emailVerifiedAt ||
       user.tokenVersion !== payload.tokenVersion
     )
-      throw new UnauthorizedException();
+      throw authError(401, AUTH_ERROR_CODES.sessionExpired, 'Phiên đăng nhập không hợp lệ hoặc đã hết hạn.');
     return {
       userId: user.id,
       username: user.username,
@@ -63,7 +66,8 @@ export class AuthSessionService {
 
   async revoke(account: AuthenticatedAccount): Promise<void> {
     const remainingSeconds = account.exp - Math.floor(Date.now() / 1000);
-    if (remainingSeconds <= 0) throw new UnauthorizedException();
+    if (remainingSeconds <= 0)
+      throw authError(401, AUTH_ERROR_CODES.sessionExpired, 'Phiên đăng nhập không hợp lệ hoặc đã hết hạn.');
     await this.store.set(
       this.revokedKey(account.jti),
       'revoked',
@@ -78,7 +82,9 @@ export class AuthSessionService {
         include: { roles: true },
       });
     } catch {
-      throw new ServiceUnavailableException(
+      throw authError(
+        503,
+        AUTH_ERROR_CODES.authUnavailable,
         'Dịch vụ xác thực tạm thời không khả dụng.',
       );
     }

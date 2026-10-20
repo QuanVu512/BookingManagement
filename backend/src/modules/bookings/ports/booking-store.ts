@@ -36,6 +36,7 @@ export interface BookingDraft {
   endsAt: Date;
   totalAmount: number;
   requiredPrepaymentAmount: number;
+  prepaymentPercent: number;
   holdExpiresAt: Date;
   cancellationDeadlineAt: Date;
   policyAcceptedAt: Date;
@@ -55,6 +56,8 @@ export interface StoredBooking {
   holdExpiresAt: Date;
   status: string;
   totalAmount: number;
+  prepaymentPercent: number;
+  requiredPrepaymentAmount: number;
   currency: string;
   priceItems: BookingPriceLine[];
 }
@@ -64,6 +67,7 @@ export interface ReplayBooking {
   courtId: string;
   startsAt: Date;
   endsAt: Date;
+  prepaymentPercent?: number;
 }
 
 export interface CancellationTarget {

@@ -59,6 +59,61 @@
   display: grid;
   gap: 8px;
 }
+.booking-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-block: 20px;
+}
+.booking-tabs a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 8px 16px;
+  border-radius: var(--radius-full, 999px);
+  border: 1px solid var(--border-subtle);
+  text-decoration: none;
+}
+.booking-tabs a[aria-current='page'] {
+  border-color: var(--accent-volt, #a3e635);
+  color: var(--accent-volt, #a3e635);
+  font-weight: 600;
+}
+.booking-panel h3 {
+  margin-block: 0 10px;
+}
+.payment-history h2 {
+  margin-block: 24px 12px;
+}
+.payment-history-detail {
+  margin-top: 18px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-subtle);
+}
+.payment-history-detail h4 {
+  margin-block: 18px 8px;
+}
+.payment-history-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+.payment-history-actions span {
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+}
+.payment-history-detail ul {
+  list-style: none;
+  padding-left: 0;
+  display: grid;
+  gap: 8px;
+}
+.payment-history-detail li {
+  padding: 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+}
 @media (max-width: 600px) {
   .booking-panel {
     padding: 16px;

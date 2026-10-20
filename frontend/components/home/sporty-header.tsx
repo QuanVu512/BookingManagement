@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuthActions, useAuthSession } from '../../context/auth-context';
 import { useRouter } from 'next/navigation';
 import { ThemeToggle } from '../theme/theme-toggle';
+import { AccountMenu } from '../account/account-menu';
 
 export function SportyHeader({
   currentPage = 'home',
@@ -357,53 +358,10 @@ export function SportyHeader({
                 </button>
               ) : null}
 
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  background: 'var(--bg-pill)',
-                  padding: '6px 14px',
-                  borderRadius: 'var(--radius-full)',
-                  border: '1px solid var(--border-subtle)',
-                }}
-              >
-                <div
-                  style={{
-                    width: '26px',
-                    height: '26px',
-                    borderRadius: '50%',
-                    background: 'var(--accent-lime)',
-                    color: 'var(--text-dark)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontWeight: 700,
-                    fontSize: '0.75rem',
-                  }}
-                >
-                  {user.fullName.charAt(0).toUpperCase()}
-                </div>
-                <div
-                  className="site-user-name"
-                  style={{
-                    fontSize: '0.85rem',
-                    fontWeight: 600,
-                    color: 'var(--text-primary)',
-                  }}
-                >
-                  {user.fullName}
-                </div>
-              </div>
-
-              <button
-                type="button"
-                className="btn btn-sm btn-secondary"
-                onClick={() => void logout().catch(() => undefined)}
-                style={{ padding: '6px 12px', fontSize: '0.8rem' }}
-              >
-                Đăng Xuất
-              </button>
+              <AccountMenu
+                user={user}
+                onLogout={() => void logout().catch(() => undefined)}
+              />
             </div>
           ) : (
             <button

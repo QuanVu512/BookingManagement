@@ -78,10 +78,13 @@ export class CreateHoldUseCase {
       command.idempotencyKey,
     );
     if (!existing) return null;
+    const percent = input.prepaymentPercent ?? 100;
     if (
-      existing.courtId !== command.courtId ||
-      existing.startsAt.getTime() !== Date.parse(command.startsAt) ||
-      existing.endsAt.getTime() !== Date.parse(command.endsAt)
+      existing.courtId !== input.courtId ||
+      existing.startsAt.getTime() !== Date.parse(input.startsAt) ||
+      existing.endsAt.getTime() !== Date.parse(input.endsAt) ||
+      (existing.prepaymentPercent !== undefined &&
+        existing.prepaymentPercent !== percent)
     )
       throw new BookingConflictError(
         'Khóa idempotency đã dùng cho thông tin đặt sân khác.',
@@ -107,7 +110,14 @@ export class CreateHoldUseCase {
       transaction,
     );
     const quote = this.schedule.quote(court, startsAt, endsAt);
-    const customer = await store.loadCustomer(transaction, command.userId);
+    const customer = await store.loadCustomer(transaction, userId);
+    // E2: snapshot immutable percent; thiếu → default 100 (rollout MIG-10);
+    // required = half-up 30% hoặc toàn phần, tính từ tổng server.
+    const percent = input.prepaymentPercent ?? 100;
+    const required =
+      percent === 30
+        ? Math.floor((quote.totalAmount * 30 + 50) / 100)
+        : quote.totalAmount;
     const draft: BookingDraft = {
       bookingCode: `BK-${randomUUID().replaceAll('-', '').slice(0, 24)}`,
       userId: customer.id,
@@ -120,7 +130,8 @@ export class CreateHoldUseCase {
       startsAt,
       endsAt,
       totalAmount: quote.totalAmount,
-      requiredPrepaymentAmount: quote.totalAmount,
+      prepaymentPercent: percent,
+      requiredPrepaymentAmount: required,
       holdExpiresAt: new Date(now.getTime() + HOLD_DURATION_MS),
       cancellationDeadlineAt: startsAt,
       policyAcceptedAt: now,

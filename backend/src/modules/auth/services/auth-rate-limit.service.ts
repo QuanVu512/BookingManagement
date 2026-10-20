@@ -1,18 +1,17 @@
 import {
-  HttpException,
-  HttpStatus,
   Injectable,
   Optional,
-  ServiceUnavailableException,
 } from '@nestjs/common';
 import { createHash } from 'node:crypto';
 import { ConfigService } from '@nestjs/config';
 import type { Request, Response } from 'express';
 import { AuthRedisStore } from './auth-redis.store.js';
 import {
+  AUTH_ERROR_CODES,
   AUTH_REDIS_NAMESPACE,
   AUTH_RATE_LIMITS,
 } from '../constants/auth-validation.constants.js';
+import { authError } from '../helpers/auth-error.js';
 import { normalizeVietnamPhone } from '../helpers/auth-normalization.js';
 import type { AuthRatePolicy } from '../decorators/auth-rate-policy.decorator.js';
 import { AUTH_RECIPIENT_LIMIT } from '../constants/auth-validation.constants.js';
@@ -76,9 +75,10 @@ export class AuthRateLimitService {
   private rejectThrottled(retryAfter: number, response: Response): void {
     if (retryAfter > 0) {
       response.setHeader('Retry-After', retryAfter);
-      throw new HttpException(
+      throw authError(
+        429,
+        AUTH_ERROR_CODES.authRateLimited,
         'Quá nhiều yêu cầu xác thực. Vui lòng thử lại sau.',
-        HttpStatus.TOO_MANY_REQUESTS,
       );
     }
   }
@@ -93,7 +93,12 @@ export class AuthRateLimitService {
         String(AUTH_RECIPIENT_LIMIT.cooldown),
       ],
     );
-    if (result !== 0 && result !== 1) throw new ServiceUnavailableException();
+    if (result !== 0 && result !== 1)
+      throw authError(
+        503,
+        AUTH_ERROR_CODES.authUnavailable,
+        'Dịch vụ xác thực tạm thời không khả dụng.',
+      );
     if (result === 0) return false;
     return (
       (await this.increment('mail:global', {
@@ -133,7 +138,9 @@ export class AuthRateLimitService {
           typeof value === 'number' && Number.isInteger(value) && value >= 0,
       )
     ) {
-      throw new ServiceUnavailableException(
+      throw authError(
+        503,
+        AUTH_ERROR_CODES.authUnavailable,
         'Dịch vụ xác thực tạm thời không khả dụng.',
       );
     }

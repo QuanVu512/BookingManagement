@@ -1,9 +1,7 @@
 import {
   Injectable,
-  UnauthorizedException,
   ConflictException,
-} from '@nestjs/common';
-import { SessionTokenSigner } from './ports/session-token-signer.js';
+} from '@nestjs/common';import { SessionTokenSigner } from './ports/session-token-signer.js';
 import { PasswordHasher } from './ports/password-hasher.js';
 import {
   AccountStore,
@@ -20,9 +18,11 @@ import type {
 import { Role, UserStatus } from '../../enums/index.js';
 import {
   AUTH_DUMMY_PASSWORD_HASH,
+  AUTH_ERROR_CODES,
   AUTH_REGISTRATION_MESSAGE,
   AUTH_RECOVERY_RESPONSE_MS,
 } from './constants/auth-validation.constants.js';
+import { authError } from './helpers/auth-error.js';
 import { validateAuthInput } from './helpers/validate-auth-input.js';
 import { AuthSessionService } from './services/auth-session.service.js';
 import type { AuthenticatedAccount } from './services/auth-session.service.js';
@@ -67,17 +67,23 @@ export class AuthService {
     valid: boolean,
   ): asserts user is AuthAccount {
     if (!user || !valid) {
-      throw new UnauthorizedException(
+      throw authError(
+        401,
+        AUTH_ERROR_CODES.invalidCredentials,
         'Tài khoản hoặc mật khẩu không chính xác.',
       );
     }
     if (user.status !== UserStatus.ACTIVE) {
-      throw new UnauthorizedException(
+      throw authError(
+        401,
+        AUTH_ERROR_CODES.invalidCredentials,
         'Tài khoản đang bị tạm khóa hoặc ngừng hoạt động.',
       );
     }
     if (!user.emailVerifiedAt) {
-      throw new UnauthorizedException(
+      throw authError(
+        401,
+        AUTH_ERROR_CODES.emailVerificationRequired,
         'Vui lòng xác minh email trước khi đăng nhập.',
       );
     }
@@ -118,7 +124,9 @@ export class AuthService {
   async getMe(userId: string): Promise<AuthSessionResponseDto> {
     const user = await this.accounts.findById(userId);
     if (!user || user.status !== UserStatus.ACTIVE) {
-      throw new UnauthorizedException(
+      throw authError(
+        401,
+        AUTH_ERROR_CODES.sessionExpired,
         'Phiên đăng nhập không hợp lệ hoặc đã hết hạn.',
       );
     }

@@ -1,6 +1,7 @@
 import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
+import { json, urlencoded } from 'express';
 import { AppModule } from './app.module.js';
 import { ValidationPipe } from '@nestjs/common';
 import { REQUEST_VALIDATION_OPTIONS } from './constants/validation.constants.js';
@@ -11,9 +12,17 @@ import { securityHeaders } from './common/security-http.js';
 import { AuthAuditMiddleware } from './modules/auth/presentation/auth-audit.middleware.js';
 
 async function bootstrap() {
-  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
+    bodyParser: false,
+  });
   const configService = app.get(ConfigService);
   app.disable('x-powered-by');
+  // RF-02/RES-01: bound auth JSON bodies before Nest routing. The default
+  // parser below only runs when the auth-scoped parser did not consume the
+  // request, so payment webhook JSON parsing is unchanged.
+  app.use('/api/auth', json({ limit: '64kb' }));
+  app.use(json());
+  app.use(urlencoded({ extended: true }));
   app.use(securityHeaders);
   const audit = app.get(AuthAuditMiddleware);
   app.use(audit.use.bind(audit));

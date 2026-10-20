@@ -1,0 +1,87 @@
+.container {
+  position: relative;
+}
+
+.trigger {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 6px 14px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-pill);
+  color: var(--text-primary);
+  cursor: pointer;
+  font: inherit;
+}
+
+.trigger:hover,
+.trigger:focus-visible {
+  border-color: var(--accent-volt);
+}
+
+.trigger:focus-visible {
+  outline: 2px solid var(--accent-volt);
+  outline-offset: 2px;
+}
+
+.avatar {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--accent-lime);
+  color: var(--text-dark);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 0.75rem;
+}
+
+.name {
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  min-width: 232px;
+  margin: 0;
+  padding: 6px;
+  list-style: none;
+  border-radius: 12px;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-header);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.32);
+  z-index: 120;
+}
+
+.item {
+  display: block;
+  width: 100%;
+  min-height: 40px;
+  padding: 9px 12px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 0.9rem;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.item:hover,
+.item:focus-visible {
+  background: rgba(163, 230, 53, 0.12);
+  outline: none;
+}
+
+.item[aria-current='page'] {
+  color: var(--accent-volt);
+  font-weight: 600;
+}

@@ -484,7 +484,9 @@ describe('Auth/Courts HTTP validation and response contract (mock dependencies)'
         required: ['username', 'password'],
         properties: {
           username: { maxLength: 254 },
-          password: { minLength: 12, maxLength: 128, writeOnly: true },
+          // RF-02: login accepts legacy raw passwords up to the runtime
+          // 1024-byte cap, so creation min/max are not part of LoginDto.
+          password: { writeOnly: true },
         },
       },
       AuthEmailDto: {

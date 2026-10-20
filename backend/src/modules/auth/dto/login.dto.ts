@@ -1,12 +1,10 @@
-import { IsAuthPassword } from '../validators/auth.validators.js';
+import { IsLoginPassword } from '../validators/auth.validators.js';
 import { ApiProperty } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import { IsNotEmpty, IsString, MaxLength } from 'class-validator';
 import {
-  AUTH_VALIDATION_MESSAGES,
   LOGIN_IDENTIFIER_MAX_LENGTH,
-  PASSWORD_MIN_LENGTH,
-  PASSWORD_MAX_LENGTH,
+  LOGIN_PASSWORD_MAX_BYTES,
 } from '../constants/auth-validation.constants.js';
 import { trimAuthValue } from '../helpers/auth-normalization.js';
 
@@ -23,12 +21,11 @@ export class LoginDto {
 
   @ApiProperty({
     format: 'password',
-    minLength: PASSWORD_MIN_LENGTH,
-    maxLength: PASSWORD_MAX_LENGTH,
+    description: `Mật khẩu thô, tối đa ${LOGIN_PASSWORD_MAX_BYTES} byte UTF-8`,
     writeOnly: true,
   })
   @IsString()
   @IsNotEmpty({ message: 'Mật khẩu không được để trống' })
-  @IsAuthPassword({ message: AUTH_VALIDATION_MESSAGES.password })
+  @IsLoginPassword()
   password!: string;
 }

@@ -11,6 +11,12 @@ export const AUTH_LIMITS = {
   identifierMax: 254,
 } as const;
 
+export const LOGIN_PASSWORD_MAX_BYTES = 1024;
+
+function utf8ByteLength(value: string): number {
+  return new TextEncoder().encode(value).byteLength;
+}
+
 const USERNAME_PATTERN = /^(?=.*[A-Za-z])[A-Za-z0-9]+$/;
 const VIETNAM_PHONE_PATTERN = /^(?:0|\+84)(?:[35789][0-9]{8}|2[0-9]{9})$/;
 // RFC dot-atom / quoted local parts and DNS domains; the backend validates final eligibility.
@@ -47,7 +53,7 @@ export function normalizeRegistration(
 
 export function getRegistrationErrors(form: RegistrationData): AuthFieldErrors {
   const values = normalizeRegistration(form);
-  const errors: AuthFieldErrors = getLoginErrors(form.username, form.password);
+  const errors: AuthFieldErrors = {};
   if (
     values.username.length < AUTH_LIMITS.usernameMin ||
     values.username.length > AUTH_LIMITS.usernameMax ||
@@ -55,6 +61,14 @@ export function getRegistrationErrors(form: RegistrationData): AuthFieldErrors {
   ) {
     errors.username =
       'Tên đăng nhập cần 8–100 ký tự, chỉ chữ Latin và số, có ít nhất một chữ.';
+  }
+  const passwordLength = Array.from(form.password).length;
+  if (
+    passwordLength < AUTH_LIMITS.passwordMin ||
+    passwordLength > AUTH_LIMITS.passwordMax
+  ) {
+    errors.password =
+      'Mật khẩu cần 12–128 ký tự; hỗ trợ Unicode và khoảng trắng.';
   }
   if (!values.fullName || values.fullName.length > AUTH_LIMITS.fullNameMax)
     errors.fullName = 'Họ tên bắt buộc, tối đa 150 ký tự.';
@@ -74,13 +88,11 @@ export function getLoginErrors(
   const errors: AuthFieldErrors = {};
   if (!username.trim() || username.trim().length > AUTH_LIMITS.identifierMax)
     errors.username = 'Vui lòng nhập tên đăng nhập, email hoặc số điện thoại.';
-  if (
-    password.length > AUTH_LIMITS.passwordMax * 2 ||
-    Array.from(password).length < AUTH_LIMITS.passwordMin ||
-    Array.from(password).length > AUTH_LIMITS.passwordMax
-  )
-    errors.password =
-      'Mật khẩu cần 12–128 ký tự; hỗ trợ Unicode và khoảng trắng.';
+  if (!password) {
+    errors.password = 'Vui lòng nhập mật khẩu.';
+  } else if (utf8ByteLength(password) > LOGIN_PASSWORD_MAX_BYTES) {
+    errors.password = 'Mật khẩu vượt quá giới hạn cho phép.';
+  }
   return errors;
 }
 

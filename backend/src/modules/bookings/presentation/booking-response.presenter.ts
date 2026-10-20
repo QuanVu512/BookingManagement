@@ -13,6 +13,14 @@ export function presentBooking(booking: StoredBooking) {
     holdExpiresAt: booking.holdExpiresAt.toISOString(),
     status: booking.status,
     totalAmount: booking.totalAmount,
+    // E2 superset (parser-compatible): snapshot trả trước từ server.
+    prepaymentPercent: booking.prepaymentPercent,
+    requiredPrepaymentAmount: booking.requiredPrepaymentAmount,
+    prepaymentAmount: booking.requiredPrepaymentAmount,
+    balanceAmount: Math.max(
+      booking.totalAmount - booking.requiredPrepaymentAmount,
+      0,
+    ),
     currency: booking.currency,
     priceItems: booking.priceItems.map((item) => ({
       startsAt: item.startsAt.toISOString(),
