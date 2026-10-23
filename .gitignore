@@ -81,6 +81,8 @@ skills-lock.json
 /.github/skills/
 /.github/agents/
 /.github/hooks/
+.opencodeignore
+
 
 # Next.js and generated Prisma Client
 /.next
