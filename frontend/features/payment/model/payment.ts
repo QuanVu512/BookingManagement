@@ -15,6 +15,7 @@ export type PaymentRequestStatus =
   | 'FAILED';
 
 export interface PaymentRequestRecord {
+  vietQrPayload?: string | null;
   id: string;
   paymentCode: string;
   purpose: PaymentPurpose;
@@ -37,6 +38,7 @@ export type PaymentScreen =
   | 'SCR_CANCELLED';
 
 export interface PaymentOutcome {
+  serverNow?: string;
   screen: PaymentScreen;
   reviewRequired: boolean;
   reviewReasonCode: string | null;

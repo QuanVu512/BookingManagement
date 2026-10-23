@@ -11,36 +11,76 @@ export interface CountdownState {
   expired: boolean;
 }
 
-export function usePaymentCountdown(input: {
+interface CountdownInput {
   expiresAt: string | null;
   serverNow: string | null;
   onExpired: () => void;
-}): CountdownState {
-  const [now, setNow] = useState(() => Date.now());
-  const expiredRef = useRef(false);
-  const { expiresAt, serverNow, onExpired } = input;
-  const onExpiredRef = useRef(onExpired);
-  onExpiredRef.current = onExpired;
-
+}
+interface CountdownSample {
+  expiry: string;
+  remaining: number;
+  at: number;
+}
+function captureCountdown(
+  expiry: string,
+  serverNow: string,
+  previous: CountdownSample | null,
+): CountdownSample {
+  const at = performance.now();
+  const remaining = Date.parse(expiry) - Date.parse(serverNow);
+  return {
+    expiry,
+    at,
+    remaining:
+      previous?.expiry === expiry
+        ? Math.min(remaining, previous.remaining - (at - previous.at))
+        : remaining,
+  };
+}
+function startCountdown(
+  sample: CountdownSample,
+  update: (value: number) => void,
+  onExpired: () => void,
+) {
+  const tick = () => {
+    const remaining = Math.max(
+      sample.remaining - (performance.now() - sample.at),
+      0,
+    );
+    update(remaining);
+    if (remaining <= 0) onExpired();
+    return remaining;
+  };
+  if (!Number.isFinite(sample.remaining) || tick() <= 0) return;
+  const timer = window.setInterval(() => {
+    if (tick() <= 0) window.clearInterval(timer);
+  }, 1000);
+  return () => window.clearInterval(timer);
+}
+export function usePaymentCountdown(input: CountdownInput): CountdownState {
+  const [remainingMs, setRemainingMs] = useState(0);
+  const notified = useRef<string | null>(null);
+  const sample = useRef<CountdownSample | null>(null);
+  const callback = useRef(input.onExpired);
+  callback.current = input.onExpired;
   useEffect(() => {
-    if (!expiresAt) return;
-    const id = window.setInterval(() => setNow(Date.now()), 1000);
-    return () => window.clearInterval(id);
-  }, [expiresAt]);
-
-  if (!expiresAt || !serverNow) return { remainingMs: 0, expired: false };
-
-  // Offset giữa server và client đo một lần từ sample.
-  const offset = Date.parse(serverNow) - now;
-  const remainingMs = Date.parse(expiresAt) - (Date.now() + offset);
-  const expired = remainingMs <= 0;
-  if (expired && !expiredRef.current) {
-    expiredRef.current = true;
-    // Authoritative refresh — không tự đổi trạng thái thanh toán.
-    queueMicrotask(() => onExpiredRef.current());
-  }
-  if (!expired) expiredRef.current = false;
-  return { remainingMs: Math.max(remainingMs, 0), expired };
+    if (!input.expiresAt || !input.serverNow) return;
+    const current = captureCountdown(
+      input.expiresAt,
+      input.serverNow,
+      sample.current,
+    );
+    sample.current = current;
+    return startCountdown(current, setRemainingMs, () => {
+      if (notified.current === current.expiry) return;
+      notified.current = current.expiry;
+      callback.current();
+    });
+  }, [input.expiresAt, input.serverNow]);
+  return {
+    remainingMs,
+    expired: Boolean(input.expiresAt && input.serverNow && remainingMs <= 0),
+  };
 }
 
 export function formatCountdown(remainingMs: number): string {

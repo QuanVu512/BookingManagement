@@ -55,6 +55,9 @@ export function isPaymentRequest(
 ): value is PaymentRequestRecord {
   return (
     isRecord(value) &&
+    (value.vietQrPayload === undefined ||
+      value.vietQrPayload === null ||
+      typeof value.vietQrPayload === 'string') &&
     typeof value.id === 'string' &&
     typeof value.paymentCode === 'string' &&
     (value.purpose === 'PREPAYMENT' || value.purpose === 'BALANCE') &&
@@ -133,8 +136,11 @@ export function parseRefundTracker(value: unknown): RefundTrackerItem[] {
       typeof item.amount !== 'number' ||
       !Number.isFinite(item.amount) ||
       typeof item.reasonType !== 'string' ||
-      !REFUND_OUTCOMES.includes(item.outcomeCode as RefundTrackerItem['outcomeCode']) ||
-      (item.actionRequired !== null && typeof item.actionRequired !== 'string') ||
+      !REFUND_OUTCOMES.includes(
+        item.outcomeCode as RefundTrackerItem['outcomeCode'],
+      ) ||
+      (item.actionRequired !== null &&
+        typeof item.actionRequired !== 'string') ||
       (item.destinationAccountLast4 !== null &&
         typeof item.destinationAccountLast4 !== 'string') ||
       (item.bankTransactionReference !== null &&
@@ -157,7 +163,6 @@ function isPaymentOutcome(value: unknown): value is PaymentOutcome {
     typeof value.requiredPrepaymentAmount === 'number'
   );
 }
-
 
 /**
  * MIG-14 client guard: success chỉ khi server resolver ra SCR04.

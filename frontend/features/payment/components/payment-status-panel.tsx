@@ -1,4 +1,7 @@
 'use client';
+import { useEffect, useRef, useState } from 'react';
+import type { BookingRecord } from '../../booking/model/booking';
+import { useBookingCheckout } from '../hooks/use-payment-status';
 import { formatVnd } from '../../booking/model/booking-time';
 import { isPaymentSuccess } from '../api/payment-contract';
 import type { PaymentOutcome, PaymentRequestRecord } from '../model/payment';
@@ -120,6 +123,118 @@ export function PaymentStatusPanel({
           cung cấp mã {request.paymentCode}.
         </p>
       ) : null}
+    </section>
+  );
+}
+
+function PaymentQr({ payload }: { payload: string }) {
+  const canvas = useRef<HTMLCanvasElement>(null);
+  const [error, setError] = useState(false);
+  useEffect(() => {
+    let current = true;
+    setError(false);
+    void import('qrcode')
+      .then(async (QRCode) => {
+        if (current && canvas.current)
+          await QRCode.default.toCanvas(canvas.current, payload, {
+            width: 240,
+            margin: 4,
+            errorCorrectionLevel: 'M',
+          });
+      })
+      .catch(() => {
+        if (current) setError(true);
+      });
+    return () => {
+      current = false;
+    };
+  }, [payload]);
+  return error ? (
+    <p role="alert">Chưa hiển thị được QR. Vui lòng mở trang thanh toán.</p>
+  ) : (
+    <canvas ref={canvas} role="img" aria-label="Mã QR thanh toán đơn đặt sân" />
+  );
+}
+
+type BookingCheckoutState = ReturnType<typeof useBookingCheckout>;
+function CheckoutCode({
+  checkout,
+  countdown,
+}: {
+  checkout: BookingCheckoutState;
+  countdown: { remainingMs: number; expired: boolean };
+}) {
+  if (!checkout.canPay) return null;
+  return (
+    <>
+      {checkout.request?.vietQrPayload && checkout.outcome?.serverNow && (
+        <p role="timer" aria-live="off">
+          {formatCountdown(countdown.remainingMs)}
+        </p>
+      )}
+      {!countdown.expired && checkout.request?.vietQrPayload && (
+        <PaymentQr payload={checkout.request.vietQrPayload} />
+      )}
+      {!checkout.loading && !checkout.request?.vietQrPayload && (
+        <p role="status">Chưa có mã QR thanh toán. Vui lòng thử lại.</p>
+      )}
+      {!countdown.expired && checkout.request?.checkoutUrl && (
+        <a
+          href={checkout.request.checkoutUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          Mở trang thanh toán
+        </a>
+      )}
+    </>
+  );
+}
+function CheckoutMessages({ checkout }: { checkout: BookingCheckoutState }) {
+  return (
+    <>
+      {checkout.loading && <p role="status">Đang tạo mã thanh toán…</p>}
+      {checkout.error && <p role="alert">{checkout.error}</p>}
+      {checkout.outcome?.reviewRequired && (
+        <p role="status">Khoản thanh toán đang được kiểm tra.</p>
+      )}
+      {!checkout.success && (
+        <button
+          type="button"
+          className="btn btn-secondary"
+          disabled={checkout.loading}
+          onClick={checkout.refresh}
+        >
+          Tải lại thanh toán
+        </button>
+      )}
+    </>
+  );
+}
+export function BookingPaymentCheckout({
+  booking,
+  onReset,
+}: {
+  booking: BookingRecord;
+  onReset?: () => void;
+}) {
+  const checkout = useBookingCheckout(booking.id);
+  const countdown = usePaymentCountdown({
+    expiresAt: checkout.request?.expiresAt ?? booking.holdExpiresAt,
+    serverNow: checkout.outcome?.serverNow ?? null,
+    onExpired: checkout.refresh,
+  });
+  return (
+    <section className="payment-checkout" aria-label="Thanh toán đặt sân">
+      <h3>{checkout.title}</h3>
+      <p>{booking.bookingCode}</p>
+      <CheckoutCode checkout={checkout} countdown={countdown} />
+      <CheckoutMessages checkout={checkout} />
+      {checkout.terminal && onReset && (
+        <button type="button" className="btn btn-primary" onClick={onReset}>
+          Chọn lịch mới
+        </button>
+      )}
     </section>
   );
 }

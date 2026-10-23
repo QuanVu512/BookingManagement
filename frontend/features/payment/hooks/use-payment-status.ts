@@ -1,7 +1,12 @@
 'use client';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { getPaymentRequest } from '../api/payment-service';
-import type { PaymentRequestRecord } from '../model/payment';
+import {
+  createPaymentRequest,
+  getPaymentOutcome,
+  getPaymentRequest,
+} from '../api/payment-service';
+import { isPaymentSuccess } from '../api/payment-contract';
+import type { PaymentRequestRecord, PaymentOutcome } from '../model/payment';
 
 /**
  * FE-PAY-05 — Polling trạng thái thanh toán (MIG-14).
@@ -103,4 +108,128 @@ export function usePaymentStatus(requestId: string | null): PaymentPollState {
   }, [requestId, fetchOnce, schedule, refresh]);
 
   return { request, loading, error, refresh };
+}
+
+interface CheckoutState {
+  request: PaymentRequestRecord | null;
+  outcome: PaymentOutcome | null;
+  loading: boolean;
+  error: string;
+}
+const CHECKOUT_POLL_MS = 3000;
+
+async function readCheckout(
+  requestId: string,
+  signal: AbortSignal,
+  update: (state: Partial<CheckoutState>) => void,
+) {
+  const [request, outcome] = await Promise.all([
+    getPaymentRequest(requestId, signal),
+    getPaymentOutcome(requestId, signal),
+  ]);
+  if (!signal.aborted) update({ request, outcome, error: '' });
+  return outcome.screen !== 'SCR_PENDING';
+}
+
+type CheckoutUpdate = (state: Partial<CheckoutState>) => void;
+function checkoutPoller(controller: AbortController, update: CheckoutUpdate) {
+  let timer: ReturnType<typeof setTimeout>;
+  const poll = async (requestId: string) => {
+    try {
+      if (await readCheckout(requestId, controller.signal, update)) return;
+    } catch {
+      if (!controller.signal.aborted)
+        update({ error: 'Chưa cập nhật được thanh toán. Vui lòng thử lại.' });
+    }
+    if (!controller.signal.aborted)
+      timer = setTimeout(() => {
+        void poll(requestId);
+      }, CHECKOUT_POLL_MS);
+  };
+  return { poll, stop: () => clearTimeout(timer) };
+}
+async function createCheckout(
+  bookingId: string,
+  controller: AbortController,
+  update: CheckoutUpdate,
+  poll: (id: string) => Promise<void>,
+) {
+  try {
+    const request = await createPaymentRequest({
+      bookingId,
+      purpose: 'PREPAYMENT',
+      prepaymentPercent: 100,
+      method: 'PAYOS_TRANSFER',
+      idempotencyKey: `booking-checkout:${bookingId}`,
+      signal: controller.signal,
+    });
+    if (!controller.signal.aborted) {
+      update({ request, loading: false });
+      void poll(request.id);
+    }
+  } catch {
+    if (!controller.signal.aborted)
+      update({
+        loading: false,
+        error: 'Chưa lấy được mã thanh toán. Vui lòng thử lại.',
+      });
+  }
+}
+function startCheckout(
+  bookingId: string,
+  controller: AbortController,
+  update: CheckoutUpdate,
+) {
+  const { poll, stop } = checkoutPoller(controller, update);
+  void createCheckout(bookingId, controller, update, poll);
+  return () => {
+    controller.abort();
+    stop();
+  };
+}
+
+export function checkoutPresentation(checkout: CheckoutState) {
+  const success =
+    checkout.outcome !== null && isPaymentSuccess(checkout.outcome);
+  const terminal =
+    checkout.outcome?.screen === 'SCR05_EXPIRED' ||
+    checkout.outcome?.screen === 'SCR_CANCELLED';
+  return {
+    success,
+    terminal,
+    canPay:
+      !success &&
+      !terminal &&
+      !checkout.outcome?.reviewRequired &&
+      checkout.request?.status !== 'PAID',
+    title: success
+      ? 'Đặt sân thành công'
+      : terminal
+        ? 'Đơn đã kết thúc'
+        : checkout.outcome?.reviewRequired
+          ? 'Đang kiểm tra thanh toán'
+          : 'Thanh toán đặt sân',
+  };
+}
+
+export function useBookingCheckout(bookingId: string) {
+  const [state, setState] = useState<CheckoutState>({
+    request: null,
+    outcome: null,
+    loading: true,
+    error: '',
+  });
+  const [revision, setRevision] = useState(0);
+  useEffect(() => {
+    const controller = new AbortController();
+    setState({ request: null, outcome: null, loading: true, error: '' });
+    return startCheckout(bookingId, controller, (patch) =>
+      setState((previous) => ({ ...previous, ...patch })),
+    );
+  }, [bookingId, revision]);
+  return {
+    ...state,
+    ...checkoutPresentation(state),
+    refresh: () => setRevision((previous) => previous + 1),
+  };
 }
