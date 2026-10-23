@@ -1,6 +1,20 @@
 name: booking-project
 
 services:
+  mailpit:
+    image: axllent/mailpit:v1.31.6
+    environment:
+      MP_DATABASE: /data/mailpit.db
+    ports:
+      - '127.0.0.1:1025:1025'
+      - '127.0.0.1:8025:8025'
+    volumes:
+      - mailpit_data:/data
+    healthcheck:
+      test: ['CMD', '/mailpit', 'readyz']
+      interval: 5s
+      timeout: 3s
+      retries: 10
   postgres:
     image: postgres:16.11-alpine
     environment:
@@ -61,6 +75,7 @@ services:
       timeout: 3s
       retries: 10
 volumes:
+  mailpit_data:
   postgres_data:
   redis_data:
   test_postgres_data:

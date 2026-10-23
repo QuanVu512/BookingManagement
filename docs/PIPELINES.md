@@ -4,20 +4,22 @@ Các lệnh chạy từ thư mục gốc repository. Script chuẩn là `package
 
 ## Lệnh thường dùng
 
-| Mục tiêu                                      | Lệnh                            |
-| --------------------------------------------- | ------------------------------- |
-| Cài dependency theo lockfile                  | `npm ci`                        |
-| Lint/type-aware lint                          | `npm run lint`                  |
-| Unit test backend + frontend Jest             | `npm test`                      |
-| E2E Jest                                      | `npm run test:e2e`              |
-| Build API (generate Prisma rồi Nest build)    | `npm run build`                 |
-| Build frontend                                | `npm run build:web`             |
-| Sinh Prisma client/types                      | `npm run prisma:generate`       |
-| Xem trạng thái migration trên DB URL hiện tại | `npm run prisma:migrate:status` |
-| Tạo migration trong môi trường dev            | `npm run prisma:migrate:dev`    |
-| Apply migration đã tạo                        | `npm run prisma:migrate:deploy` |
-| Khởi động PostgreSQL và Redis local           | `npm run infra:up`              |
-| Dừng container local, giữ volume              | `npm run infra:down`            |
+| Mục tiêu                                      | Lệnh                                                                                           |
+| --------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| Cài dependency theo lockfile                  | `npm ci`                                                                                       |
+| Lint/type-aware lint                          | `npm run lint`                                                                                 |
+| Unit test backend + frontend Jest             | `npm test`                                                                                     |
+| E2E Jest                                      | `npm run test:e2e`                                                                             |
+| Build API (generate Prisma rồi Nest build)    | `npm run build`                                                                                |
+| Build frontend                                | `npm run build:web`                                                                            |
+| Sinh Prisma client/types                      | `npm run prisma:generate`                                                                      |
+| Xem trạng thái migration trên DB URL hiện tại | `npm run prisma:migrate:status`                                                                |
+| Tạo migration trong môi trường dev            | `npm run prisma:migrate:dev`                                                                   |
+| Apply migration đã tạo                        | `npm run prisma:migrate:deploy`                                                                |
+| Khởi động PostgreSQL, Redis và Mailpit local  | `npm run infra:up`                                                                             |
+| Khởi động riêng Mailpit, đợi healthcheck      | `npm run mailpit:up`                                                                           |
+| Chạy backend với SMTP Mailpit local           | `start:dev` với môi trường SMTP local; xem [OPERATIONS](OPERATIONS.md#smtp-local-bằng-mailpit) |
+| Dừng container local, giữ volume              | `npm run infra:down`                                                                           |
 
 Yêu cầu Node nằm trong `.nvmrc` và `engines` của package. Prisma config ở `backend/prisma.config.ts`; lệnh Prisma phụ thuộc `DATABASE_URL`. Không đọc/ghi credential thật để chạy lệnh và không chạy migration lên môi trường không được chỉ định.
 

@@ -25,6 +25,8 @@ npm run start:dev
 
 PostgreSQL/Redis local: npm run infra:up trước migration/start. Nếu DB là Neon, khởi động Redis local theo OPERATIONS; không cần PostgreSQL local. Terminal thứ hai chạy npm run web:dev.
 
+SMTP local: `npm run infra:up` cũng khởi động Mailpit; `npm run mailpit:up` chỉ khởi động Mailpit. Backend vẫn dùng `npm run start:dev`; cấu hình SMTP local hoặc nạp file env development riêng theo [hướng dẫn Mailpit](docs/OPERATIONS.md#smtp-local-bằng-mailpit). Xem OTP/link reset tại http://127.0.0.1:8025. Không có script `start:dev:mailpit` trong `package.json`.
+
 Build API sinh client rồi compile; không tự migrate DB. DB có bảng/dữ liệu sẵn cần baseline phù hợp trước apply v1.
 
 ## Booking MVP

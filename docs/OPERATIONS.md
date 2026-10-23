@@ -4,19 +4,19 @@ Backend Nest modular monolith và Next frontend có scripts ở package.json roo
 
 ## Các lệnh hệ thống
 
-| Tác vụ                          | Command từ root                                                        |
-| ------------------------------- | ---------------------------------------------------------------------- |
-| Cài cây dependency khóa         | npm ci                                                                 |
-| PostgreSQL và Redis local       | npm run infra:up                                                       |
-| Redis local khi DB là Neon      | docker compose --env-file .env -f infra/docker-compose.yml up -d redis |
-| Xem lịch sử migration ở DB đích | npm run prisma:migrate:status                                          |
-| Apply SQL migrations có sẵn     | npm run prisma:migrate:deploy                                          |
-| Sinh client/types               | npm run prisma:generate                                                |
-| Chạy backend development        | npm run start:dev                                                      |
-| Chạy frontend development       | npm run web:dev                                                        |
-| Build API                       | npm run build                                                          |
-| Build frontend                  | npm run build:web                                                      |
-| Dừng hạ tầng local, giữ volumes | npm run infra:down                                                     |
+| Tác vụ                             | Command từ root                                                        |
+| ---------------------------------- | ---------------------------------------------------------------------- |
+| Cài cây dependency khóa            | npm ci                                                                 |
+| PostgreSQL, Redis và Mailpit local | npm run infra:up                                                       |
+| Redis local khi DB là Neon         | docker compose --env-file .env -f infra/docker-compose.yml up -d redis |
+| Xem lịch sử migration ở DB đích    | npm run prisma:migrate:status                                          |
+| Apply SQL migrations có sẵn        | npm run prisma:migrate:deploy                                          |
+| Sinh client/types                  | npm run prisma:generate                                                |
+| Chạy backend development           | npm run start:dev                                                      |
+| Chạy frontend development          | npm run web:dev                                                        |
+| Build API                          | npm run build                                                          |
+| Build frontend                     | npm run build:web                                                      |
+| Dừng hạ tầng local, giữ volumes    | npm run infra:down                                                     |
 
 .env root được tạo từ.env.example nếu chưa có. Prisma CLI đọc backend/prisma.config.ts; Nest/Next có cấu hình đọc env root. Không commit.env hoặc credential thật.
 
@@ -31,6 +31,40 @@ Khi dùng Neon, giữ connection parameters/TLS mà provider cấp và chọn đ
 - Frontend: http://localhost:4001
 - API: http://localhost:4000
 - Swagger: http://localhost:4000/api/docs
+- Mailpit: http://127.0.0.1:8025
+
+## SMTP local bằng Mailpit
+
+Mailpit nhận email để xem tại máy local, không chuyển thư đến hộp thư thật. Service dùng image chính thức được pin phiên bản, healthcheck và volume `mailpit_data` giữ mail qua các lần dừng/khởi động. Cổng SMTP 1025 và giao diện 8025 chỉ bind loopback.
+
+Backend hiện chỉ có `start:dev`; không có script `start:dev:mailpit` hoặc file `infra/mailpit.env` được cung cấp sẵn. Sau khi cấu hình DB/Redis/JWT cho development, tạo một file **local, không commit** tên `.env.mailpit.local` tại root nếu muốn ghi đè riêng SMTP mà không thay cấu hình production. File này được rule `.env*` của Git ignore và chỉ cần chứa các giá trị không bí mật sau:
+
+```dotenv
+SMTP_HOST=127.0.0.1
+SMTP_PORT=1025
+SMTP_SECURE=false
+SMTP_REQUIRE_TLS=false
+SMTP_USER=
+SMTP_PASSWORD=
+SMTP_FROM=no-reply@smasharena.test
+```
+
+Từ root chạy:
+
+```powershell
+npm run infra:up
+npx --no-install dotenv run --override -f .env.mailpit.local -- npm run start:dev
+```
+
+`dotenv` CLI có sẵn trong dependency của repository. `--override` đưa các khóa trong file SMTP local vào process trước khi Nest nạp cấu hình; DB/Redis/JWT không nằm trong file này nên vẫn dùng môi trường development hiện có. Cả `SMTP_USER` và `SMTP_PASSWORD` phải rỗng để không dùng thông tin xác thực SMTP cũ; chỉ xóa biến khỏi shell có thể khiến giá trị trong file env khác được nạp lại. `SMTP_FROM` phải là địa chỉ email thuần hợp lệ theo validation của backend. Cấu hình không TLS này chỉ dành cho local; không chạy với `NODE_ENV=production`.
+
+Nếu đã cấu hình SMTP local trong môi trường development thì chạy trực tiếp `npm run start:dev`. Nếu đã chạy DB/Redis hoặc dùng DB khác, chỉ khởi động Mailpit bằng `npm run mailpit:up`. Chạy frontend ở terminal khác bằng `npm run web:dev`; dừng backend development cũ trước khi chạy backend mới để tránh trùng cổng API. Backend trên host dùng `127.0.0.1:1025`; nếu sau này backend chạy trong cùng Compose network thì hostname SMTP phải là `mailpit`, không phải loopback.
+
+Mở http://127.0.0.1:8025, đăng ký tài khoản mới rồi gửi OTP từ màn hình xác minh email; dùng mã trong Mailpit để xác minh và đăng nhập. Tài khoản chưa xác minh khi đăng nhập đúng mật khẩu cũng được chuyển sang màn hình OTP. Chức năng quên mật khẩu gửi link reset vào cùng Mailpit. Các giới hạn gửi/TTL/CSRF hiện hành vẫn áp dụng; đăng ký vẫn cần HIBP truy cập được. Mailpit không làm phát sinh email cho mỗi lần đăng nhập thành công.
+
+Kiểm tra container bằng `docker compose --env-file .env -f infra/docker-compose.yml ps mailpit`. Dừng riêng Mailpit bằng `docker compose --env-file .env -f infra/docker-compose.yml stop mailpit`; `npm run infra:down` dừng cả hạ tầng local và giữ volumes.
+
+Production tiếp tục dùng `start:prod` và SMTP provider có TLS theo [SECURITY.md](SECURITY.md); không nạp `.env.mailpit.local`. Logic Auth/SMTP, các file `.env` hiện có và lệnh `start:dev`/`start:prod` không đổi. Cấu hình mặc định không bật relay/forwarding. Tham khảo [Docker Mailpit](https://mailpit.axllent.org/docs/install/docker/) và [SMTP mặc định](https://mailpit.axllent.org/docs/configuration/smtp/).
 
 ## Tiền kiểm chuẩn hóa điện thoại Auth
 
