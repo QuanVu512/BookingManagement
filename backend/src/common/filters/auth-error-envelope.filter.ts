@@ -4,8 +4,7 @@ import {
   HttpException,
   HttpStatus,
 } from '@nestjs/common';
-import { BaseExceptionFilter } from '@nestjs/core';
-import type { HttpAdapterHost } from '@nestjs/core';
+import { BaseExceptionFilter, HttpAdapterHost } from '@nestjs/core';
 import type { Request } from 'express';
 import { AUTH_ERROR_CODES } from '../../modules/auth/constants/auth-validation.constants.js';
 
@@ -13,6 +12,7 @@ interface ErrorBody {
   code?: unknown;
   message?: unknown;
   fieldErrors?: unknown;
+  verification?: unknown;
 }
 
 /**
@@ -51,13 +51,22 @@ export class AuthErrorEnvelopeFilter extends BaseExceptionFilter {
     const isLogin = request.path.endsWith('/login');
     const isRegister = request.path.includes('/register');
     const code =
-      typeof body.code === 'string' ? body.code : inferCode(status, request.path, rawMessage);
+      typeof body.code === 'string'
+        ? body.code
+        : inferCode(status, request.path, rawMessage);
     const message = normalizeMessage(status, isLogin, isRegister, rawMessage);
     const payload: Record<string, unknown> = {
       statusCode: status,
       code,
       message,
     };
+    if (
+      isLogin &&
+      code === AUTH_ERROR_CODES.emailVerificationRequired &&
+      body.verification
+    ) {
+      payload.verification = body.verification;
+    }
     if (body.fieldErrors && typeof body.fieldErrors === 'object') {
       payload.fieldErrors = body.fieldErrors;
     }

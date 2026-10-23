@@ -132,6 +132,38 @@ describe('Auth SMTP adapter', () => {
     expect(log).not.toHaveBeenCalled();
     expect(error).not.toHaveBeenCalled();
   });
+  it('sends an OTP with five-minute and replacement expiry information', async () => {
+    const sendMail = jest
+      .fn<() => Promise<unknown>>()
+      .mockResolvedValue({ accepted: ['customer@example.com'] });
+    jest
+      .spyOn(nodemailer, 'createTransport')
+      .mockReturnValue({
+        sendMail,
+        close: jest.fn(),
+      } as unknown as Transporter);
+    await new AuthMailService(new ConfigService(settings)).sendEmailOtp(
+      'customer@example.com',
+      '001234',
+    );
+    expect(sendMail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        to: 'customer@example.com',
+        text: expect.stringContaining('001234'),
+        disableFileAccess: true,
+        disableUrlAccess: true,
+      }),
+    );
+    expect(sendMail).toHaveBeenCalledWith(
+      expect.objectContaining({ text: expect.stringContaining('5 phút') }),
+    );
+    expect(sendMail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        text: expect.stringContaining('mã mới được tạo'),
+      }),
+    );
+  });
+
   it('returns a generic error instead of provider details', async () => {
     jest.spyOn(nodemailer, 'createTransport').mockReturnValue({
       sendMail: async () => {

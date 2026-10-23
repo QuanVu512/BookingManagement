@@ -83,7 +83,10 @@ describe('AuthService.login', () => {
         { provide: AuthCsrfService, useValue: {} },
         {
           provide: AuthRecoveryService,
-          useValue: { sendVerification: async () => undefined },
+          useValue: {
+            sendVerification: async () => undefined,
+            prepareVerification: async () => 'b'.repeat(64),
+          },
         },
         {
           provide: CompromisedPasswordService,
@@ -370,7 +373,9 @@ describe('AuthService.register', () => {
   const configServiceMock = { get: jest.fn<(...args: unknown[]) => unknown>() };
   let service: AuthController;
 
-  afterEach(() => {jest.restoreAllMocks()});
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
   beforeEach(async () => {
     jest.clearAllMocks();
@@ -386,7 +391,10 @@ describe('AuthService.register', () => {
         { provide: AuthCsrfService, useValue: {} },
         {
           provide: AuthRecoveryService,
-          useValue: { sendVerification: async () => undefined },
+          useValue: {
+            sendVerification: async () => undefined,
+            prepareVerification: async () => 'b'.repeat(64),
+          },
         },
         {
           provide: CompromisedPasswordService,
@@ -583,7 +591,10 @@ describe('AuthService.getMe and logout', () => {
         { provide: AuthCsrfService, useValue: {} },
         {
           provide: AuthRecoveryService,
-          useValue: { sendVerification: async () => undefined },
+          useValue: {
+            sendVerification: async () => undefined,
+            prepareVerification: async () => 'b'.repeat(64),
+          },
         },
         {
           provide: CompromisedPasswordService,

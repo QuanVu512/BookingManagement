@@ -58,7 +58,7 @@ local now = tonumber(redis.call('TIME')[1])
 if r.challengeId ~= ARGV[1] then return {-1} end
 if r.status == 'VERIFIED_PENDING_ACTIVATION' or r.status == 'ACTIVATING' then return {-4} end
 if r.status ~= 'ISSUED' then return {-1} end
-if now > tonumber(r.expiresAt) then return {-1} end
+if now >= tonumber(r.expiresAt) then return {-1} end
 if tonumber(r.attempts) >= tonumber(ARGV[4]) then return {-3} end
 if r.codeHash ~= ARGV[2] then
   r.attempts = tonumber(r.attempts) + 1
@@ -144,15 +144,20 @@ export class EmailOtpService {
     private readonly limiter: AuthRateLimitService,
     config: ConfigService,
   ) {
-    this.enabled = config.get<string>('EMAIL_OTP_ENABLED') === 'true';
-    const secret = config.get<string>('AUTH_OTP_HMAC_SECRET') ?? '';
+    this.enabled = config.get<string>('EMAIL_OTP_ENABLED') !== 'false';
+    const secret =
+      config.get<string>('AUTH_OTP_HMAC_SECRET') ??
+      config.get<string>('JWT_SECRET') ??
+      '';
     if (this.enabled && !AUTH_OTP_HMAC_SECRET_PATTERN.test(secret)) {
       throw new Error(
         'AUTH_OTP_HMAC_SECRET must be 64 hexadecimal characters when EMAIL_OTP_ENABLED=true.',
       );
     }
     this.secret = this.enabled
-      ? Buffer.from(secret, 'hex')
+      ? createHmac('sha256', Buffer.from(secret, 'hex'))
+          .update('booking:email-otp:key:v1')
+          .digest()
       : null;
   }
 
@@ -191,7 +196,8 @@ export class EmailOtpService {
         issuance.record.generation,
       ),
     };
-    const token = existingToken ?? issuance.token;
+    // A single account key replaces the previous challenge across browsers/tabs.
+    const token = existingToken ?? this.emailToken(account.email);
     await this.store.set(
       this.key(token),
       JSON.stringify(record),
@@ -205,6 +211,27 @@ export class EmailOtpService {
       resendAfterSeconds: AUTH_OTP.resendCooldownSeconds,
       delivered: true,
     };
+  }
+
+  async verifyEmail(email: string, code: string): Promise<void> {
+    const token = this.emailToken(email);
+    const record = await this.readRecord(token);
+    if (!record || record.status !== 'ISSUED') throw this.invalid();
+    await this.verify(token, record.challengeId, code);
+    await this.activate(token, record.challengeId);
+  }
+
+  private emailToken(email: string): string {
+    this.assertEnabled();
+    if (!this.secret) throw this.disabled();
+    return createHmac('sha256', this.secret)
+      .update(
+        JSON.stringify([
+          'email-verification-account',
+          email.trim().toLowerCase(),
+        ]),
+      )
+      .digest('hex');
   }
 
   /**
@@ -236,6 +263,7 @@ export class EmailOtpService {
     const eligible =
       user && user.status === UserStatus.ACTIVE && !user.emailVerifiedAt;
     if (!eligible || !user) {
+      await this.limiter.reserveRecipient(email, 'email-otp');
       const dummy = this.createRecord(
         { id: 'dummy', email, tokenVersion: 0 },
         1,
@@ -267,21 +295,18 @@ export class EmailOtpService {
       },
       record.generation,
     );
-    const result = await this.store.evaluate(OTP_VERIFY_SCRIPT, this.key(token), [
-      challengeId,
-      expected,
-      String(AUTH_OTP.activationWindowSeconds),
-      String(AUTH_OTP.maxAttempts),
-    ]);
+    const result = await this.store.evaluate(
+      OTP_VERIFY_SCRIPT,
+      this.key(token),
+      [
+        challengeId,
+        expected,
+        String(AUTH_OTP.activationWindowSeconds),
+        String(AUTH_OTP.maxAttempts),
+      ],
+    );
     const outcome = Array.isArray(result) ? Number(result[0]) : -1;
     if (outcome === 1) {
-      return {
-        status: 'verified',
-        activationExpiresInSeconds: AUTH_OTP.activationWindowSeconds,
-      };
-    }
-    if (outcome === -4) {
-      // Already verified; guide the caller to the activation endpoint.
       return {
         status: 'verified',
         activationExpiresInSeconds: AUTH_OTP.activationWindowSeconds,
@@ -308,17 +333,18 @@ export class EmailOtpService {
     const claimed = await this.store.evaluate(
       OTP_ACTIVATION_CLAIM_SCRIPT,
       this.key(token),
-      [
-        challengeId,
-        String(AUTH_OTP.activationLeaseSeconds),
-      ],
+      [challengeId, String(AUTH_OTP.activationLeaseSeconds)],
     );
     const claim = Array.isArray(claimed) ? Number(claimed[0]) : -1;
     if (claim === -2) throw this.expired();
     if (claim === -1) throw this.invalid();
     const record = await this.readRecord(token);
     if (!record || record.challengeId !== challengeId) throw this.invalid();
-    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(record.userId)) {
+    if (
+      !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+        record.userId,
+      )
+    ) {
       throw this.invalid();
     }
     if (record.status === 'ACTIVATED' || claim === 3) {
@@ -335,7 +361,7 @@ export class EmailOtpService {
       throw authError(
         503,
         'OTP_ACTIVATION_PENDING',
-        'Mã đã được xác minh nhưng chưa thể kích hoạt. Vui lòng thử kích hoạt lại.',
+        'Mã đã được sử dụng nhưng chưa thể kích hoạt tài khoản. Vui lòng yêu cầu mã mới rồi thử lại.',
       );
     }
     await this.store
@@ -363,9 +389,7 @@ export class EmailOtpService {
     };
   }
 
-  private async activateInDatabase(
-    record: EmailOtpRecord,
-  ): Promise<boolean> {
+  private async activateInDatabase(record: EmailOtpRecord): Promise<boolean> {
     return this.prisma.$transaction(async (transaction) => {
       const rows = await transaction.$queryRaw<
         Array<{
@@ -420,7 +444,10 @@ export class EmailOtpService {
   private async assertActivationBudget(token: string): Promise<void> {
     const key = `${AUTH_OTP_REDIS_NAMESPACE}:activation:${this.hash(token)}`;
     const result = await this.store.evaluate(OTP_FAILURE_SCRIPT, key, ['60']);
-    if (Array.isArray(result) && Number(result[0]) > AUTH_OTP.activationPerProofPerMinute) {
+    if (
+      Array.isArray(result) &&
+      Number(result[0]) > AUTH_OTP.activationPerProofPerMinute
+    ) {
       throw authError(
         429,
         'AUTH_RATE_LIMITED',

@@ -27,6 +27,7 @@ import { AuthOneTimeTokenService } from './auth-one-time-token.service.js';
 import { AuthRedisStore } from './auth-redis.store.js';
 import { AuthMailService } from './auth-mail.service.js';
 import { CompromisedPasswordService } from './compromised-password.service.js';
+import { EmailOtpService } from './email-otp.service.js';
 
 describe('Email verification and recovery', () => {
   const account = {
@@ -88,6 +89,13 @@ describe('Email verification and recovery', () => {
     const module = await Test.createTestingModule({
       providers: [
         AuthRecoveryService,
+        {
+          provide: EmailOtpService,
+          useValue: {
+            issue: () => sendToken(),
+            resendForEmail: () => sendToken(),
+          },
+        },
         { provide: PasswordHasher, useClass: ArgonPasswordHasher },
         {
           provide: AuthRateLimitService,
@@ -130,6 +138,27 @@ describe('Email verification and recovery', () => {
     jest.useRealTimers();
     jest.restoreAllMocks();
   });
+  it('binds a short-lived OTP delivery proof to its recipient and purpose', async () => {
+    const proof = await recovery.prepareVerification(account);
+    await expect(tokens.read('email-otp-delivery', proof)).resolves.toEqual(
+      account,
+    );
+    await expect(tokens.read('verify-email', proof)).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
+    await expect(
+      recovery.sendEmailOtp({
+        email: 'another@example.com',
+        verificationToken: proof,
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(sendToken).not.toHaveBeenCalled();
+    jest.advanceTimersByTime(10 * 60 * 1000);
+    await expect(
+      tokens.read('email-otp-delivery', proof),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
   it('stores only a hash of a secure random token with purpose and finite TTL', async () => {
     const token = await tokens.issue('verify-email', account);
     const second = await tokens.issue('verify-email', account);

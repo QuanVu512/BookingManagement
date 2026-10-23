@@ -31,10 +31,12 @@ import { AuthCsrfService } from './services/auth-csrf.service.js';
 import { AuthRecoveryService } from './services/auth-recovery.service.js';
 import {
   AuthEmailDto,
-  AuthTokenDto,
+  SendEmailOtpDto,
+  VerifyEmailCodeDto,
   ResetPasswordDto,
 } from './dto/auth-recovery.dto.js';
 import { RegistrationResponseDto } from './dto/auth-response.dto.js';
+import { EmailOtpService } from './services/email-otp.service.js';
 
 @Controller('api/auth')
 @UseGuards(AuthCsrfGuard)
@@ -44,6 +46,7 @@ export class AuthController {
     private readonly csrf: AuthCsrfService,
     private readonly recovery: AuthRecoveryService,
     private readonly cookies: AuthCookiePresenter,
+    private readonly otp: EmailOtpService,
   ) {}
 
   @Get('csrf')
@@ -81,8 +84,14 @@ export class AuthController {
   @UseGuards(AuthRateLimitGuard)
   @HttpCode(HttpStatus.OK)
   @ApiOkResponse({ type: LogoutResponseDto })
-  verifyEmail(@Body() dto: AuthTokenDto): Promise<LogoutResponseDto> {
-    return this.recovery.verifyEmail(dto);
+  async verifyEmail(
+    @Body() dto: VerifyEmailCodeDto,
+  ): Promise<LogoutResponseDto> {
+    await this.otp.verifyEmail(dto.email, dto.code);
+    return {
+      success: true,
+      message: 'Email đã được xác minh. Bạn có thể đăng nhập.',
+    };
   }
 
   @Post('resend-verification')
@@ -90,8 +99,8 @@ export class AuthController {
   @UseGuards(AuthRateLimitGuard)
   @HttpCode(HttpStatus.OK)
   @ApiOkResponse({ type: LogoutResponseDto })
-  resendVerification(@Body() dto: AuthEmailDto): Promise<LogoutResponseDto> {
-    return this.recovery.requestEmail(dto, 'verify-email');
+  resendVerification(@Body() dto: SendEmailOtpDto): Promise<LogoutResponseDto> {
+    return this.recovery.sendEmailOtp(dto);
   }
 
   @Post('forgot-password')

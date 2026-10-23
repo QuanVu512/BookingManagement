@@ -141,6 +141,21 @@ describe('Auth rate limits', () => {
       service.check('login', request('ip'), response as unknown as Response),
     ).rejects.toBeInstanceOf(ServiceUnavailableException);
   });
+  it('uses a ten-second cooldown for OTP and keeps the recovery cooldown', async () => {
+    evaluate.mockResolvedValue(0);
+    await service.reserveRecipient('customer@example.com', 'email-otp');
+    expect(evaluate).toHaveBeenLastCalledWith(
+      expect.any(String),
+      expect.any(String),
+      ['3', '3600', '10'],
+    );
+    await service.reserveRecipient('customer@example.com', 'reset-password');
+    expect(evaluate).toHaveBeenLastCalledWith(
+      expect.any(String),
+      expect.any(String),
+      ['3', '3600', '60'],
+    );
+  });
   it('suppresses recipients before global quota and fails closed on malformed admission', async () => {
     evaluate.mockResolvedValueOnce(0);
     await expect(

@@ -14,7 +14,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { Test } from '@nestjs/testing';
 import { createClient } from 'redis';
-import { randomUUID } from 'node:crypto';
+import { randomInt, randomUUID } from 'node:crypto';
 import { PrismaService } from '../../infrastructure/prisma/prisma.service.js';
 import { RedisService } from '../../infrastructure/redis/redis.service.js';
 import { Role, UserStatus } from '../../enums/index.js';
@@ -22,6 +22,7 @@ import { AuthRedisStore } from './services/auth-redis.store.js';
 import { AuthSessionService } from './services/auth-session.service.js';
 import { AuthOneTimeTokenService } from './services/auth-one-time-token.service.js';
 import { AuthRecoveryService } from './services/auth-recovery.service.js';
+import { EmailOtpService } from './services/email-otp.service.js';
 import { AuthMailService } from './services/auth-mail.service.js';
 import { CompromisedPasswordService } from './services/compromised-password.service.js';
 import {
@@ -53,6 +54,9 @@ liveDescribe(
     let sessions: AuthSessionService;
     let tokens: AuthOneTimeTokenService;
     let recovery: AuthRecoveryService;
+    let otp: EmailOtpService;
+    const sendEmailOtp =
+      jest.fn<(email: string, code: string) => Promise<void>>();
     const id = randomUUID();
     const email = `auth-${id}@example.com`;
     const trackedKeys = new Set<string>();
@@ -79,13 +83,23 @@ liveDescribe(
           AuthSessionService,
           AuthOneTimeTokenService,
           AuthRecoveryService,
+          EmailOtpService,
+          {
+            provide: ConfigService,
+            useValue: new ConfigService({
+              AUTH_OTP_HMAC_SECRET: '1234567890abcdef'.repeat(4),
+            }),
+          },
           { provide: PasswordHasher, useClass: ArgonPasswordHasher },
-          AuthRateLimitService,
+          {
+            provide: AuthRateLimitService,
+            useValue: { reserveRecipient: async () => true },
+          },
           { provide: PrismaService, useValue: prisma },
           { provide: RedisService, useValue: { client: redis } },
           {
             provide: AuthMailService,
-            useValue: { sendToken: async () => undefined },
+            useValue: { sendToken: async () => undefined, sendEmailOtp },
           },
           {
             provide: CompromisedPasswordService,
@@ -97,19 +111,26 @@ liveDescribe(
       sessions = module.get(AuthSessionService);
       tokens = module.get(AuthOneTimeTokenService);
       recovery = module.get(AuthRecoveryService);
+      otp = module.get(EmailOtpService);
+    });
+    beforeEach(async () => {
+      sendEmailOtp.mockReset().mockResolvedValue();
+      const evaluate = store.evaluate.bind(store);
       jest.spyOn(store, 'set').mockImplementation(async (key, value, ttl) => {
         trackedKeys.add(key);
         return redis.set(key, value, { EX: ttl });
       });
-    });
-    beforeEach(async () => {
+      jest.spyOn(store, 'evaluate').mockImplementation((script, key, args) => {
+        trackedKeys.add(key);
+        return evaluate(script, key, args);
+      });
       await prisma.user.upsert({
         where: { id },
         create: {
           id,
           username: `auth${id.replaceAll('-', '')}`,
           email,
-          phone: `test-${id.slice(0, 12)}`,
+          phone: `+849${String(randomInt(0, 100000000)).padStart(8, '0')}`,
           passwordHash: 'test-hash',
           status: UserStatus.ACTIVE,
           tokenVersion: 0,
@@ -200,6 +221,32 @@ liveDescribe(
       await expect(recovery.verifyEmail({ token })).rejects.toBeInstanceOf(
         BadRequestException,
       );
+    });
+    it('activates an account using OTP against real Redis and PostgreSQL and rejects replay', async () => {
+      await otp.issue({ id, email, tokenVersion: 0 });
+      const code = sendEmailOtp.mock.calls[0]?.[1];
+      if (!code) throw new Error('Missing OTP fixture delivery');
+      await otp.verifyEmail(email, code);
+      expect(
+        (await prisma.user.findUniqueOrThrow({ where: { id } }))
+          .emailVerifiedAt,
+      ).toBeInstanceOf(Date);
+      await expect(otp.verifyEmail(email, code)).rejects.toMatchObject({
+        status: 400,
+      });
+    });
+    it('rejects an OTP when the account version changes before activation', async () => {
+      await otp.issue({ id, email, tokenVersion: 0 });
+      const code = sendEmailOtp.mock.calls[0]?.[1];
+      if (!code) throw new Error('Missing OTP fixture delivery');
+      await prisma.user.update({ where: { id }, data: { tokenVersion: 1 } });
+      await expect(otp.verifyEmail(email, code)).rejects.toMatchObject({
+        status: 400,
+      });
+      expect(
+        (await prisma.user.findUniqueOrThrow({ where: { id } }))
+          .emailVerifiedAt,
+      ).toBeNull();
     });
     it('allows one concurrent reset across separate tokens via a PostgreSQL version compare-and-update', async () => {
       await prisma.user.update({

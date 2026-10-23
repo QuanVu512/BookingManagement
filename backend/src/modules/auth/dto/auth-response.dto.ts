@@ -51,6 +51,9 @@ export class LogoutResponseDto {
 export class RegistrationResponseDto extends LogoutResponseDto {
   @ApiProperty({ enum: ['verification_required'] })
   status!: 'verification_required';
+
+  @ApiProperty({ minLength: 64, maxLength: 64, readOnly: true })
+  verificationToken!: string;
 }
 
 export class CsrfResponseDto {

@@ -39,6 +39,7 @@ import { AuthCsrfService } from './services/auth-csrf.service.js';
 import { AuthRateLimitService } from './services/auth-rate-limit.service.js';
 import { AuthOneTimeTokenService } from './services/auth-one-time-token.service.js';
 import { AuthRecoveryService } from './services/auth-recovery.service.js';
+import { EmailOtpService } from './services/email-otp.service.js';
 import { AuthMailService } from './services/auth-mail.service.js';
 import { CompromisedPasswordService } from './services/compromised-password.service.js';
 import { JwtStrategy } from './strategies/jwt.strategy.js';
@@ -85,6 +86,7 @@ describe('Auth security HTTP integration (real guards/JWT, simulated DB/Redis/ma
   let jwt: JwtService;
   let sessions: AuthSessionService;
   let tokens: AuthOneTimeTokenService;
+  let otp: EmailOtpService;
   const auditRecord = jest.fn<(event: SecurityEvent) => void>();
   let account:
     | (Omit<typeof ACCOUNT, 'emailVerifiedAt'> & {
@@ -99,6 +101,8 @@ describe('Auth security HTTP integration (real guards/JWT, simulated DB/Redis/ma
     >();
   const sendToken =
     jest.fn<(purpose: string, email: string, token: string) => Promise<void>>();
+  const sendEmailOtp =
+    jest.fn<(email: string, code: string) => Promise<void>>();
   const findUnique =
     jest.fn<
       (query: { where: { id?: string; email?: string } }) => Promise<unknown>
@@ -128,6 +132,7 @@ describe('Auth security HTTP integration (real guards/JWT, simulated DB/Redis/ma
         AuthRateLimitService,
         AuthOneTimeTokenService,
         AuthRecoveryService,
+        EmailOtpService,
         JwtStrategy,
         JwtAuthGuard,
         AuthCsrfGuard,
@@ -200,7 +205,7 @@ describe('Auth security HTTP integration (real guards/JWT, simulated DB/Redis/ma
           provide: CompromisedPasswordService,
           useValue: { assertAllowed: async () => undefined },
         },
-        { provide: AuthMailService, useValue: { sendToken } },
+        { provide: AuthMailService, useValue: { sendToken, sendEmailOtp } },
       ],
     }).compile();
     app = module.createNestApplication();
@@ -214,6 +219,7 @@ describe('Auth security HTTP integration (real guards/JWT, simulated DB/Redis/ma
     jwt = module.get(JwtService);
     sessions = module.get(AuthSessionService);
     tokens = module.get(AuthOneTimeTokenService);
+    otp = module.get(EmailOtpService);
   });
   beforeEach(() => {
     entries.clear();
@@ -239,6 +245,7 @@ describe('Auth security HTTP integration (real guards/JWT, simulated DB/Redis/ma
       return { count: 1 };
     });
     sendToken.mockReset().mockResolvedValue();
+    sendEmailOtp.mockReset().mockResolvedValue();
     jest.spyOn(argon, 'verify').mockResolvedValue(true);
     jest.spyOn(argon, 'hash').mockResolvedValue('new-test-hash');
   });
@@ -433,15 +440,126 @@ describe('Auth security HTTP integration (real guards/JWT, simulated DB/Redis/ma
       expect(response.status).toBe(201);
       expect(response.headers.get('set-cookie')).toBeNull();
     }
-    expect(sendToken).toHaveBeenCalledTimes(1);
-    expect(sendToken).toHaveBeenLastCalledWith(
-      'verify-email',
-      ACCOUNT.email,
-      expect.stringMatching(/^[a-f0-9]{64}$/),
-    );
+    expect(sendEmailOtp).not.toHaveBeenCalled();
     const blocked = await post('register', payload);
     expect(blocked.status).toBe(429);
     expect(Number(blocked.headers.get('retry-after'))).toBeGreaterThan(0);
+  });
+
+  it('sends exactly once on OTP entry with a registration proof and confirms actual delivery', async () => {
+    findFirst.mockResolvedValue(null);
+    if (account) account.emailVerifiedAt = null;
+    const registration = await post('register', {
+      username: 'newuser01',
+      fullName: 'Customer',
+      email: ACCOUNT.email,
+      phone: ACCOUNT.phone,
+      password: 'long password phrase',
+      confirmPassword: 'long password phrase',
+    });
+    const body: unknown = await registration.json();
+    if (!body || typeof body !== 'object' || !('verificationToken' in body))
+      throw new Error('Missing proof');
+    expect(sendEmailOtp).not.toHaveBeenCalled();
+    findFirst.mockResolvedValueOnce(account);
+    const response = await post('resend-verification', {
+      email: ACCOUNT.email,
+      verificationToken: body.verificationToken,
+    });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      success: true,
+      message: 'OTP đã được gửi thành công.',
+    });
+    expect(sendEmailOtp).toHaveBeenCalledTimes(1);
+    expect(response.headers.get('set-cookie')).toBeNull();
+  });
+
+  it('returns the recipient and delivery proof only after a correct unverified login', async () => {
+    if (account) account.emailVerifiedAt = null;
+    const response = await post('login', {
+      username: ACCOUNT.username,
+      password: 'long password phrase',
+    });
+    expect(response.status).toBe(401);
+    const body: unknown = await response.json();
+    expect(body).toMatchObject({
+      code: 'EMAIL_VERIFICATION_REQUIRED',
+      verification: {
+        email: ACCOUNT.email,
+        token: expect.stringMatching(/^[a-f0-9]{64}$/),
+      },
+    });
+    expect(sendEmailOtp).not.toHaveBeenCalled();
+    jest.spyOn(argon, 'verify').mockResolvedValueOnce(false);
+    const rejected = await post('login', {
+      username: ACCOUNT.username,
+      password: 'wrong password',
+    });
+    expect(await rejected.json()).not.toHaveProperty('verification');
+  });
+
+  it('rejects OTP delivery without proof or for a different recipient', async () => {
+    expect(
+      (await post('resend-verification', { email: ACCOUNT.email })).status,
+    ).toBe(400);
+    const verificationToken = await tokens.issue('email-otp-delivery', ACCOUNT);
+    expect(
+      (
+        await post('resend-verification', {
+          email: 'another@example.com',
+          verificationToken,
+        })
+      ).status,
+    ).toBe(400);
+    expect(sendEmailOtp).not.toHaveBeenCalled();
+  });
+
+  it('does not confirm a second delivery during the server cooldown', async () => {
+    if (account) account.emailVerifiedAt = null;
+    const verificationToken = await tokens.issue('email-otp-delivery', ACCOUNT);
+    const payload = { email: ACCOUNT.email, verificationToken };
+    expect((await post('resend-verification', payload)).status).toBe(200);
+    const blocked = await post('resend-verification', payload);
+    expect(blocked.status).toBe(429);
+    expect(await blocked.json()).not.toMatchObject({ success: true });
+    expect(sendEmailOtp).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not report success if SMTP delivery fails', async () => {
+    if (account) account.emailVerifiedAt = null;
+    findFirst.mockResolvedValueOnce(account);
+    const verificationToken = await tokens.issue('email-otp-delivery', ACCOUNT);
+    sendEmailOtp.mockRejectedValueOnce(new Error('SMTP unavailable'));
+    const response = await post('resend-verification', {
+      email: ACCOUNT.email,
+      verificationToken,
+    });
+    expect(response.status).toBe(500);
+    expect(await response.json()).not.toMatchObject({ success: true });
+  });
+
+  it('validates and normalizes email plus OTP without issuing a session', async () => {
+    const verify = jest.spyOn(otp, 'verifyEmail').mockResolvedValue();
+    const response = await post('verify-email', {
+      email: ' CUSTOMER@EXAMPLE.COM ',
+      code: '001234',
+    });
+    expect(response.status).toBe(200);
+    expect(response.headers.get('set-cookie')).toBeNull();
+    expect(verify).toHaveBeenCalledWith('customer@example.com', '001234');
+    expect(await response.json()).toMatchObject({ success: true });
+  });
+  it('rejects malformed OTP and legacy link tokens at the HTTP boundary', async () => {
+    const verify = jest.spyOn(otp, 'verifyEmail').mockResolvedValue();
+    for (const payload of [
+      { email: ACCOUNT.email, code: '12345' },
+      { email: 'invalid', code: '123456' },
+      { token: 'a'.repeat(64) },
+    ]) {
+      expect((await post('verify-email', payload)).status).toBe(400);
+    }
+    expect(verify).not.toHaveBeenCalled();
   });
 
   it('returns identical forgot-password HTTP status/body for existing and missing accounts', async () => {

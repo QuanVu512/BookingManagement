@@ -30,7 +30,8 @@ export class AuthMailService {
     purpose: AuthTokenPurpose,
     email: string,
     token: string,
-  ): Promise<void> {    const link = `${this.webOrigin}/auth/${purpose}#token=${token}`;
+  ): Promise<void> {
+    const link = `${this.webOrigin}/auth/${purpose}#token=${token}`;
     const subject =
       purpose === 'verify-email'
         ? 'Xác minh email Booking'
@@ -51,7 +52,7 @@ export class AuthMailService {
       from: this.from,
       to: email,
       subject: 'Mã xác minh email Booking',
-      text: `Mã xác minh email của bạn là: ${code}\n\nMã có hiệu lực trong 10 phút. Nếu bạn không yêu cầu, hãy bỏ qua email này.`,
+      text: `Mã xác minh email của bạn là: ${code}\n\nMã hết hạn sau 5 phút hoặc khi mã mới được tạo. Nếu bạn không yêu cầu, hãy bỏ qua email này.`,
       disableFileAccess: true,
       disableUrlAccess: true,
     });

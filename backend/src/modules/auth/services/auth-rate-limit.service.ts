@@ -1,13 +1,11 @@
-import {
-  Injectable,
-  Optional,
-} from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import { createHash } from 'node:crypto';
 import { ConfigService } from '@nestjs/config';
 import type { Request, Response } from 'express';
 import { AuthRedisStore } from './auth-redis.store.js';
 import {
   AUTH_ERROR_CODES,
+  AUTH_OTP,
   AUTH_REDIS_NAMESPACE,
   AUTH_RATE_LIMITS,
 } from '../constants/auth-validation.constants.js';
@@ -90,7 +88,11 @@ export class AuthRateLimitService {
       [
         String(AUTH_RECIPIENT_LIMIT.limit),
         String(AUTH_RECIPIENT_LIMIT.seconds),
-        String(AUTH_RECIPIENT_LIMIT.cooldown),
+        String(
+          purpose === 'email-otp'
+            ? AUTH_OTP.resendCooldownSeconds
+            : AUTH_RECIPIENT_LIMIT.cooldown,
+        ),
       ],
     );
     if (result !== 0 && result !== 1)

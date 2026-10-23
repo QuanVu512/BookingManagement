@@ -7,6 +7,7 @@ import { ArgonPasswordHasher } from '../src/modules/auth/infrastructure/argon-pa
 import { JwtSessionTokenSigner } from '../src/modules/auth/infrastructure/jwt-session-token-signer.js';
 import { AuthCookiePresenter } from '../src/modules/auth/presentation/auth-cookie.presenter.js';
 import { AuthRecoveryService } from '../src/modules/auth/services/auth-recovery.service.js';
+import { EmailOtpService } from '../src/modules/auth/services/email-otp.service.js';
 import { AuthRateLimitService } from '../src/modules/auth/services/auth-rate-limit.service.js';
 import { AuthRateLimitGuard } from '../src/modules/auth/guards/auth-rate-limit.guard.js';
 import { CompromisedPasswordService } from '../src/modules/auth/services/compromised-password.service.js';
@@ -128,8 +129,15 @@ describe('Auth/Courts HTTP validation and response contract (mock dependencies)'
       controllers: [AuthController, CourtsController],
       providers: [
         {
+          provide: EmailOtpService,
+          useValue: { verifyEmail: async () => undefined },
+        },
+        {
           provide: AuthRecoveryService,
-          useValue: { sendVerification: async () => undefined },
+          useValue: {
+            sendVerification: async () => undefined,
+            prepareVerification: async () => 'b'.repeat(64),
+          },
         },
         AuthRateLimitGuard,
         {
@@ -239,7 +247,11 @@ describe('Auth/Courts HTTP validation and response contract (mock dependencies)'
     ['register', { ...REGISTER_PAYLOAD, confirmPassword: 'Mismatch1!' }],
     [
       'register',
-      { ...REGISTER_PAYLOAD, password: 'mậtkhẩu', confirmPassword: 'mậtkhẩu' },
+      { ...REGISTER_PAYLOAD, password: 'mậtkhẩ', confirmPassword: 'mậtkhẩ' },
+    ],
+    [
+      'register',
+      { ...REGISTER_PAYLOAD, password: '1234567', confirmPassword: '1234567' },
     ],
     ['register', { ...REGISTER_PAYLOAD, username: '12345678' }],
     ['register', { ...REGISTER_PAYLOAD, phone: '+12025550123' }],
@@ -302,6 +314,7 @@ describe('Auth/Courts HTTP validation and response contract (mock dependencies)'
     expect(await response.json()).toEqual({
       success: true,
       status: 'verification_required',
+      verificationToken: 'b'.repeat(64),
       message:
         'Nếu thông tin phù hợp, hướng dẫn xác minh sẽ được gửi qua email. Nếu chưa nhận được, hãy dùng chức năng gửi lại hoặc kiểm tra thông tin đăng ký.',
     });
@@ -472,6 +485,7 @@ describe('Auth/Courts HTTP validation and response contract (mock dependencies)'
       'message',
       'status',
       'success',
+      'verificationToken',
     ]);
     expect(schemaKeys('LogoutResponseDto')).toEqual(['message', 'success']);
     expect(schemaKeys('CourtsResponseDto')).toEqual(['data', 'success']);
@@ -493,17 +507,18 @@ describe('Auth/Courts HTTP validation and response contract (mock dependencies)'
         required: ['email'],
         properties: { email: { format: 'email', maxLength: 254 } },
       },
-      AuthTokenDto: {
-        required: ['token'],
+      VerifyEmailCodeDto: {
+        required: ['email', 'code'],
         properties: {
-          token: { minLength: 64, maxLength: 64, writeOnly: true },
+          email: { format: 'email', maxLength: 254 },
+          code: { minLength: 6, maxLength: 6 },
         },
       },
       ResetPasswordDto: {
         required: ['token', 'password', 'confirmPassword'],
         properties: {
-          password: { minLength: 12, maxLength: 128, writeOnly: true },
-          confirmPassword: { minLength: 12, maxLength: 128, writeOnly: true },
+          password: { minLength: 7, maxLength: 128, writeOnly: true },
+          confirmPassword: { minLength: 7, maxLength: 128, writeOnly: true },
         },
       },
       RegisterDto: {

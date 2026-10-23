@@ -171,9 +171,11 @@ describe('Auth completion rules', () => {
     ).rejects.toBeInstanceOf(BadRequestException);
   });
   it.each([
-    'a'.repeat(12),
+    'a'.repeat(7),
     'a'.repeat(64),
-    '😀'.repeat(128),
+    'a' + '😀'.repeat(127),
+    'abc def',
+    'mậtkhẩu123',
     '  mật khẩu dài có dấu 😀  ',
   ])('accepts a bounded Unicode passphrase %s', async (password) => {
     await expect(
@@ -183,17 +185,20 @@ describe('Auth completion rules', () => {
       ),
     ).resolves.toBeInstanceOf(RegisterDto);
   });
-  it.each(['a'.repeat(11), 'a'.repeat(129), '😀'.repeat(129)])(
-    'rejects password %s',
-    async (password) => {
-      await expect(
-        pipe.transform(
-          { ...REGISTER_PAYLOAD, password, confirmPassword: password },
-          metadata,
-        ),
-      ).rejects.toBeInstanceOf(BadRequestException);
-    },
-  );
+  it.each([
+    'a'.repeat(6),
+    '1234567',
+    '😀'.repeat(128),
+    'a'.repeat(129),
+    '😀'.repeat(129),
+  ])('rejects password %s', async (password) => {
+    await expect(
+      pipe.transform(
+        { ...REGISTER_PAYLOAD, password, confirmPassword: password },
+        metadata,
+      ),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
   it.each(['0912345678', '+84912345678', '02431234567'])(
     'accepts valid Vietnamese phone %s',
     async (phone) => {

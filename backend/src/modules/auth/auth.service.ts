@@ -1,7 +1,9 @@
 import {
   Injectable,
   ConflictException,
-} from '@nestjs/common';import { SessionTokenSigner } from './ports/session-token-signer.js';
+  UnauthorizedException,
+} from '@nestjs/common';
+import { SessionTokenSigner } from './ports/session-token-signer.js';
 import { PasswordHasher } from './ports/password-hasher.js';
 import {
   AccountStore,
@@ -29,6 +31,7 @@ import type { AuthenticatedAccount } from './services/auth-session.service.js';
 import { CompromisedPasswordService } from './services/compromised-password.service.js';
 import type { LoginResult } from './application/auth-results.js';
 import { AuthRecoveryService } from './services/auth-recovery.service.js';
+import type { AuthTokenAccount } from './services/auth-one-time-token.service.js';
 import type { RegistrationResponseDto } from './dto/auth-response.dto.js';
 
 @Injectable()
@@ -50,6 +53,7 @@ export class AuthService {
       dto.password,
     );
     this.assertCanLogin(user, valid);
+    if (!user.emailVerifiedAt) throw await this.verificationRequired(user);
     const publicUser = this.toPublicUser(user);
     const accessToken = await this.issueSession(publicUser, user.tokenVersion);
     return {
@@ -80,13 +84,17 @@ export class AuthService {
         'Tài khoản đang bị tạm khóa hoặc ngừng hoạt động.',
       );
     }
-    if (!user.emailVerifiedAt) {
-      throw authError(
-        401,
-        AUTH_ERROR_CODES.emailVerificationRequired,
-        'Vui lòng xác minh email trước khi đăng nhập.',
-      );
-    }
+  }
+
+  private async verificationRequired(
+    user: AuthAccount,
+  ): Promise<UnauthorizedException> {
+    const token = await this.recovery.prepareVerification(user);
+    return new UnauthorizedException({
+      code: AUTH_ERROR_CODES.emailVerificationRequired,
+      message: 'Vui lòng xác minh email trước khi đăng nhập.',
+      verification: { email: user.email, token },
+    });
   }
 
   async register(input: RegisterDto): Promise<RegistrationResponseDto> {
@@ -113,10 +121,14 @@ export class AuthService {
     await this.passwords.assertAllowed(dto.password);
     const passwordHash = await this.hasher.hash(dto.password);
     const conflict = await this.checkRegistrationConflict(dto);
-    if (!conflict) await this.registerNewAccount(dto, passwordHash);
+    const account = conflict
+      ? null
+      : await this.registerNewAccount(dto, passwordHash);
+    const verificationToken = await this.recovery.prepareVerification(account);
     return {
       success: true,
       status: 'verification_required',
+      verificationToken,
       message: AUTH_REGISTRATION_MESSAGE,
     };
   }
@@ -149,18 +161,18 @@ export class AuthService {
   private async registerNewAccount(
     dto: RegisterDto,
     passwordHash: string,
-  ): Promise<void> {
+  ): Promise<AuthTokenAccount | null> {
     try {
       const user = await this.accounts.create(dto, passwordHash);
-      await this.recovery.sendVerification({
+      return {
         id: user.id,
         email: user.email,
         tokenVersion: user.tokenVersion,
-      });
+      };
     } catch (error) {
       if (error instanceof AccountConflictError) {
         await this.checkRegistrationConflict(dto);
-        return;
+        return null;
       }
       throw error;
     }

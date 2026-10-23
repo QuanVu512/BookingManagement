@@ -4,6 +4,7 @@ import { IsEmail, IsString, Matches, MaxLength } from 'class-validator';
 import {
   AUTH_FIELD_MAX_LENGTH,
   AUTH_RANDOM_TOKEN_PATTERN,
+  AUTH_OTP_CODE_PATTERN,
   AUTH_VALIDATION_MESSAGES,
   PASSWORD_MIN_LENGTH,
   PASSWORD_MAX_LENGTH,
@@ -30,6 +31,20 @@ export class AuthTokenDto {
     message: 'Liên kết không hợp lệ hoặc đã hết hạn.',
   })
   token!: string;
+}
+
+export class SendEmailOtpDto extends AuthEmailDto {
+  @ApiProperty({ minLength: 64, maxLength: 64, writeOnly: true })
+  @IsString()
+  @Matches(AUTH_RANDOM_TOKEN_PATTERN)
+  verificationToken!: string;
+}
+
+export class VerifyEmailCodeDto extends AuthEmailDto {
+  @ApiProperty({ minLength: 6, maxLength: 6, example: '012345' })
+  @IsString()
+  @Matches(AUTH_OTP_CODE_PATTERN, { message: 'Mã xác minh phải gồm 6 chữ số.' })
+  code!: string;
 }
 
 export class ResetPasswordDto extends AuthTokenDto {

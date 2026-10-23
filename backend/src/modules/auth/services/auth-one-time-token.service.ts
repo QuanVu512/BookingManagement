@@ -9,6 +9,8 @@ import {
 import { AuthRedisStore } from './auth-redis.store.js';
 import type { AuthTokenPurpose } from './auth-mail.service.js';
 
+type StoredTokenPurpose = AuthTokenPurpose | 'email-otp-delivery';
+
 export type AuthTokenAccount = {
   id: string;
   email: string;
@@ -20,7 +22,7 @@ export class AuthOneTimeTokenService {
   constructor(private readonly store: AuthRedisStore) {}
 
   async issue(
-    purpose: AuthTokenPurpose,
+    purpose: StoredTokenPurpose,
     account: AuthTokenAccount,
   ): Promise<string> {
     const token = randomBytes(AUTH_RANDOM_TOKEN_BYTES).toString('hex');
@@ -33,20 +35,20 @@ export class AuthOneTimeTokenService {
   }
 
   async read(
-    purpose: AuthTokenPurpose,
+    purpose: StoredTokenPurpose,
     token: string,
   ): Promise<AuthTokenAccount> {
     return this.parse(await this.store.get(this.key(purpose, token)));
   }
 
   async consume(
-    purpose: AuthTokenPurpose,
+    purpose: StoredTokenPurpose,
     token: string,
   ): Promise<AuthTokenAccount> {
     return this.parse(await this.store.consume(this.key(purpose, token)));
   }
 
-  private key(purpose: AuthTokenPurpose, token: string): string {
+  private key(purpose: StoredTokenPurpose, token: string): string {
     if (!AUTH_RANDOM_TOKEN_PATTERN.test(token)) throw this.invalid();
     return `${AUTH_REDIS_NAMESPACE}:token:${purpose}:${createHash('sha256').update(token).digest('hex')}`;
   }

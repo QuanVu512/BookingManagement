@@ -1,9 +1,17 @@
-import { BadRequestException, Injectable, Logger } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  Logger,
+  ServiceUnavailableException,
+  HttpException,
+} from '@nestjs/common';
+import { randomBytes } from 'node:crypto';
 import { PasswordHasher } from '../ports/password-hasher.js';
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service.js';
 import { UserStatus } from '../../../enums/index.js';
 import {
   AuthEmailDto,
+  SendEmailOtpDto,
   AuthTokenDto,
   ResetPasswordDto,
 } from '../dto/auth-recovery.dto.js';
@@ -14,9 +22,14 @@ import type { AuthTokenAccount } from './auth-one-time-token.service.js';
 import { AuthMailService } from './auth-mail.service.js';
 import type { AuthTokenPurpose } from './auth-mail.service.js';
 import { CompromisedPasswordService } from './compromised-password.service.js';
-import { AUTH_RECOVERY_RESPONSE_MS } from '../constants/auth-validation.constants.js';
+import {
+  AUTH_RANDOM_TOKEN_BYTES,
+  AUTH_ERROR_CODES,
+  AUTH_RECOVERY_RESPONSE_MS,
+} from '../constants/auth-validation.constants.js';
 import { AUTH_RECOVERY_CONCURRENCY } from '../constants/auth-validation.constants.js';
 import { AuthRateLimitService } from './auth-rate-limit.service.js';
+import { EmailOtpService } from './email-otp.service.js';
 
 export const AUTH_RECOVERY_MESSAGE =
   'Nếu tài khoản phù hợp tồn tại, hướng dẫn sẽ được gửi qua email.';
@@ -33,7 +46,53 @@ export class AuthRecoveryService {
     private readonly passwords: CompromisedPasswordService,
     private readonly limiter: AuthRateLimitService,
     private readonly hasher: PasswordHasher,
+    private readonly otp: EmailOtpService,
   ) {}
+
+  prepareVerification(account: AuthTokenAccount | null): Promise<string> {
+    return account
+      ? this.tokens.issue('email-otp-delivery', account)
+      : Promise.resolve(randomBytes(AUTH_RANDOM_TOKEN_BYTES).toString('hex'));
+  }
+
+  async sendEmailOtp(input: SendEmailOtpDto): Promise<LogoutResponseDto> {
+    const dto = validateAuthInput(SendEmailOtpDto, input);
+    const account = await this.tokens.read(
+      'email-otp-delivery',
+      dto.verificationToken,
+    );
+    if (account.email !== dto.email) throw this.invalid();
+    const user = await this.prisma.user.findFirst({
+      where: { ...this.accountWhere(account), emailVerifiedAt: null },
+    });
+    if (!user) throw this.invalid();
+    if (this.activeDeliveries >= AUTH_RECOVERY_CONCURRENCY)
+      throw new ServiceUnavailableException(
+        'Chưa thể gửi mã OTP. Vui lòng thử lại sau.',
+      );
+    return this.deliverEmailOtp(account);
+  }
+
+  private async deliverEmailOtp(
+    account: AuthTokenAccount,
+  ): Promise<LogoutResponseDto> {
+    this.activeDeliveries++;
+    try {
+      const result = await this.otp.issue(account);
+      if (!result.delivered)
+        throw new HttpException(
+          {
+            code: AUTH_ERROR_CODES.authRateLimited,
+            message:
+              'Bạn đã yêu cầu mã quá nhanh hoặc đạt giới hạn gửi mã. Vui lòng thử lại sau.',
+          },
+          429,
+        );
+      return { success: true, message: 'OTP đã được gửi thành công.' };
+    } finally {
+      this.activeDeliveries--;
+    }
+  }
 
   sendVerification(account: AuthTokenAccount): Promise<void> {
     if (this.activeDeliveries >= AUTH_RECOVERY_CONCURRENCY)
@@ -53,9 +112,7 @@ export class AuthRecoveryService {
   private async deliverInitialVerification(
     account: AuthTokenAccount,
   ): Promise<void> {
-    if (await this.limiter.reserveRecipient(account.email, 'verify-email')) {
-      await this.deliverIfEligible(account.email, 'verify-email');
-    }
+    await this.otp.issue(account);
   }
 
   async requestEmail(
@@ -63,7 +120,9 @@ export class AuthRecoveryService {
     purpose: AuthTokenPurpose,
   ): Promise<LogoutResponseDto> {
     const dto = validateAuthInput(AuthEmailDto, input);
-    const allowed = await this.limiter.reserveRecipient(dto.email, purpose);
+    const allowed =
+      purpose === 'verify-email' ||
+      (await this.limiter.reserveRecipient(dto.email, purpose));
     // Same response deadline for existing, missing, disabled and delivery-failed accounts.
     const deadline = new Promise<void>((resolve) =>
       setTimeout(resolve, AUTH_RECOVERY_RESPONSE_MS),
@@ -132,13 +191,12 @@ export class AuthRecoveryService {
     email: string,
     purpose: AuthTokenPurpose,
   ): Promise<void> {
-    const user = await this.prisma.user.findUnique({ where: { email } });
-    if (
-      !user ||
-      user.status !== UserStatus.ACTIVE ||
-      (purpose === 'verify-email' && user.emailVerifiedAt)
-    )
+    if (purpose === 'verify-email') {
+      await this.otp.resendForEmail(email);
       return;
+    }
+    const user = await this.prisma.user.findUnique({ where: { email } });
+    if (!user || user.status !== UserStatus.ACTIVE) return;
     const account = {
       id: user.id,
       email: user.email,
