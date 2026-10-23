@@ -58,9 +58,6 @@ export function AccountMenu({
         aria-label={`Mở menu tài khoản của ${user.fullName}`}
         onClick={() => setOpen((value) => !value)}
       >
-        <span className={styles.avatar} aria-hidden="true">
-          {user.fullName.charAt(0).toUpperCase()}
-        </span>
         <span className={styles.name}>{user.fullName}</span>
       </button>
       {open && (

@@ -13,7 +13,9 @@ import {
 export type ThemeMode = 'dark' | 'light';
 
 const THEME_STORAGE_KEY = 'smash-arena-theme';
-const DEFAULT_THEME: ThemeMode = 'dark';
+// Figma frames 11:4 and 11:133 (public home + court detail) are light surfaces.
+// A saved preference still wins; the toggle keeps dark mode available.
+const DEFAULT_THEME: ThemeMode = 'light';
 
 interface ThemeContextValue {
   theme: ThemeMode;

@@ -20,20 +20,34 @@ for (const [name, value] of Object.entries({
   IS_REACT_ACT_ENVIRONMENT: true,
 }))
   Object.defineProperty(globalThis, name, { value, configurable: true });
+const router = { push: jest.fn(), prefetch: jest.fn() };
+jest.unstable_mockModule('next/navigation', () => ({
+  useRouter: () => router,
+}));
 const { createRoot } = await import('react-dom/client');
 const { AuthProvider } = await import('../context/auth-context.js');
-const { CourtInfoCard } = await import(
-  '../features/courts/components/court-info-card.js'
-);
-const { useCourtCatalog } = await import(
-  '../features/courts/hooks/use-court-catalog.js'
-);
-const { useCourtDetail } = await import(
-  '../features/courts/hooks/use-court-detail.js'
-);
-const { loadCourtCatalog, loadCourtDetail } = await import(
-  '../features/courts/api/court-api.js'
-);
+jest.unstable_mockModule('next/image', () => ({
+  default: (props: {
+    src: string;
+    alt: string;
+    width?: number;
+    height?: number;
+    sizes?: string;
+  }) => createElement('img', props),
+}));
+const { CourtInfoCard } =
+  await import('../features/courts/components/court-info-card.js');
+const { useCourtCatalog } =
+  await import('../features/courts/hooks/use-court-catalog.js');
+const { useCourtDetail } =
+  await import('../features/courts/hooks/use-court-detail.js');
+const { loadCourtCatalog, loadCourtDetail } =
+  await import('../features/courts/api/court-api.js');
+
+const { BookingDateInput } =
+  await import('../features/booking/components/booking-schedule-picker.js');
+const { bookingDateBounds, formatBookingDate } =
+  await import('../features/booking/model/booking-time.js');
 
 const COURT: CourtItem = {
   id: 'court-1',
@@ -127,6 +141,45 @@ afterEach(async () => {
   container = undefined;
   root = undefined;
   jest.restoreAllMocks();
+});
+
+describe('Booking date picker contract', () => {
+  it('displays dd/MM/yyyy, restricts the native calendar and rejects injected out-of-range dates', async () => {
+    const timezone = 'Asia/Ho_Chi_Minh';
+    const bounds = bookingDateBounds(timezone);
+    const change = jest.fn();
+    await render(
+      createElement(BookingDateInput, {
+        value: bounds.min,
+        onChange: change,
+        timezone,
+      }),
+    );
+    const input = container?.querySelector('input[type="date"]');
+    if (!(input instanceof dom.window.HTMLInputElement))
+      throw new Error('Missing date picker');
+    expect(input.min).toBe(bounds.min);
+    expect(input.max).toBe(bounds.max);
+    expect(text()).toBe(formatBookingDate(bounds.min));
+    const descriptor = Object.getOwnPropertyDescriptor(
+      dom.window.HTMLInputElement.prototype,
+      'value',
+    );
+    if (!descriptor?.set) throw new Error('Missing date setter');
+    for (const invalid of ['2000-01-01', '2099-01-01']) {
+      await act(async () => {
+        descriptor.set?.call(input, invalid);
+        input.dispatchEvent(new dom.window.Event('change', { bubbles: true }));
+      });
+      expect(change).not.toHaveBeenCalled();
+      expect(input.value).toBe(bounds.min);
+    }
+    await act(async () => {
+      descriptor.set?.call(input, bounds.max);
+      input.dispatchEvent(new dom.window.Event('change', { bubbles: true }));
+    });
+    expect(change).toHaveBeenCalledWith(bounds.max);
+  });
 });
 
 describe('Courts feature API', () => {
@@ -233,14 +286,12 @@ describe('Courts feature hooks', () => {
       );
     }
     const pending: ((response: Response) => void)[] = [];
-    jest
-      .spyOn(globalThis, 'fetch')
-      .mockImplementation(
-        () =>
-          new Promise<Response>((resolve) => {
-            pending.push(resolve);
-          }),
-      );
+    jest.spyOn(globalThis, 'fetch').mockImplementation(
+      () =>
+        new Promise<Response>((resolve) => {
+          pending.push(resolve);
+        }),
+    );
     await render(createElement(DetailProbe, { courtId: 'court-a' }));
     expect(state?.court).toBeUndefined();
     await act(async () => {
@@ -275,6 +326,116 @@ describe('Courts feature hooks', () => {
 });
 
 describe('Court detail page composition', () => {
+  it('loads real service choices, quotes the selected quantity, and clears the amount when it changes', async () => {
+    const product = {
+      id: '60000000-0000-4000-8000-000000000004',
+      code: 'PADDLE',
+      name: 'Thuê vợt Pickleball',
+      imageUrl: '/products/paddle-carbon.jpg',
+      availableQuantity: 10,
+      kind: 'PADDLE',
+      billingMode: 'HOURLY_RENTAL',
+      unit: 'vợt',
+      unitPrice: 30000,
+    };
+    const fetch = jest
+      .spyOn(globalThis, 'fetch')
+      .mockImplementation(async (input) => {
+        const url =
+          typeof input === 'string'
+            ? input
+            : input instanceof URL
+              ? input.href
+              : input.url;
+        if (url.endsWith('/auth/me'))
+          return new Response('{}', { status: 401 });
+        if (url.includes('/services'))
+          return new Response(
+            JSON.stringify({ success: true, data: [product] }),
+          );
+        return new Response(
+          JSON.stringify({
+            success: true,
+            data: {
+              ...QUOTE,
+              totalAmount: 130001,
+              serviceItems: [
+                {
+                  productId: product.id,
+                  code: product.code,
+                  name: product.name,
+                  kind: product.kind,
+                  billingMode: product.billingMode,
+                  unit: product.unit,
+                  unitPrice: 30000,
+                  quantity: 1,
+                  durationMinutes: 60,
+                  amount: 30000,
+                },
+              ],
+            },
+          }),
+        );
+      });
+    await render(
+      createElement(AuthProvider, {
+        children: createElement(CourtInfoCard, { court: COURT }),
+      }),
+    );
+    const quantity = container?.querySelector('input[type="number"]');
+    if (!(quantity instanceof dom.window.HTMLInputElement))
+      throw new Error('Missing service quantity');
+    const descriptor = Object.getOwnPropertyDescriptor(
+      dom.window.HTMLInputElement.prototype,
+      'value',
+    );
+    if (!descriptor?.set) throw new Error('Missing input setter');
+    await act(async () => {
+      descriptor.set?.call(quantity, '1');
+      quantity.dispatchEvent(new dom.window.Event('input', { bubbles: true }));
+    });
+    await act(async () => buttonByText('Kiểm tra lịch & giá')?.click());
+    await flush();
+    expect(fetch).toHaveBeenLastCalledWith(
+      expect.stringContaining('/quote'),
+      expect.objectContaining({
+        method: 'POST',
+        body: expect.stringContaining('"quantity":1'),
+      }),
+    );
+    expect(
+      container?.querySelector('.order-total strong')?.textContent,
+    ).toContain('130.001');
+    expect(text()).toContain('Chỉ cho thuê');
+    expect(text()).toContain('60 phút');
+    expect(
+      container?.querySelector('img[alt="Thuê vợt Pickleball"]'),
+    ).not.toBeNull();
+    expect(text()).not.toContain('Thuê theo thời lượng đặt sân');
+    expect(text()).not.toContain('Khoảng sân đang trống');
+    expect(text()).not.toContain('Tôi đồng ý giữ chỗ');
+    expect(buttonByText('Đặt sân')).toBeDefined();
+    const plus = container?.querySelector<HTMLButtonElement>(
+      'button[aria-label="Tăng Thuê vợt Pickleball"]',
+    );
+    await act(async () => plus?.click());
+    expect(quantity.value).toBe('2');
+    await act(async () => {
+      descriptor.set?.call(quantity, '100');
+      quantity.dispatchEvent(new dom.window.Event('input', { bubbles: true }));
+    });
+    expect(quantity.value).toBe('10');
+    expect(plus?.disabled).toBe(true);
+
+    await act(async () => {
+      descriptor.set?.call(quantity, '2');
+      quantity.dispatchEvent(new dom.window.Event('input', { bubbles: true }));
+    });
+    expect(container?.querySelector('.order-total strong')?.textContent).toBe(
+      '—',
+    );
+  });
+
   it('mounts the booking panel with the court id and timezone', async () => {
     const fetch = jest
       .spyOn(globalThis, 'fetch')
@@ -309,7 +470,21 @@ describe('Court detail page composition', () => {
       expect.stringContaining('/api/courts/court-1/availability?'),
       expect.anything(),
     );
-    expect(text()).toContain('Khoảng sân đang trống');
+    expect(
+      container?.querySelector('.order-total strong')?.textContent,
+    ).toContain('100.001');
+    expect(text()).toContain('Tóm tắt thanh toán');
+    expect(text()).toContain('Nước uống & dụng cụ');
+    const preset = container?.querySelector<HTMLButtonElement>(
+      'button[aria-label="18:00 – 19:00"]',
+    );
+    await act(async () => preset?.click());
+    expect(text()).not.toContain('Khoảng sân đang trống');
+    expect(container?.querySelector('.order-total strong')?.textContent).toBe(
+      '—',
+    );
+    const hold = buttonByText('Đặt sân');
+    expect(hold?.disabled).toBe(true);
   });
 
   it('blocks booking when the court has no timezone and does not mount the panel', async () => {
@@ -319,9 +494,7 @@ describe('Court detail page composition', () => {
         court: { ...COURT, timezone: undefined },
       }),
     );
-    expect(text()).toContain(
-      'Thiếu cấu hình múi giờ của sân. Chưa thể đặt.',
-    );
+    expect(text()).toContain('Thiếu cấu hình múi giờ của sân. Chưa thể đặt.');
     expect(text()).not.toContain('Giờ theo');
     expect(fetch).not.toHaveBeenCalled();
   });

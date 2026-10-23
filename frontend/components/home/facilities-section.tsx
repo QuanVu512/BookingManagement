@@ -1,150 +1,74 @@
-'use client';
+interface FacilityItem {
+  index: string;
+  title: string;
+  description: string;
+  tag: string;
+}
 
-import React from 'react';
+const FACILITIES: FacilityItem[] = [
+  {
+    index: '01',
+    title: 'Mặt sân',
+    description: 'Không gian dành cho tập luyện và thi đấu Pickleball tiêu chuẩn.',
+    tag: 'Cushion Acrylic',
+  },
+  {
+    index: '02',
+    title: 'Hệ thống chiếu sáng',
+    description: 'Hỗ trợ tầm nhìn tối ưu khi chơi vào chiều tối với ánh sáng đồng đều.',
+    tag: 'Đèn LED chống chói',
+  },
+  {
+    index: '03',
+    title: 'Khu thay đồ',
+    description: 'Thay trang phục, chuẩn bị trước và sau buổi chơi trong không gian sạch sẽ.',
+    tag: 'Locker an toàn',
+  },
+  {
+    index: '04',
+    title: 'Nước uống',
+    description: 'Bổ sung nước và khoáng chất trong suốt thời gian tập luyện.',
+    tag: 'Miễn phí tại sân',
+  },
+  {
+    index: '05',
+    title: 'Khu nghỉ ngơi',
+    description: 'Dừng chân, thư giãn và giao lưu giữa các lượt chơi gay cấn.',
+    tag: 'Lounge thư giãn',
+  },
+  {
+    index: '06',
+    title: 'Bãi đỗ xe',
+    description: 'Khu vực để phương tiện thuận tiện, rộng rãi và an toàn khi đến sân.',
+    tag: 'Camera an ninh',
+  },
+];
 
 export function FacilitiesSection() {
-  const facilities = [
-    {
-      icon: '🏟️',
-      title: 'Mặt sân thi đấu tiêu chuẩn',
-      desc: 'Mặt sân giảm chấn chuyên dụng, độ nảy bóng chuẩn xác, chống trơn trượt tối đa trong mọi điều kiện thi đấu.',
-    },
-    {
-      icon: '💡',
-      title: 'Hệ thống đèn LED thể thao',
-      desc: 'Chiếu sáng chống chói góc rộng đạt chuẩn thi đấu buổi tối, bảo vệ mắt và cung cấp tầm nhìn tối ưu.',
-    },
-    {
-      icon: '🚿',
-      title: 'Phòng thay đồ & Tủ đồ',
-      desc: 'Khu vực thay đồ sạch sẽ, ngăn nắp với tủ bảo quản tư trang an toàn cho người chơi và câu lạc bộ.',
-    },
-    {
-      icon: '🥤',
-      title: 'Dịch vụ nước uống & Giải khát',
-      desc: 'Cung cấp nước khoáng, nước uống điện giải thể thao và khăn lạnh phục vụ nhanh ngay tại sân.',
-    },
-    {
-      icon: '🪑',
-      title: 'Khu nghỉ ngơi có mái che',
-      desc: 'Không gian ghế nghỉ mát mẻ có quạt công nghiệp và mái che cách nhiệt để hồi phục thể lực giữa các set đấu.',
-    },
-    {
-      icon: '🚗',
-      title: 'Bãi đỗ xe rộng rãi',
-      desc: 'Khu vực gửi xe máy và ô tô thuận tiện ngay tại ngõ vào sân đấu, đảm bảo an ninh cho vận động viên.',
-    },
-  ];
-
   return (
-    <section
-      id="facilities"
-      style={{
-        padding: '64px 0',
-        backgroundColor: 'var(--bg-primary)',
-        borderTop: '1px solid var(--border-subtle)',
-      }}
-    >
-      <div className="container">
-        <div
-          style={{
-            textAlign: 'center',
-            maxWidth: '720px',
-            margin: '0 auto 36px',
-          }}
-        >
-          <div className="badge badge-standard" style={{ marginBottom: '8px' }}>
-            Dịch vụ tại sân
-          </div>
-          <h2
-            style={{
-              fontSize: 'clamp(1.7rem, 3.2vw, 2.2rem)',
-              fontWeight: 700,
-              color: 'var(--text-primary)',
-            }}
-          >
-            Tiện Ích & Dịch Vụ{' '}
-            <span className="gradient-volt-text">Tại Cơ Sở</span>
+    <section id="facilities" className="arena-facilities arena-wide">
+      <div className="arena-section-heading">
+        <div>
+          <h2>
+            HỆ THỐNG TIỆN ÍCH <span className="arena-live">Dịch vụ tại sân</span>
           </h2>
-          <p
-            style={{
-              color: 'var(--text-secondary)',
-              marginTop: '6px',
-              fontSize: '0.92rem',
-            }}
-          >
-            Từ mặt sân, ánh sáng đến khu thay đồ và nghỉ ngơi, các tiện ích được
-            bố trí để bạn thuận tiện trước, trong và sau buổi chơi.
+          <p>
+            Trang thiết bị hiện đại và không gian tiện nghi đồng hành cùng mọi
+            trận đấu
           </p>
         </div>
-
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
-            gap: '20px',
-          }}
-        >
-          {facilities.map((f, i) => (
-            <div
-              key={i}
-              style={{
-                backgroundColor: 'var(--bg-card)',
-                borderRadius: 'var(--radius-md)',
-                border: '1px solid var(--border-subtle)',
-                padding: '24px',
-                display: 'flex',
-                gap: '16px',
-                alignItems: 'flex-start',
-                transition: 'border-color var(--transition-fast)',
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.borderColor = 'rgba(163, 230, 53, 0.4)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.borderColor = 'var(--border-subtle)';
-              }}
-            >
-              <div
-                style={{
-                  width: '44px',
-                  height: '44px',
-                  borderRadius: '10px',
-                  background: 'rgba(163, 230, 53, 0.1)',
-                  border: '1px solid rgba(163, 230, 53, 0.25)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: '1.3rem',
-                  flexShrink: 0,
-                }}
-              >
-                {f.icon}
-              </div>
-              <div>
-                <h3
-                  style={{
-                    fontSize: '1.05rem',
-                    fontWeight: 600,
-                    color: 'var(--text-primary)',
-                    marginBottom: '6px',
-                  }}
-                >
-                  {f.title}
-                </h3>
-                <p
-                  style={{
-                    fontSize: '0.85rem',
-                    color: 'var(--text-secondary)',
-                    lineHeight: 1.5,
-                  }}
-                >
-                  {f.desc}
-                </p>
-              </div>
+      </div>
+      <div className="arena-facilities-grid">
+        {FACILITIES.map((facility) => (
+          <div key={facility.title} className="arena-facility-card">
+            <div className="arena-facility-header">
+              <span className="arena-facility-index">{facility.index}</span>
+              <span className="arena-facility-tag">{facility.tag}</span>
             </div>
-          ))}
-        </div>
+            <h3>{facility.title}</h3>
+            <p>{facility.description}</p>
+          </div>
+        ))}
       </div>
     </section>
   );

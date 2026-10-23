@@ -1,0 +1,529 @@
+.arena-shell .arena-main {
+  width: 100%;
+  max-width: 1280px;
+  padding: 32px 32px 64px;
+  margin-inline: auto;
+  flex: 1;
+  animation: arena-page-in 0.3s ease-out both;
+}
+.arena-shell .arena-page-heading {
+  margin-bottom: 32px;
+}
+.arena-shell .arena-page-heading h1 {
+  color: white;
+  font-weight: 800;
+  font-size: 30px;
+  line-height: 1.2;
+  margin: 4px 0;
+}
+.arena-shell .arena-page-heading p {
+  color: #94a3b8;
+  font-size: 14px;
+  margin: 4px 0 0;
+}
+.arena-shell .arena-page-heading .arena-eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #10e760;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+.arena-breadcrumb {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  color: #94a3b8;
+  font-size: 11px;
+  margin-bottom: 20px;
+}
+.arena-breadcrumb a {
+  color: #34d399;
+  text-decoration: none;
+}
+.arena-shell .court-detail-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(300px, 1fr);
+  align-items: start;
+  gap: 24px 32px;
+}
+.arena-shell .court-detail-main {
+  min-width: 0;
+  background: rgba(11, 18, 32, 0.92);
+  border: 1px solid rgb(255 255 255 / 10%);
+  border-radius: 16px;
+  padding: 24px;
+}
+.arena-shell .detail-panel {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+}
+.arena-shell .court-detail-info {
+  padding: 14px;
+  background: rgb(15 23 42 / 70%);
+  border: 1px solid #1e293b;
+  border-radius: 12px;
+  margin-bottom: 20px;
+}
+.arena-shell .court-detail-info h1 {
+  font-size: 16px;
+  font-weight: 800;
+  margin: 8px 0;
+}
+.arena-shell .court-detail-info p {
+  font-size: 12px;
+  margin-block: 6px;
+}
+.arena-shell .court-detail-features {
+  gap: 6px;
+}
+.arena-shell .court-detail-features li {
+  font-size: 10px;
+  padding: 4px 8px;
+  border-radius: 8px;
+}
+.arena-shell .court-type-label {
+  border-radius: 6px;
+  font-size: 11px;
+}
+.arena-shell .court-detail-price {
+  margin-top: 12px;
+  padding-top: 12px;
+  font-size: 11px;
+}
+.arena-shell .court-detail-price strong {
+  color: #10e760;
+  font-size: 14px;
+}
+.arena-court-gallery {
+  margin-top: 12px;
+  font-size: 11px;
+  color: #94a3b8;
+}
+.arena-court-gallery summary {
+  cursor: pointer;
+}
+.arena-shell .arena-court-gallery .court-detail-media {
+  position: relative;
+  aspect-ratio: 16/9;
+  overflow: hidden;
+  border-radius: 10px;
+  margin-top: 12px;
+}
+.arena-court-tabs {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 0 0 8px;
+  margin-bottom: 16px;
+}
+.arena-court-tabs :is(a, button) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  padding: 8px 14px;
+  border: 1px solid #1e293b;
+  border-radius: 8px;
+  color: #94a3b8;
+  background: rgb(15 23 42 / 60%);
+  font-weight: 700;
+  font-size: 12px;
+  text-decoration: none;
+  transition:
+    background 0.2s,
+    border-color 0.2s,
+    color 0.2s;
+}
+.arena-court-tabs :is([aria-pressed='true'], [aria-current='page']) {
+  color: #10e760;
+  border-color: rgb(16 185 129 / 40%);
+  background: rgb(16 185 129 / 20%);
+  box-shadow: 0 0 12px -2px rgb(16 231 96 / 35%);
+}
+.arena-day-strip {
+  grid-column: 1/-1;
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  padding-bottom: 8px;
+}
+.arena-day-strip button {
+  flex-shrink: 0;
+  min-width: 88px;
+  padding: 12px 16px;
+  border-radius: 12px;
+  border: 1px solid #1e293b;
+  background: rgb(15 23 42 / 80%);
+  color: #cbd5e1;
+  transition:
+    background 0.2s,
+    color 0.2s,
+    box-shadow 0.2s;
+}
+.arena-day-strip span {
+  display: block;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.arena-day-strip strong {
+  display: block;
+  font-size: 16px;
+  font-weight: 800;
+  margin-top: 2px;
+}
+.arena-day-strip button[aria-pressed='true'] {
+  background: #10e760;
+  color: #020617;
+  border-color: #10e760;
+  box-shadow: var(--arena-glow);
+}
+.arena-shell .schedule-panel .detail-section-heading {
+  gap: 12px;
+  padding-top: 4px;
+}
+.arena-shell .schedule-panel h2 {
+  font-size: 14px;
+  font-weight: 800;
+}
+.arena-shell .schedule-panel .detail-muted {
+  font-size: 11px;
+  margin-block: 12px;
+}
+.arena-shell .schedule-period {
+  margin-block: 20px;
+}
+.arena-shell .schedule-period h3 {
+  color: #94a3b8;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.arena-shell .schedule-presets {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+.arena-shell .schedule-presets button {
+  padding: 12px 6px;
+  border-radius: 12px;
+  background: rgb(15 23 42 / 90%);
+  color: #cbd5e1;
+  border: 1px solid #1e293b;
+  font-size: 12px;
+  font-weight: 600;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 4px;
+  min-height: 72px;
+  transition:
+    background 0.2s,
+    border-color 0.2s,
+    color 0.2s,
+    transform 0.2s,
+    box-shadow 0.2s;
+}
+.arena-shell .schedule-presets button small {
+  font-size: 9px;
+  font-weight: 500;
+  color: #94a3b8;
+}
+.arena-shell .schedule-presets button:hover {
+  border-color: rgb(16 185 129 / 50%);
+  background: #1e293b;
+  color: white;
+}
+.arena-shell .schedule-presets button[aria-pressed='true'] {
+  background: #10e760;
+  color: #020617;
+  border-color: #10e760;
+  transform: scale(1.02);
+  box-shadow: var(--arena-glow);
+  font-weight: 800;
+}
+.arena-shell .schedule-presets button[aria-pressed='true'] small {
+  color: #020617;
+  font-weight: 700;
+}
+.arena-shell .schedule-panel input {
+  background: #0f172a;
+  border: 1px solid #475569;
+  border-radius: 10px;
+  color: white;
+  padding: 9px;
+  font-size: 12px;
+}
+.arena-shell .schedule-custom {
+  border-color: #1e293b;
+  gap: 12px;
+}
+.arena-shell .schedule-panel .btn {
+  font-size: 12px;
+  border-radius: 12px;
+  padding: 10px 16px;
+}
+.arena-shell .detail-order {
+  margin: 0;
+  position: sticky;
+  top: 108px;
+  padding: 24px;
+  background: rgba(11, 18, 32, 0.92);
+  border: 1px solid rgb(255 255 255 / 10%);
+  border-radius: 16px;
+  box-shadow: var(--arena-shadow);
+  min-width: 0;
+}
+.arena-shell .detail-order > .detail-section-heading {
+  padding-bottom: 16px;
+  border-bottom: 1px solid #1e293b;
+  gap: 8px;
+}
+.arena-shell .detail-order h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 16px;
+  font-weight: 800;
+}
+.arena-shell .detail-order h2 svg {
+  color: #10e760;
+}
+.arena-shell .detail-order > .detail-section-heading > span {
+  color: #34d399;
+  font-size: 10px;
+  border: 1px solid rgb(16 185 129 / 20%);
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: rgb(16 185 129 / 10%);
+}
+.arena-shell .detail-order .order-court-name {
+  color: white;
+  font-weight: 700;
+  font-size: 12px;
+  margin: 16px 0 10px;
+}
+.arena-shell .detail-order .order-section {
+  padding: 12px 0;
+  font-size: 12px;
+}
+.arena-shell .detail-order .order-section h3 {
+  font-size: 11px;
+  margin-bottom: 4px;
+}
+.arena-shell .detail-order p {
+  font-size: 11px;
+  margin-block: 6px;
+}
+.arena-shell .detail-order .order-section strong {
+  color: #10e760;
+  font-size: 12px;
+}
+.arena-shell .detail-order .order-section a {
+  color: #94a3b8;
+  font-size: 10px;
+  margin-top: 4px;
+}
+.arena-shell .detail-order .order-services {
+  margin: 0;
+  padding-left: 0;
+  font-size: 11px;
+  list-style: none;
+}
+.arena-shell .detail-order .order-services li {
+  padding: 4px 0;
+}
+.arena-shell .detail-order .order-total {
+  display: block;
+  margin-top: 20px;
+  padding: 16px;
+  border: 1px solid rgb(16 185 129 / 30%);
+  border-radius: 12px;
+  background: rgb(15 23 42 / 90%);
+}
+.arena-shell .detail-order .order-total span {
+  display: block;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-size: 10px;
+}
+.arena-shell .detail-order .order-total strong {
+  display: block;
+  color: #10e760;
+  font-size: 24px;
+  font-weight: 800;
+  margin-top: 4px;
+}
+.arena-shell .detail-order form {
+  margin-top: 16px;
+}
+.arena-shell .detail-order .btn {
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 800;
+  padding: 12px 16px;
+  min-height: 44px;
+}
+.arena-shell .detail-order .btn-primary {
+  background: #10e760;
+  color: #020617;
+  box-shadow: var(--arena-glow);
+  border-color: #10e760;
+}
+.arena-shell .detail-order .btn-primary:hover {
+  background: #0ecc53;
+}
+.arena-coupon {
+  margin-top: 20px;
+  font-size: 11px;
+  color: #94a3b8;
+}
+.arena-coupon label {
+  display: block;
+  margin-bottom: 6px;
+  font-weight: 600;
+}
+.arena-coupon > div {
+  display: flex;
+  gap: 8px;
+}
+.arena-shell .arena-coupon input {
+  border-radius: 12px;
+  padding: 8px 12px;
+  color: white;
+  min-width: 0;
+  flex: 1;
+  font-size: 12px;
+  background: #0f172a;
+  border-color: #334155;
+}
+.arena-coupon small {
+  display: block;
+  font-size: 10px;
+  margin-top: 6px;
+}
+.arena-shell #court-services {
+  margin-top: 28px;
+  padding-top: 24px;
+  border-top: 1px solid #1e293b;
+}
+.arena-shell #court-services h2 {
+  font-size: 14px;
+  font-weight: 800;
+}
+.arena-shell #court-services .detail-muted {
+  margin-block: 8px 16px;
+  font-size: 11px;
+}
+.arena-shell .court-services-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.arena-shell .court-service-card {
+  padding: 14px;
+  border: 1px solid #1e293b;
+  border-radius: 12px;
+  background: rgb(15 23 42 / 70%);
+  transition: border-color 0.2s;
+}
+.arena-shell .court-service-card:hover {
+  border-color: rgb(16 185 129 / 40%);
+}
+.arena-shell .court-service-card > img {
+  width: 52px;
+  height: 52px;
+  border-radius: 8px;
+  object-fit: cover;
+  float: left;
+  margin: 0 12px 8px 0;
+}
+.arena-shell .court-service-card h3 {
+  color: white;
+  font-size: 12px;
+  font-weight: 700;
+}
+.arena-shell .court-service-card p {
+  font-size: 11px;
+  margin: 4px 0;
+}
+.arena-shell .service-product-price {
+  color: #10e760;
+  font-weight: 800;
+}
+.arena-shell .service-billing-mode {
+  font-size: 10px;
+  color: #94a3b8;
+}
+.arena-shell .service-quantity {
+  clear: both;
+  margin-top: 12px;
+}
+.arena-shell .service-quantity :is(input, button) {
+  background: #020617;
+  color: white;
+  border-color: #475569;
+  border-radius: 8px;
+}
+.arena-shell .service-quantity button {
+  width: 32px;
+  height: 32px;
+  min-height: 32px;
+}
+.arena-shell .booking-live [role='alert'] {
+  color: #fca5a5;
+  font-size: 12px;
+  padding: 12px;
+  border: 1px solid rgb(248 113 113 / 25%);
+  background: rgb(127 29 29 / 12%);
+  border-radius: 12px;
+  margin-block: 12px;
+}
+.arena-shell .booking-live [role='status'] {
+  font-size: 12px;
+}
+@media (max-width: 1023px) {
+  .arena-shell .court-detail-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 24px;
+  }
+  .arena-shell .detail-order {
+    position: static;
+  }
+  .arena-shell .arena-main {
+    padding-inline: 24px;
+  }
+}
+@media (max-width: 639px) {
+  .arena-shell .arena-main {
+    padding-inline: 16px;
+  }
+  .arena-shell .arena-page-heading h1 {
+    font-size: 26px;
+  }
+  .arena-shell .arena-page-heading p {
+    font-size: 12px;
+  }
+  .arena-shell .court-detail-main,
+  .arena-shell .detail-order {
+    padding: 20px;
+  }
+  .arena-shell .schedule-presets {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .arena-shell .schedule-presets button {
+    font-size: 11px;
+  }
+  .arena-shell .court-services-grid {
+    grid-template-columns: 1fr;
+  }
+}
