@@ -1,5 +1,59 @@
 const MINUTE_MS = 60_000;
 export const BOOKING_REFRESH_MS = 15_000;
+const MAX_BOOKING_ADVANCE_MONTHS = 2;
+export const DEFAULT_BOOKING_TIMEZONE = 'Asia/Ho_Chi_Minh';
+
+export function formatBookingDate(value: string) {
+  const date = value.slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return '';
+  return date.split('-').reverse().join('/');
+}
+
+export function bookingDateBounds(timezone: string, now = new Date()) {
+  const min = wallClock(now, timezone).slice(0, 10);
+  const latest = new Date(`${min}T00:00:00Z`);
+  const day = latest.getUTCDate();
+  latest.setUTCDate(1);
+  latest.setUTCMonth(latest.getUTCMonth() + MAX_BOOKING_ADVANCE_MONTHS);
+  const lastDay = new Date(
+    Date.UTC(latest.getUTCFullYear(), latest.getUTCMonth() + 1, 0),
+  ).getUTCDate();
+  latest.setUTCDate(Math.min(day, lastDay));
+  return { min, max: latest.toISOString().slice(0, 10) };
+}
+
+export function isBookableDate(
+  value: string,
+  timezone: string,
+  now = new Date(),
+) {
+  const { min, max } = bookingDateBounds(timezone, now);
+  const parsed = Date.parse(`${value}T00:00:00Z`);
+  return (
+    /^\d{4}-\d{2}-\d{2}$/.test(value) &&
+    Number.isFinite(parsed) &&
+    new Date(parsed).toISOString().slice(0, 10) === value &&
+    value >= min &&
+    value <= max
+  );
+}
+
+export function assertBookableWindow(
+  window: { start: string; end: string },
+  timezone: string,
+  now = new Date(),
+) {
+  if (
+    [window.start, window.end].every((value) =>
+      isBookableDate(value.slice(0, 10), timezone, now),
+    )
+  )
+    return;
+  const { min, max } = bookingDateBounds(timezone, now);
+  throw new Error(
+    `Chỉ chọn ngày từ ${formatBookingDate(min)} đến ${formatBookingDate(max)}.`,
+  );
+}
 
 function wallClock(instant: Date, timezone: string) {
   const parts = new Intl.DateTimeFormat('en-CA', {
@@ -43,8 +97,12 @@ export function initialBookingWindow(timezone: string) {
 export function bookingTime(value: string, timezone: string) {
   return new Intl.DateTimeFormat('vi-VN', {
     timeZone: timezone,
-    dateStyle: 'short',
-    timeStyle: 'short',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
   }).format(new Date(value));
 }
 export function formatVnd(amount: number) {

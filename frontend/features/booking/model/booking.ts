@@ -6,6 +6,7 @@ export interface PriceItem {
   amount: number;
 }
 export interface BookingRecord {
+  serviceItems?: BookingServiceLine[];
   id: string;
   bookingCode: string;
   courtId: string;
@@ -27,6 +28,7 @@ export interface BookingRecord {
   priceItems: PriceItem[];
 }
 export interface Availability {
+  serviceItems?: BookingServiceLine[];
   available: boolean;
   reason: string | null;
   totalAmount: number;
@@ -38,6 +40,7 @@ export interface Availability {
   priceItems: PriceItem[];
 }
 export interface BookingInput {
+  services?: ServiceSelection[];
   policyAccepted: true;
   courtId: string;
   startsAt: string;
@@ -49,6 +52,7 @@ export interface BookingWindow {
   end: string;
 }
 export interface LiveBookingState {
+  services?: ServiceSelection[];
   window: BookingWindow;
   busy: boolean;
   error: string;
@@ -56,3 +60,29 @@ export interface LiveBookingState {
   booking?: BookingRecord;
   canRetry: boolean;
 }
+export interface ServiceProduct {
+  imageUrl?: string | null;
+  availableQuantity?: number;
+  id: string;
+  code: string;
+  name: string;
+  kind: 'DRINK' | 'BALL' | 'PADDLE';
+  billingMode: 'SALE' | 'HOURLY_RENTAL';
+  unit: string;
+  unitPrice: number;
+}
+export interface ServiceSelection {
+  productId: string;
+  quantity: number;
+}
+export interface BookingServiceLine extends ServiceSelection {
+  code: string;
+  name: string;
+  kind: ServiceProduct['kind'];
+  billingMode: ServiceProduct['billingMode'];
+  unit: string;
+  unitPrice: number;
+  durationMinutes: number;
+  amount: number;
+}
+export const MAX_SERVICE_QUANTITY = 99;

@@ -8,6 +8,7 @@ import {
   getSlotPrice,
   getSlotCaption,
 } from '../../lib/court-booking';
+import { BookingDateInput } from '../../features/booking/components/booking-schedule-picker';
 import { BookingIcon } from './booking-icon';
 
 interface SlotPickerProps {
@@ -82,13 +83,10 @@ function SlotPickerHeading(props: SlotPickerProps) {
       </div>
       <label className="cb-date-label">
         Ngày thi đấu
-        <input
-          aria-label="Ngày thi đấu"
-          type="date"
-          data-booking-date
+        <BookingDateInput
+          label="Ngày thi đấu"
           value={props.date}
-          onChange={(event) => props.onDateChange(event.target.value)}
-          required
+          onChange={props.onDateChange}
         />
       </label>
     </div>

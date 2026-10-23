@@ -1,4 +1,8 @@
-import type { BookingInput, BookingWindow } from '../model/booking';
+import type {
+  BookingInput,
+  BookingWindow,
+  ServiceSelection,
+} from '../model/booking';
 import { localInputToIso } from '../model/booking-time';
 
 export interface RequestKeyState {
@@ -7,6 +11,7 @@ export interface RequestKeyState {
 }
 
 export interface RequestIdentityInput {
+  services?: ServiceSelection[];
   accountId?: string;
   courtId: string;
   timezone: string;
@@ -18,10 +23,14 @@ export function requestFingerprint({
   courtId,
   timezone,
   window,
+  services,
 }: RequestIdentityInput) {
   const startsAt = localInputToIso(window.start, timezone);
   const endsAt = localInputToIso(window.end, timezone);
-  return JSON.stringify([accountId, courtId, startsAt, endsAt]);
+  const selection = [...(services ?? [])]
+    .sort((left, right) => left.productId.localeCompare(right.productId))
+    .map(({ productId, quantity }) => [productId, quantity]);
+  return JSON.stringify([accountId, courtId, startsAt, endsAt, selection]);
 }
 
 export function bookingRequestInput(
@@ -41,5 +50,6 @@ export function bookingRequestInput(
     startsAt,
     endsAt,
     idempotencyKey: request.key,
+    ...(identity.services?.length ? { services: identity.services } : {}),
   };
 }

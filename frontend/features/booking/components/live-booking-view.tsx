@@ -1,10 +1,7 @@
 'use client';
 import Link from 'next/link';
-import {
-  bookingTime,
-  BOOKING_STATUS_LABELS,
-  formatVnd,
-} from '../model/booking-time';
+import { BookingDateTimeInput } from './booking-schedule-picker';
+import { bookingTime, BOOKING_STATUS_LABELS } from '../model/booking-time';
 import type {
   Availability,
   BookingRecord,
@@ -12,7 +9,7 @@ import type {
   LiveBookingState,
 } from '../model/booking';
 
-interface LiveBookingViewProps {
+export interface LiveBookingViewProps {
   state: LiveBookingState;
   timezone: string;
   authenticated: boolean;
@@ -25,81 +22,28 @@ interface LiveBookingViewProps {
 }
 
 function Quote({ quote }: { quote: Availability }) {
-  return (
-    <section aria-label="Báo giá từ máy chủ">
-      <h2>
-        {quote.available ? 'Khoảng sân đang trống' : 'Khoảng sân chưa khả dụng'}
-      </h2>
-      {quote.reason && <p role="status">{quote.reason}</p>}
-      <ul>
-        {quote.priceItems.map((item) => (
-          <li key={item.startsAt}>
-            {bookingTime(item.startsAt, quote.timezone)} →{' '}
-            {bookingTime(item.endsAt, quote.timezone)}: {formatVnd(item.amount)}
-          </li>
-        ))}
-      </ul>
-      <p>
-        <strong>Tổng tiền sân: {formatVnd(quote.totalAmount)}</strong>
-      </p>
-      <p>
-        Vệ sinh thêm {quote.cleanupMinutes} phút, không tính phí. Khóa lịch đến{' '}
-        {bookingTime(quote.occupiedUntil, quote.timezone)}.
-      </p>
-      <p>Lịch có thể thay đổi trước khi tạo giữ chỗ.</p>
-    </section>
-  );
-}
-function TimeInput({
-  label,
-  value,
-  onChange,
-}: {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-}) {
-  return (
-    <label>
-      {label}
-      <input
-        type="datetime-local"
-        required
-        step="60"
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-      />
-    </label>
-  );
+  return quote.available ? null : <p role="status">{quote.reason}</p>;
 }
 function TimeFields({
   state,
   onChangeWindow,
-}: {
-  state: LiveBookingState;
-  onChangeWindow: (window: BookingWindow) => void;
-}) {
+  timezone,
+}: Pick<LiveBookingViewProps, 'state' | 'onChangeWindow' | 'timezone'>) {
   return (
     <>
-      <TimeInput
+      <BookingDateTimeInput
+        timezone={timezone}
         label="Bắt đầu"
         value={state.window.start}
         onChange={(start) => onChangeWindow({ ...state.window, start })}
       />
-      <TimeInput
+      <BookingDateTimeInput
+        timezone={timezone}
         label="Kết thúc"
         value={state.window.end}
         onChange={(end) => onChangeWindow({ ...state.window, end })}
       />
     </>
-  );
-}
-function BookingConsent() {
-  return (
-    <label className="booking-consent">
-      <input type="checkbox" required /> Tôi đồng ý giữ chỗ 5 phút; chưa có
-      thanh toán hoặc xác nhận sân. Có thể hủy trước giờ chơi khi chưa check-in.
-    </label>
   );
 }
 function BookingFields({
@@ -108,13 +52,16 @@ function BookingFields({
   onChangeWindow,
   onQuote,
   onCreate,
-}: {
-  state: LiveBookingState;
-  authenticated: boolean;
-  onChangeWindow: (window: BookingWindow) => void;
-  onQuote: () => void;
-  onCreate: () => void;
-}) {
+  timezone,
+}: Pick<
+  LiveBookingViewProps,
+  | 'state'
+  | 'authenticated'
+  | 'onChangeWindow'
+  | 'onQuote'
+  | 'onCreate'
+  | 'timezone'
+>) {
   return (
     <form
       onSubmit={(event) => {
@@ -123,11 +70,14 @@ function BookingFields({
       }}
     >
       <fieldset disabled={state.busy}>
-        <TimeFields state={state} onChangeWindow={onChangeWindow} />
+        <TimeFields
+          state={state}
+          timezone={timezone}
+          onChangeWindow={onChangeWindow}
+        />
         <button type="button" className="btn btn-secondary" onClick={onQuote}>
           Kiểm tra lịch & giá
         </button>
-        <BookingConsent />
         <HoldSubmitButton state={state} authenticated={authenticated} />
       </fieldset>
     </form>
@@ -146,7 +96,7 @@ function HoldSubmitButton({
       className="btn btn-primary"
       disabled={!authenticated || !state.quote?.available || !!state.booking}
     >
-      Giữ chỗ 5 phút
+      Đặt sân
     </button>
   );
 }
@@ -159,7 +109,7 @@ function BookingResult({ booking }: { booking: BookingRecord }) {
     </p>
   );
 }
-function BookingFeedback({
+export function BookingFeedback({
   state,
   authenticated,
   onCreate,
@@ -224,6 +174,7 @@ export function LiveBookingView({
         5 phút.
       </p>
       <BookingFields
+        timezone={timezone}
         state={state}
         authenticated={authenticated}
         onChangeWindow={onChangeWindow}
@@ -236,9 +187,6 @@ export function LiveBookingView({
         onCreate={onCreate}
       />
       {showSignIn && <BookingSignIn label={signInLabel} onClick={onSignIn} />}
-      <p>
-        Giai đoạn này chỉ giữ chỗ, không thu tiền hoặc chuyển sang CONFIRMED.
-      </p>
     </section>
   );
 }

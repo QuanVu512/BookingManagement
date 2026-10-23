@@ -87,6 +87,21 @@ describe('Booking client reconciliation and session boundaries', () => {
     jest.restoreAllMocks();
   });
 
+  it.each(['2000-01-01', '2099-01-01'])(
+    'blocks checking or booking invalid day %s before any HTTP request',
+    async (date) => {
+      const fetch = jest.spyOn(globalThis, 'fetch');
+      await act(async () =>
+        controls.changeWindow({ start: `${date}T08:00`, end: `${date}T09:00` }),
+      );
+      await act(async () => controls.quoteAvailability());
+      expect(controls.error).toContain('Chỉ chọn ngày');
+      await act(async () => controls.createHold());
+      expect(controls.error).toContain('Chỉ chọn ngày');
+      expect(fetch).not.toHaveBeenCalled();
+    },
+  );
+
   it('reuses the original key after a lost response even when availability is now occupied', async () => {
     const keys: string[] = [];
     let posted = false;
@@ -167,5 +182,58 @@ describe('Booking client reconciliation and session boundaries', () => {
       '2035-01-07T23:11:00.000Z',
     );
     expect(() => localInputToIso('invalid', 'Asia/Ho_Chi_Minh')).toThrow();
+  });
+
+  it('invalidates quotes on quantity changes and binds hold retries to the selected services', async () => {
+    const keys: string[] = [];
+    const line = {
+      productId: 'paddle',
+      code: 'PADDLE',
+      name: 'Thuê vợt',
+      kind: 'PADDLE',
+      billingMode: 'HOURLY_RENTAL',
+      unit: 'vợt',
+      unitPrice: 30000,
+      quantity: 1,
+      durationMinutes: 60,
+      amount: 30000,
+    };
+    let first = true;
+    jest.spyOn(globalThis, 'fetch').mockImplementation(async (url, options) => {
+      if (requestUrl(url).endsWith('/auth/csrf'))
+        return new Response(JSON.stringify({ token: 'a'.repeat(64) }));
+      if (requestUrl(url).endsWith('/quote'))
+        return ok({ ...quote, serviceItems: [line], totalAmount: 130001 });
+      if (typeof options?.body !== 'string')
+        throw new Error('Missing request body');
+      const input: unknown = JSON.parse(options.body);
+      if (
+        typeof input !== 'object' ||
+        !input ||
+        !('idempotencyKey' in input) ||
+        typeof input.idempotencyKey !== 'string'
+      )
+        throw new Error('Missing key');
+      expect(input).toMatchObject({
+        services: [{ productId: 'paddle', quantity: 1 }],
+      });
+      keys.push(input.idempotencyKey);
+      if (first) {
+        first = false;
+        throw new TypeError('lost response');
+      }
+      return ok({ ...booking, serviceItems: [line], totalAmount: 130001 });
+    });
+    await act(async () => controls.changeService('paddle', 1));
+    await act(async () => controls.quoteAvailability());
+    expect(controls.quote?.totalAmount).toBe(130001);
+    await act(async () => controls.changeService('paddle', 2));
+    expect(controls.quote).toBeUndefined();
+    await act(async () => controls.changeService('paddle', 1));
+    await act(async () => controls.createHold());
+    expect(controls.canRetry).toBe(true);
+    await act(async () => controls.createHold());
+    expect(keys[0]).toBe(keys[1]);
+    expect(controls.booking?.serviceItems?.[0].quantity).toBe(1);
   });
 });

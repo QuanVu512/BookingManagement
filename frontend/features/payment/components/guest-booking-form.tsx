@@ -1,10 +1,13 @@
 'use client';
 import { useState } from 'react';
-import { formatVnd } from '../../booking/model/booking-time';
 import {
-  createGuestBooking,
-  newIdempotencyKey,
-} from '../api/payment-service';
+  formatVnd,
+  DEFAULT_BOOKING_TIMEZONE,
+  assertBookableWindow,
+  localInputToIso,
+} from '../../booking/model/booking-time';
+import { BookingDateTimeInput } from '../../booking/components/booking-schedule-picker';
+import { createGuestBooking, newIdempotencyKey } from '../api/payment-service';
 
 export interface GuestHoldCreated {
   bookingId: string;
@@ -26,9 +29,11 @@ const TOKEN_STORAGE_KEY = 'guest-manage-token';
  */
 export function GuestBookingForm({
   courtId,
+  timezone = DEFAULT_BOOKING_TIMEZONE,
   onCreated,
 }: {
   courtId: string;
+  timezone?: string;
   onCreated: (result: GuestHoldCreated) => void;
 }) {
   const [name, setName] = useState('');
@@ -43,16 +48,23 @@ export function GuestBookingForm({
   async function submit(event: React.FormEvent) {
     event.preventDefault();
     setError(null);
-    if (!name.trim() || !phone.trim() || !email.trim() || !startsAt || !endsAt) {
+    if (
+      !name.trim() ||
+      !phone.trim() ||
+      !email.trim() ||
+      !startsAt ||
+      !endsAt
+    ) {
       setError('Vui lòng nhập đầy đủ họ tên, điện thoại, email và khung giờ.');
       return;
     }
     setSubmitting(true);
     try {
+      assertBookableWindow({ start: startsAt, end: endsAt }, timezone);
       const result = await createGuestBooking({
         courtId,
-        startsAt: new Date(startsAt).toISOString(),
-        endsAt: new Date(endsAt).toISOString(),
+        startsAt: localInputToIso(startsAt, timezone),
+        endsAt: localInputToIso(endsAt, timezone),
         customerName: name.trim(),
         customerPhone: phone.trim(),
         customerEmail: email.trim(),
@@ -120,35 +132,21 @@ export function GuestBookingForm({
             />
           </label>
         </p>
-        <p>
-          <label>
-            Bắt đầu
-            <input
-              name="startsAt"
-              type="datetime-local"
-              value={startsAt}
-              onChange={(event) => setStartsAt(event.target.value)}
-              required
-            />
-          </label>
-        </p>
-        <p>
-          <label>
-            Kết thúc
-            <input
-              name="endsAt"
-              type="datetime-local"
-              value={endsAt}
-              onChange={(event) => setEndsAt(event.target.value)}
-              required
-            />
-          </label>
-        </p>
-        {error && (
-          <p role="alert">
-            {error}
-          </p>
-        )}
+        <BookingDateTimeInput
+          label="Bắt đầu"
+          timezone={timezone}
+          value={startsAt}
+          onChange={setStartsAt}
+          disabled={submitting}
+        />
+        <BookingDateTimeInput
+          label="Kết thúc"
+          timezone={timezone}
+          value={endsAt}
+          onChange={setEndsAt}
+          disabled={submitting}
+        />
+        {error && <p role="alert">{error}</p>}
         <p>
           <button type="submit" disabled={submitting}>
             {submitting ? 'Đang giữ chỗ…' : 'Giữ chỗ và thanh toán 100%'}
@@ -162,8 +160,8 @@ export function GuestBookingForm({
             {formatVnd(created.prepaymentAmount)}.
           </p>
           <p>
-            Mã truy cập đã lưu trong tab này. Nếu mất mã, liên hệ quầy để
-            được cấp lại sau khi xác minh — không gửi mã qua email tự động.
+            Mã truy cập đã lưu trong tab này. Nếu mất mã, liên hệ quầy để được
+            cấp lại sau khi xác minh — không gửi mã qua email tự động.
           </p>
         </div>
       )}

@@ -3,6 +3,8 @@ import {
   isAvailability,
   isBooking,
   parseBookingPage,
+  parseAvailability,
+  parseServiceProducts,
 } from '../features/booking/api/booking-contract.js';
 
 const priceItem = {
@@ -25,6 +27,30 @@ const booking = {
   totalAmount: 100001,
   currency: 'VND',
   priceItems: [priceItem],
+};
+
+const product = {
+  imageUrl: '/products/paddle-carbon.jpg',
+  availableQuantity: 10,
+  id: 'paddle',
+  code: 'PADDLE',
+  name: 'Thuê vợt',
+  kind: 'PADDLE',
+  billingMode: 'HOURLY_RENTAL',
+  unit: 'vợt',
+  unitPrice: 30000,
+};
+const serviceLine = {
+  productId: 'paddle',
+  code: 'PADDLE',
+  name: 'Thuê vợt',
+  kind: 'PADDLE',
+  billingMode: 'HOURLY_RENTAL',
+  unit: 'vợt',
+  unitPrice: 30000,
+  quantity: 1,
+  durationMinutes: 60,
+  amount: 30000,
 };
 
 describe('Booking response contract boundary', () => {
@@ -72,5 +98,43 @@ describe('Booking response contract boundary', () => {
         totalAmount: 100001,
       }),
     ).toBe(false);
+  });
+
+  it('rejects invalid inventory while preserving valid catalog images', () => {
+    expect(parseServiceProducts([product])).toHaveLength(1);
+    expect(() =>
+      parseServiceProducts([{ ...product, availableQuantity: -1 }]),
+    ).toThrow();
+    expect(() =>
+      parseServiceProducts([{ ...product, availableQuantity: undefined }]),
+    ).toThrow();
+  });
+
+  it('rejects a sale paddle, malformed service totals, and an ignored service selection', () => {
+    expect(() =>
+      parseServiceProducts([{ ...product, billingMode: 'SALE' }]),
+    ).toThrow();
+    expect(
+      isBooking({
+        ...booking,
+        totalAmount: 130001,
+        serviceItems: [serviceLine],
+      }),
+    ).toBe(true);
+    expect(isBooking({ ...booking, serviceItems: [serviceLine] })).toBe(false);
+    const quote = {
+      available: true,
+      reason: null,
+      totalAmount: 100001,
+      currency: 'VND',
+      cleanupMinutes: 15,
+      timezone: booking.timezone,
+      serverNow: '2035-01-08T00:00:00Z',
+      occupiedUntil: '2035-01-08T02:15:00Z',
+      priceItems: [priceItem],
+    };
+    expect(() =>
+      parseAvailability(quote, [{ productId: 'paddle', quantity: 1 }]),
+    ).toThrow('Dịch vụ');
   });
 });

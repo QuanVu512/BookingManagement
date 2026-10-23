@@ -32,14 +32,7 @@ export function getLocalDate(): string {
     .join('-');
 }
 
-export function formatBookingDate(date: string): string {
-  return new Intl.DateTimeFormat('vi-VN', {
-    weekday: 'long',
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-  }).format(new Date(`${date}T12:00:00+07:00`));
-}
+export { formatBookingDate } from '../features/booking/model/booking-time';
 
 export function createBookingSelection(date: string): BookingSelection {
   return {
