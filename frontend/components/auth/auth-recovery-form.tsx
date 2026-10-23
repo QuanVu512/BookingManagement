@@ -2,6 +2,7 @@
 
 import { useAuthRecoveryForm } from '../../hooks/use-auth-recovery-form';
 import type { RecoveryMode } from '../../hooks/use-auth-recovery-form';
+import styles from './auth-form.module.css';
 import { AUTH_LIMITS } from '../../lib/auth-validation';
 
 type RecoveryFormState = ReturnType<typeof useAuthRecoveryForm>;
@@ -23,7 +24,7 @@ export function AuthRecoveryForm({ mode }: { mode: RecoveryMode }) {
       <RecoveryStatus form={form} />
       <RecoveryForm mode={mode} form={form} />
       <p>
-        <a href="/">Về trang chủ và đăng nhập</a>
+        <a href="/auth/login">Quay lại đăng nhập</a>
       </p>
     </main>
   );
@@ -34,7 +35,7 @@ function RecoveryStatus({ form }: { form: RecoveryFormState }) {
   return (
     <>
       {error && (
-        <p id="recovery-error" role="alert">
+        <p id="recovery-error" className={styles.error} role="alert">
           {error}
         </p>
       )}
@@ -78,9 +79,6 @@ function RecoveryFields({
   if (mode !== 'reset-password') return null;
   return (
     <>
-      <p id="password-policy">
-        Mật khẩu 12–128 ký tự; hỗ trợ Unicode và khoảng trắng.
-      </p>
       <RecoveryInput form={form} field="password" label="Mật khẩu mới" />
       <RecoveryInput
         form={form}
@@ -102,12 +100,7 @@ function RecoveryInput({
 }) {
   const id = `recovery-${field}`;
   const description =
-    [
-      field === 'password' ? 'password-policy' : '',
-      form.error ? 'recovery-error' : '',
-    ]
-      .filter(Boolean)
-      .join(' ') || undefined;
+    [form.error ? 'recovery-error' : ''].filter(Boolean).join(' ') || undefined;
   return (
     <p>
       <label htmlFor={id}>{label}</label>

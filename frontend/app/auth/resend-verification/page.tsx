@@ -1,4 +1,4 @@
-import { AuthRecoveryForm } from '../../../components/auth/auth-recovery-form';
+import { EmailVerificationPage } from '../../../components/auth/email-verification-page';
 export default function ResendVerificationPage() {
-  return <AuthRecoveryForm mode="resend-verification" />;
+  return <EmailVerificationPage />;
 }

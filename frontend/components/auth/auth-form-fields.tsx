@@ -5,7 +5,7 @@ import type { KeyboardEvent } from 'react';
 import type { RegistrationData } from '../../types/auth';
 import { AUTH_LIMITS } from '../../lib/auth-validation';
 import type { AuthFieldErrors } from '../../lib/auth-validation';
-import styles from './auth-modal.module.css';
+import styles from './auth-form.module.css';
 
 interface FieldProps {
   name: keyof RegistrationData;

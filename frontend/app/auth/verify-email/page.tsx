@@ -1,4 +1,4 @@
-import { AuthRecoveryForm } from '../../../components/auth/auth-recovery-form';
+import { EmailVerificationPage } from '../../../components/auth/email-verification-page';
 export default function VerifyEmailPage() {
-  return <AuthRecoveryForm mode="verify-email" />;
+  return <EmailVerificationPage />;
 }

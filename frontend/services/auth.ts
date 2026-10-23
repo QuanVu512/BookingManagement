@@ -5,6 +5,7 @@ import type {
   SessionResult,
   AuthMessage,
   RegistrationResult,
+  EmailVerificationFlow,
 } from '../types/auth';
 import {
   API_BASE_URL,
@@ -18,6 +19,7 @@ const SESSION_ERROR_MESSAGE =
   'Chưa thể xác nhận phiên đăng nhập. Vui lòng thử lại.';
 
 export class AuthRequestError extends Error {
+  verification?: EmailVerificationFlow;
   constructor(
     message: string,
     readonly status?: number,
@@ -64,17 +66,30 @@ function getErrorMessage(body: unknown): string {
   return AUTH_ERROR_MESSAGE;
 }
 function getErrorCode(body: unknown): string | undefined {
-  return isRecord(body) && typeof body.code === 'string' ? body.code : undefined;
+  return isRecord(body) && typeof body.code === 'string'
+    ? body.code
+    : undefined;
+}
+function isVerificationFlow(value: unknown): value is EmailVerificationFlow {
+  return (
+    isRecord(value) &&
+    typeof value.email === 'string' &&
+    typeof value.token === 'string' &&
+    /^[a-f0-9]{64}$/.test(value.token)
+  );
 }
 async function readResponse(response: Response): Promise<unknown> {
   if (!response.ok) {
     const body: unknown = await response.json().catch(() => null);
-    throw new AuthRequestError(
+    const error = new AuthRequestError(
       getErrorMessage(body),
       response.status,
       response.status >= 500,
       getErrorCode(body),
     );
+    if (isRecord(body) && isVerificationFlow(body.verification))
+      error.verification = body.verification;
+    throw error;
   }
   try {
     return await response.json();
@@ -146,12 +161,15 @@ export async function registerAccount(
     !isRecord(body) ||
     body.success !== true ||
     body.status !== 'verification_required' ||
+    typeof body.verificationToken !== 'string' ||
+    !/^[a-f0-9]{64}$/.test(body.verificationToken) ||
     typeof body.message !== 'string'
   )
     throw new AuthRequestError(AUTH_ERROR_MESSAGE);
   return {
     success: true,
     status: 'verification_required',
+    verificationToken: body.verificationToken,
     message: body.message,
   };
 }

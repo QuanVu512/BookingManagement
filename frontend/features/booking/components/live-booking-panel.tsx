@@ -11,7 +11,7 @@ export function LiveBookingPanel({
   timezone: string;
 }) {
   const session = useAuthSession();
-  const { openAuthModal, refreshSession } = useAuthActions();
+  const { openSignIn, refreshSession } = useAuthActions();
   const state = useLiveBooking(
     courtId,
     timezone,
@@ -22,7 +22,7 @@ export function LiveBookingPanel({
       ? 'Kiểm tra lại phiên đăng nhập'
       : 'Đăng nhập để giữ sân';
   const signIn = () =>
-    session.status === 'unknown' ? void refreshSession() : openAuthModal();
+    session.status === 'unknown' ? void refreshSession() : openSignIn();
   return (
     <LiveBookingView
       state={state}

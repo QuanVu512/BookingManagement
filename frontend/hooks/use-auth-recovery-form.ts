@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import { authMessage } from '../services/auth';
-import { getLoginErrors, isEmail } from '../lib/auth-validation';
+import { getPasswordError, isEmail } from '../lib/auth-validation';
 
 export type RecoveryMode =
   'verify-email' | 'resend-verification' | 'forgot-password' | 'reset-password';
@@ -121,7 +121,7 @@ function validateRecovery(
   )
     return 'Vui lòng nhập email hợp lệ.';
   if (mode === 'reset-password') {
-    const error = getLoginErrors('recovery', values.password).password;
+    const error = getPasswordError(values.password);
     if (error) return error;
     if (values.password !== values.confirmPassword)
       return 'Mật khẩu xác nhận không khớp.';

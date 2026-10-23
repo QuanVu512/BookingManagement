@@ -13,7 +13,7 @@ export default function AccountSecurityPage() {
       status={session.status}
       sessionLoading={session.isLoading}
       sessionError={session.sessionError}
-      onSignIn={() => actions.openAuthModal()}
+      onSignIn={() => actions.openSignIn()}
       onRetrySession={() => void actions.refreshSession()}
     >
       <AccountSecurityView />

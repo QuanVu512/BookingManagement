@@ -1,9 +1,3 @@
-.dialog {
-  display: flex;
-  flex-direction: column;
-  max-height: calc(100dvh - 32px);
-  transform: translate3d(0, 0, 0);
-}
 .fields {
   border: 0;
   padding: 0;
@@ -30,46 +24,21 @@
     animation: none;
   }
 }
-.header {
-  flex-shrink: 0;
-  padding: 20px 24px 12px;
-}
-.title {
-  font-size: 1.35rem;
-  color: var(--text-primary);
-  margin-top: 8px;
-}
-.pendingCourt {
-  color: var(--accent-volt);
-  font-size: 0.82rem;
-  margin-top: 4px;
-}
-.tabs {
-  display: flex;
-  flex-shrink: 0;
-  border-bottom: 1px solid var(--border-subtle);
-}
-.tabs button {
-  flex: 1;
-  padding: 12px;
-  color: var(--text-secondary);
-  border-bottom: 2px solid transparent;
-}
-.tabs button[aria-pressed='true'] {
-  color: var(--accent-volt);
-  border-bottom-color: var(--accent-volt);
-}
-.body {
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  padding: 18px 24px;
-  min-height: 0;
-}
+
 .field {
   margin-bottom: 12px;
 }
 .field :global(.form-input) {
   padding: 10px 12px;
+}
+.field :global(.form-input:focus) {
+  border-color: var(--text-secondary);
+  box-shadow: none;
+  outline: 2px solid var(--text-secondary);
+  outline-offset: 2px;
+}
+.field :global(.form-input[aria-invalid='true']) {
+  border-color: #ef6a6a;
 }
 .fieldError,
 .error {
@@ -109,20 +78,14 @@
   color: var(--text-secondary);
 }
 .passwordToggle:focus-visible {
-  outline: 2px solid var(--accent-volt);
+  outline: 2px solid var(--text-secondary);
   outline-offset: -2px;
   border-radius: 6px;
 }
-.submit,
-.guest {
+.submit {
   width: 100%;
 }
-.divider {
-  text-align: center;
-  color: var(--text-muted);
-  margin: 16px 0;
-  font-size: 0.8rem;
-}
+
 :global([data-theme='light']) .warning {
   color: #775300;
 }
@@ -130,13 +93,10 @@
 :global([data-theme='light']) .error {
   color: #b42318;
 }
+:global([data-theme='light']) .field :global(.form-input[aria-invalid='true']) {
+  border-color: #b42318;
+}
 @media (max-width: 480px) {
-  .header {
-    padding: 16px 18px 12px;
-  }
-  .body {
-    padding: 14px 18px;
-  }
   .field :global(.form-input) {
     font-size: 16px;
   }

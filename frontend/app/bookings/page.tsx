@@ -1,6 +1,5 @@
 ﻿import Link from 'next/link';
 import { SportyHeader } from '../../components/home/sporty-header';
-import { AuthModal } from '../../components/auth/auth-modal';
 import { MyBookingsPanel } from '../../features/booking/components/my-bookings-panel';
 import '../../public/booking-live.css';
 
@@ -34,7 +33,6 @@ export default async function MyBookingsPage({
         </nav>
         <MyBookingsPanel initialTab={tab} />
       </main>
-      <AuthModal />
     </>
   );
 }

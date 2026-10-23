@@ -30,6 +30,7 @@ import {
   registerAccount,
   logoutAccount,
 } from '../services/auth';
+import { useRouter } from 'next/navigation';
 
 interface AuthSessionValue {
   user: UserProfile | null;
@@ -40,14 +41,12 @@ interface AuthSessionValue {
   logoutError: string;
 }
 interface AuthDialogValue {
-  isAuthModalOpen: boolean;
   isGuestConfirmOpen: boolean;
   pendingCourt: CourtItem | null;
   guestSessionActive: boolean;
 }
 interface DialogActions {
-  openAuthModal: (court?: CourtItem) => void;
-  closeAuthModal: () => void;
+  openSignIn: (court?: CourtItem) => void;
   openGuestConfirm: () => void;
   closeGuestConfirm: () => void;
   proceedAsGuest: () => void;
@@ -59,18 +58,10 @@ interface SessionActions {
   refreshSession: () => Promise<void>;
 }
 type AuthActionsValue = DialogActions & SessionActions;
-type DialogCommand =
-  | { type: 'open-auth'; court?: CourtItem }
-  | {
-      type:
-        | 'close-auth'
-        | 'open-guest'
-        | 'close-guest'
-        | 'proceed-guest'
-        | 'reset-guest';
-    };
+type DialogCommand = {
+  type: 'open-guest' | 'close-guest' | 'proceed-guest' | 'reset-guest';
+};
 const INITIAL_DIALOG: AuthDialogValue = {
-  isAuthModalOpen: false,
   isGuestConfirmOpen: false,
   pendingCourt: null,
   guestSessionActive: false,
@@ -85,10 +76,7 @@ const AuthActionsContext = createContext<AuthActionsValue | undefined>(
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const dialog = useDialogStore();
-  const session = useSessionStore(
-    dialog.actions.closeAuthModal,
-    dialog.resetGuest,
-  );
+  const session = useSessionStore(dialog.resetGuest);
   const actions = useMemo(
     () => ({ ...dialog.actions, ...session.actions }),
     [dialog.actions, session.actions],
@@ -109,19 +97,8 @@ function reduceDialog(
   command: DialogCommand,
 ): AuthDialogValue {
   switch (command.type) {
-    case 'open-auth':
-      return {
-        ...state,
-        isAuthModalOpen: true,
-        isGuestConfirmOpen: false,
-        pendingCourt: command.court ?? state.pendingCourt,
-      };
-    case 'close-auth':
-      return state.isAuthModalOpen
-        ? { ...state, isAuthModalOpen: false }
-        : state;
     case 'open-guest':
-      return { ...state, isAuthModalOpen: false, isGuestConfirmOpen: true };
+      return { ...state, isGuestConfirmOpen: true };
     case 'close-guest':
       return state.isGuestConfirmOpen
         ? { ...state, isGuestConfirmOpen: false }
@@ -148,18 +125,16 @@ function useDialogStore() {
 }
 
 function useAuthDialogActions(dispatch: Dispatch<DialogCommand>) {
-  const openAuthModal = useCallback(
-    (court?: CourtItem) => dispatch({ type: 'open-auth', court }),
-    [dispatch],
+  const router = useRouter();
+  const openSignIn = useCallback(
+    (court?: CourtItem) => {
+      dispatch({ type: 'close-guest' });
+      const next = court ? `/courts/${court.id}` : window.location.pathname;
+      router.push(`/auth/login?next=${encodeURIComponent(next)}`);
+    },
+    [dispatch, router],
   );
-  const closeAuthModal = useCallback(
-    () => dispatch({ type: 'close-auth' }),
-    [dispatch],
-  );
-  return useMemo(
-    () => ({ openAuthModal, closeAuthModal }),
-    [openAuthModal, closeAuthModal],
-  );
+  return useMemo(() => ({ openSignIn }), [openSignIn]);
 }
 
 function useGuestDialogActions(dispatch: Dispatch<DialogCommand>) {
@@ -183,7 +158,7 @@ function useGuestDialogActions(dispatch: Dispatch<DialogCommand>) {
 
 type SessionSetter = Dispatch<SetStateAction<AuthSessionValue>>;
 
-function useSessionStore(closeModal: () => void, resetGuest: () => void) {
+function useSessionStore(resetGuest: () => void) {
   const [value, setValue] = useState<AuthSessionValue>({
     user: null,
     status: 'unknown',
@@ -194,7 +169,7 @@ function useSessionStore(closeModal: () => void, resetGuest: () => void) {
   });
   const revision = useRef(0);
   const refreshSession = useSessionChecks(setValue, revision);
-  const acceptUser = useAcceptedUser(setValue, revision, closeModal);
+  const acceptUser = useAcceptedUser(setValue, revision);
   const acceptLogout = useAcceptedLogout(setValue, resetGuest);
   const setLogoutError = useCallback((logoutError: string) => {
     setValue((current) => ({ ...current, logoutError, isLoading: false }));
@@ -247,11 +222,7 @@ function useSessionChecks(
   );
 }
 
-function useAcceptedUser(
-  setValue: SessionSetter,
-  revision: RefObject<number>,
-  closeModal: () => void,
-) {
+function useAcceptedUser(setValue: SessionSetter, revision: RefObject<number>) {
   return useCallback(
     (user: UserProfile) => {
       revision.current += 1;
@@ -263,10 +234,9 @@ function useAcceptedUser(
         sessionError: '',
         logoutError: '',
       });
-      closeModal();
       return user;
     },
-    [closeModal, revision, setValue],
+    [revision, setValue],
   );
 }
 

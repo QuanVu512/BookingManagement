@@ -1,7 +1,6 @@
 'use client';
 import Link from 'next/link';
 import { SportyHeader } from '../../../components/home/sporty-header';
-import { AuthModal } from '../../../components/auth/auth-modal';
 import { CourtInfoCard } from '../../../features/courts/components/court-info-card';
 import { useCourtDetail } from '../../../features/courts/hooks/use-court-detail';
 
@@ -24,7 +23,6 @@ export function BookingScreen({ courtId }: { courtId: string }) {
         )}
         {court && <CourtInfoCard court={court} />}
       </main>
-      <AuthModal />
     </>
   );
 }

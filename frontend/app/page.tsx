@@ -8,7 +8,6 @@ import { CourtCatalogView } from '../features/courts/components/court-catalog-vi
 import { ScaleupStorePreview } from '../components/home/scaleup-store-preview';
 import { FacilitiesSection } from '../components/home/facilities-section';
 import { SportyFooter } from '../components/home/sporty-footer';
-import { AuthModal } from '../components/auth/auth-modal';
 import { GuestConfirmDialog } from '../components/auth/guest-confirm-dialog';
 
 export default function HomePage() {
@@ -42,9 +41,6 @@ export default function HomePage() {
       </main>
 
       <SportyFooter />
-
-      {/* Auth Modal Popup */}
-      <AuthModal />
 
       {/* Guest Confirmation Dialog */}
       <GuestConfirmDialog />

@@ -19,9 +19,11 @@ const VALID_FORM = {
 
 describe('Frontend auth validation', () => {
   it.each([
-    'a'.repeat(12),
+    'a'.repeat(7),
     'a'.repeat(64),
-    '😀'.repeat(128),
+    'a' + '😀'.repeat(127),
+    'abc def',
+    'mậtkhẩu123',
     '  mật khẩu dài có dấu 😀  ',
   ])('accepts Unicode passphrases at backend boundaries: %s', (password) => {
     expect(
@@ -74,9 +76,11 @@ describe('Frontend auth validation', () => {
     ['email', 'invalid-email'],
     ['phone', '+12025550123'],
     ['phone', '0123456789'],
-    ['password', 'mậtkhẩu123'],
     ['password', 'abcde'],
-    ['password', 'abc def'],
+    ['password', 'abcdef'],
+    ['password', '1234567'],
+    ['password', '😀'.repeat(128)],
+    ['password', 'a'.repeat(129)],
     ['confirmPassword', 'Mismatch1!'],
     ['fullName', '   '],
   ])('reports invalid %s', (field, value) => {

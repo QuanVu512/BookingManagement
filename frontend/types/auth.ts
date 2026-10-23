@@ -11,6 +11,7 @@ export interface AuthMessage {
 }
 export interface RegistrationResult extends AuthMessage {
   status: 'verification_required';
+  verificationToken: string;
 }
 
 export interface RegistrationData {
@@ -38,3 +39,8 @@ export type {
   CourtStatus,
   CourtType,
 } from '../features/courts/model/court';
+
+export interface EmailVerificationFlow {
+  email: string;
+  token: string;
+}

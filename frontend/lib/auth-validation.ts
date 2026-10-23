@@ -3,7 +3,7 @@ import type { RegistrationData } from '../types/auth';
 export const AUTH_LIMITS = {
   usernameMin: 8,
   usernameMax: 100,
-  passwordMin: 12,
+  passwordMin: 7,
   passwordMax: 128,
   fullNameMax: 150,
   emailMax: 254,
@@ -12,6 +12,9 @@ export const AUTH_LIMITS = {
 } as const;
 
 export const LOGIN_PASSWORD_MAX_BYTES = 1024;
+const PASSWORD_LETTER_PATTERN = /\p{L}/u;
+export const PASSWORD_REQUIREMENT_MESSAGE =
+  'Mật khẩu phải dài hơn 6 ký tự, tối đa 128 ký tự và chứa ít nhất một chữ cái.';
 
 function utf8ByteLength(value: string): number {
   return new TextEncoder().encode(value).byteLength;
@@ -62,14 +65,8 @@ export function getRegistrationErrors(form: RegistrationData): AuthFieldErrors {
     errors.username =
       'Tên đăng nhập cần 8–100 ký tự, chỉ chữ Latin và số, có ít nhất một chữ.';
   }
-  const passwordLength = Array.from(form.password).length;
-  if (
-    passwordLength < AUTH_LIMITS.passwordMin ||
-    passwordLength > AUTH_LIMITS.passwordMax
-  ) {
-    errors.password =
-      'Mật khẩu cần 12–128 ký tự; hỗ trợ Unicode và khoảng trắng.';
-  }
+  const passwordError = getPasswordError(form.password);
+  if (passwordError) errors.password = passwordError;
   if (!values.fullName || values.fullName.length > AUTH_LIMITS.fullNameMax)
     errors.fullName = 'Họ tên bắt buộc, tối đa 150 ký tự.';
   if (values.email.length > AUTH_LIMITS.emailMax || !isEmail(values.email))
@@ -79,6 +76,18 @@ export function getRegistrationErrors(form: RegistrationData): AuthFieldErrors {
   if (!form.confirmPassword || form.password !== form.confirmPassword)
     errors.confirmPassword = 'Mật khẩu xác nhận không khớp.';
   return errors;
+}
+
+export function getPasswordError(password: string): string | undefined {
+  const length = Array.from(password).length;
+  if (
+    length < AUTH_LIMITS.passwordMin ||
+    length > AUTH_LIMITS.passwordMax ||
+    !PASSWORD_LETTER_PATTERN.test(password)
+  ) {
+    return PASSWORD_REQUIREMENT_MESSAGE;
+  }
+  return undefined;
 }
 
 export function getLoginErrors(

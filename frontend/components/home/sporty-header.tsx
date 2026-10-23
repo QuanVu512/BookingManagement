@@ -19,7 +19,7 @@ export function SportyHeader({
     sessionError,
     logoutError,
   } = useAuthSession();
-  const { logout, openAuthModal, refreshSession } = useAuthActions();
+  const { logout, openSignIn, refreshSession } = useAuthActions();
   const router = useRouter();
   const isHomePage = currentPage === 'home';
   const [activeNav, setActiveNav] = useState<'courts' | 'facilities' | 'about'>(
@@ -367,7 +367,7 @@ export function SportyHeader({
             <button
               type="button"
               className="btn btn-sm btn-primary"
-              onClick={() => openAuthModal()}
+              onClick={() => openSignIn()}
             >
               Đăng nhập
             </button>

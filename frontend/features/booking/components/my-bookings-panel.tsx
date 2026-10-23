@@ -16,7 +16,7 @@ export function MyBookingsPanel({
   const signIn = () =>
     session.status === 'unknown'
       ? void actions.refreshSession()
-      : actions.openAuthModal();
+      : actions.openSignIn();
   if (initialTab === 'payments' && session.isAuthenticated) {
     return (
       <PaymentHistoryPanel accountId={accountId} bookings={feed.bookings} />

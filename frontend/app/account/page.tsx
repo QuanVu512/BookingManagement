@@ -13,7 +13,7 @@ export default function AccountPage() {
       status={session.status}
       sessionLoading={session.isLoading}
       sessionError={session.sessionError}
-      onSignIn={() => actions.openAuthModal()}
+      onSignIn={() => actions.openSignIn()}
       onRetrySession={() => void actions.refreshSession()}
     >
       {session.user ? <AccountProfileView user={session.user} /> : null}
