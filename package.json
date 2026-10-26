@@ -143,6 +143,9 @@
     "@nestjs/mau": {
       "undici": "^6.29.0",
       "tmp": "^0.2.7"
+    },
+    "@nestjs/platform-express": {
+      "multer": "^2.5.0"
     }
   }
 }
