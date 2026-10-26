@@ -13,6 +13,9 @@ import { BookingExpiryModule } from './modules/bookings/booking-expiry.module.js
 import { BookingsModule } from './modules/bookings/bookings.module.js';
 import { PaymentsModule } from './modules/payments/payments.module.js';
 import { CheckInModule } from './modules/check-in/check-in.module.js';
+import { LegalContentModule } from './modules/legal-content/legal-content.module.js';
+import { PrivacyRequestsModule } from './modules/privacy-requests/privacy-requests.module.js';
+import { SupportModule } from './modules/support/support.module.js';
 import { PrismaModule } from './infrastructure/prisma/prisma.module.js';
 import { QueueModule } from './infrastructure/queue/queue.module.js';
 import { RedisModule } from './infrastructure/redis/redis.module.js';
@@ -39,6 +42,9 @@ export const { ObserveModule, ObserveInstrument } = createObserveModule();
     BookingExpiryModule,
     PaymentsModule,
     CheckInModule,
+    LegalContentModule,
+    PrivacyRequestsModule,
+    SupportModule,
     PrismaModule,
     QueueModule,
     RedisModule,
