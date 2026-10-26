@@ -98,3 +98,8 @@ Seed ở `backend/prisma/seed.mjs`, khai báo `migrations.seed` trong Prisma con
 Lệnh `npm run test:booking:deposit:integration` chỉ dùng `BOOKING_DEPOSIT_DATABASE_TEST_URL`, không fallback sang `DATABASE_URL` hoặc đọc `.env`. Target phải là loopback và database tên `booking_deposit_test`, chưa có bảng public. Test từ chối DB không rỗng, không DROP/TRUNCATE bảng hiện hữu và không cần Redis. Chuẩn bị database test rỗng riêng; suite tự replay các SQL migration lịch sử, chèn snapshot 100% rồi apply SQL migration mới để kiểm upgrade. DB chỉ dành cho suite này; tạo lại DB disposable riêng cho lần chạy tiếp, không tái sử dụng DB ứng dụng.
 
 Đặt `BOOKING_DEPOSIT_REQUIRE_STORAGE=true` để thiếu URL phải FAIL thay vì SKIP. CI tạo database riêng trên PostgreSQL service disposable và bật flag này. Local thiếu URL thì suite SKIP, không phải PASS của migration. Không dùng pretest:e2e, migrate dev/deploy hoặc reset trên DB ứng dụng để chạy suite.
+
+
+## Điều tra CI và kiểm tra Nest runtime
+
+Xem [hướng dẫn đọc và xử lý lỗi CI](CI-TROUBLESHOOTING.md) để phân loại lỗi, tái hiện trên PowerShell, tra cứu dependency và hiểu giới hạn của rerun. `npm run test:backend:runtime` chạy HTTP regression Nest ESM/CommonJS + throttler thật (200/200/429), không cần storage; CI chạy trước các integration suite. Jest backend dùng `test/setup-nest-esm.mjs` qua `setupFiles` để common/core đã nạp xong trước graph test, tránh vòng lặp require(esm) từ plugin CommonJS.

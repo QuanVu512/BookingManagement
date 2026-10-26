@@ -53,6 +53,9 @@ jobs:
       - name: Install locked dependencies
         run: npm ci
 
+      - name: Nest ESM and throttler HTTP runtime regression
+        run: npm run test:backend:runtime
+
       - name: Generate persistence client types
         run: npm run prisma:generate
       - name: Migrate disposable auth test database

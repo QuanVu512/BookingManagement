@@ -32,6 +32,7 @@
     "test:frontend:ui": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js --config frontend/jest.config.js --runInBand --testPathPatterns=rendering",
     "test:auth:ui": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js --config frontend/jest.config.js --runInBand --runTestsByPath frontend/__tests__/frontend-auth-rendering.spec.tsx",
     "test:auth:phones": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js --config backend/jest.config.js --runInBand --runTestsByPath backend/prisma/audit-auth-phones.spec.mjs backend/src/modules/auth/helpers/auth-normalization.spec.ts backend/test/phone-normalization-parity.spec.mjs backend/test/auth-phone-migration.spec.ts",
+    "test:backend:runtime": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js --config backend/jest.config.js --runInBand --runTestsByPath backend/test/throttler-runtime.integration.spec.ts",
     "test:booking:integration": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js --config backend/jest.config.js --runInBand --runTestsByPath backend/test/booking.integration.spec.ts",
     "test:booking:deposit:integration": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js --config backend/jest.config.js --runInBand --runTestsByPath backend/test/booking-deposit.integration.spec.ts",
     "test:booking:ui": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js --config frontend/jest.config.js --runInBand --runTestsByPath frontend/__tests__/frontend-booking-rendering.spec.tsx",

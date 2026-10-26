@@ -7,6 +7,7 @@ const rootDir = dirname(fileURLToPath(import.meta.url));
 const config = {
   rootDir,
   testEnvironment: 'node',
+  setupFiles: ['<rootDir>/test/setup-nest-esm.mjs'],
   roots: ['<rootDir>/src', '<rootDir>/test', '<rootDir>/prisma'],
   testMatch: ['**/*.spec.ts', '**/*.e2e-spec.ts', '**/*.spec.mjs'],
   transform: {
