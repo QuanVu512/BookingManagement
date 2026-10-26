@@ -9,6 +9,9 @@ Next.js frontend và NestJS modular monolith. Backend dùng một PostgreSQL dat
 - [Data dictionary](docs/DATABASE-DESIGN.md)
 - [Tech stack](docs/TECH-STACK.md)
 - [Commands vận hành](docs/OPERATIONS.md)
+- [Legal, privacy và chính sách booking](docs/LEGAL-AND-PRIVACY.md)
+- [Danh mục dữ liệu cá nhân](docs/PRIVACY-DATA-INVENTORY.md)
+- [Điều kiện phát hành thương mại](docs/RELEASE-REQUIREMENTS.md)
 
 Học liệu cá nhân, lab, giáo trình và bản copy Sheet nằm trong guide/ được Git ignore. docs/ chứa tài liệu hệ thống publish cùng repo. Prisma schema/migration ứng dụng thuộc backend/prisma và cần commit.
 
