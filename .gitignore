@@ -1,6 +1,6 @@
 # compiled output
 /dist
-/node_modules
+node_modules/
 /build
 
 # TypeScript build cache
@@ -19,8 +19,11 @@ lerna-debug.log*
 .DS_Store
 
 # Tests
-/coverage
-/.nyc_output
+coverage/
+.nyc_output/
+playwright-report/
+test-results/
+blob-report/
 
 # IDEs and editors
 /.idea
@@ -46,10 +49,11 @@ lerna-debug.log*
 .env.local
 .env.*
 !.env.example
+!.env.*.example
 
-# temp directory
-.temp
-.tmp
+# Temporary files; disposable AI reports belong in .temp/ai-reports/
+.temp/
+.tmp/
 
 # Personal learning material (guides, labs, DOCX, TXT, screenshots)
 /guide/
@@ -64,19 +68,19 @@ pids
 report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 
 
-#AI agents
+# AI agents: local configuration, coordination and session state
 # Local agent skills and references (including addyosmani/agent-skills)
 /.agents/
-/.opencode
-ai/*
+/.opencode/
+/ai/
 AGENTS.md
 AIROLEs.md
 CLAUDE.md
 GEMINI.md
-/coordination
-docs/AI*
-ai/templates
-.codex
+/coordination/
+/docs/AI*.md
+.codex/
+/.playwright-mcp/
 skills-lock.json
 /.github/skills/
 /.github/agents/
@@ -93,11 +97,15 @@ skills-lock.json
 # Local Antigravity settings
 /.antigravity/
 
-# Local plans, tasks and proposed pilot material
-**/*[Pp][Ll][Aa][Nn]*.md
-**/*[Tt][Aa][Ss][Kk]*.md
-**/plans/
-**/tasks/
+# Former AI-only compliance trees; runtime legal JSON stays with source code
+/docs/compliance/
+/compliance/
+
+# Existing local-only proposals (explicit paths, not global PLAN/TASK rules)
+/docs/PLAN.md
+/docs/AUTH-PERFORMANCE-PLAN.md
+/docs/FRONTEND-PERFORMANCE-PLAN.md
+/docs/completion/PLAN-REVIEW-FINAL.md
 /docs/AGENT-READING-RULES.md
 /docs/*PILOT*.md
 /docs/adr/*pilot*.md

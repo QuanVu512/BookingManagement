@@ -13,7 +13,6 @@ export default defineConfig({
   schema: 'prisma/schema.prisma',
   migrations: {
     path: 'prisma/migrations',
-    // URL encoding avoids whitespace and Windows command-argument quoting issues.
     seed: `node --input-type=module --eval=import('${new URL('prisma/seed.mjs', import.meta.url).href}')`,
   },
   datasource: {
