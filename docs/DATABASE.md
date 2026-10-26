@@ -59,3 +59,11 @@ erDiagram
 Booking MVP dùng unique `(userId, idempotencyKey)` qua migration `20261016090000_booking_user_idempotency`; guest vẫn có partial unique riêng. Exclusion hiện có được giữ nguyên. Luồng giá/snapshot/expiry/hủy xem [BOOKING-MVP.md](BOOKING-MVP.md).
 
 Schema/migration không chứng minh database đã được migrate, seed hoặc có dữ liệu. Dùng [PIPELINES.md](PIPELINES.md) và [OPERATIONS.md](OPERATIONS.md) cho lệnh; kiểm tra trạng thái ở môi trường được giao trước khi kết luận.
+
+## Snapshot tiền cọc và policy tạo mới
+
+Migration `20261026000000_guest_deposit_policy` gỡ riêng CHECK `bookings_guest_full_prepayment_check` từng ép guest trả 100%. Member và Guest tạo hold mới đều được use case bắt buộc cọc 30%; database giữ `NUMERIC(5,2)` và miền snapshot 30/100 để đọc booking 100% lịch sử, không biến policy hiện hành thành enum chỉ còn 30. Các CHECK tổng tiền, khoản trả trước, snapshot 100% phải đủ tổng và exclusion occupancy không đổi. Raw SQL/import không thay thế validation policy tạo mới tại ứng dụng.
+
+Migration không UPDATE/backfill booking, receipt hay policy snapshot. ALTER TABLE có lock timeout 5 giây, statement timeout 30 giây và transaction; cần cửa sổ vận hành phù hợp khi được cấp quyền triển khai. Không chạy lên production trong task sửa này. Không rollback bằng cách áp lại CHECK guest 100% khi đã có booking guest 30%, hoặc đổi tiền lịch sử để vượt CHECK; cần đánh giá tương thích ứng dụng và dữ liệu trước.
+
+`npm run test:booking:deposit:integration` dùng PostgreSQL thật, toàn bộ SQL migration cũ rồi migration mới trên database rỗng riêng `booking_deposit_test`; có repro SQLSTATE 23514 trước upgrade, giữ lịch sử 100%, tạo Member/Guest 30% qua use case/Prisma thật, từ chối input 100% mới, kiểm CHECK tiền và rollback khi trùng occupancy. Xem [pipeline](PIPELINES.md) để cấu hình an toàn.

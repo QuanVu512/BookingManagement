@@ -421,7 +421,7 @@ model Booking {
   cleanupMinutes Int @default(15) @map("cleanup_minutes") @db.SmallInt
   /// Tổng giá sân đã chốt
   totalAmount Decimal @map("total_amount") @db.Decimal(14,0)
-  /// 30.00 hoặc 100.00
+  /// Snapshot 30.00 hoặc 100.00 lịch sử; policy tạo mới Member/Guest bắt buộc 30.
   prepaymentPercent Decimal @map("prepayment_percent") @db.Decimal(5,2)
   /// Khoản cần nhận để xác nhận booking
   requiredPrepaymentAmount Decimal @map("required_prepayment_amount") @db.Decimal(14,0)

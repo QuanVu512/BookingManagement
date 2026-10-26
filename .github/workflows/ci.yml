@@ -35,6 +35,8 @@ jobs:
       BOOKING_DATABASE_TEST_URL: postgresql://auth_test:disposable_test_only@127.0.0.1:5432/booking_mvp_test
       BOOKING_REDIS_TEST_URL: redis://127.0.0.1:6379
       BOOKING_REQUIRE_STORAGE: 'true'
+      BOOKING_DEPOSIT_DATABASE_TEST_URL: postgresql://auth_test:disposable_test_only@127.0.0.1:5432/booking_deposit_test
+      BOOKING_DEPOSIT_REQUIRE_STORAGE: 'true'
       AUTH_MIGRATION_TEST_URL: postgresql://auth_test:disposable_test_only@127.0.0.1:5432/auth_validation_test
       AUTH_MIGRATION_REQUIRE_STORAGE: 'true'
       NEXT_PUBLIC_API_URL: https://api.example.test
@@ -60,6 +62,10 @@ jobs:
         run: |
           psql "$DATABASE_URL" -c 'CREATE DATABASE booking_mvp_test'
           DATABASE_URL="$BOOKING_DATABASE_TEST_URL" npm run prisma:migrate:deploy
+      - name: Guest deposit upgrade on isolated PostgreSQL
+        run: |
+          psql "$DATABASE_URL" -c 'CREATE DATABASE booking_deposit_test'
+          npm run test:booking:deposit:integration
       - name: Create isolated phone migration test database
         run: psql "$DATABASE_URL" -c 'CREATE DATABASE auth_validation_test'
       - name: Auth storage integration

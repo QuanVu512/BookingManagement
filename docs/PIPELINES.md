@@ -92,3 +92,9 @@ Booking MVP có suite `npm run test:booking:integration`. CI tạo DB `booking_m
 Storage auth chạy riêng bằng `npm run test:auth:storage`; booking dùng `test:booking:integration`. `test:auth:phones` dùng Jest; phần DB/CLI chỉ chạy khi có `AUTH_MIGRATION_TEST_URL`, buộc URL loopback và DB `auth_validation_test` riêng vì suite tạo lại bảng users. CI tạo DB này và đặt `AUTH_MIGRATION_REQUIRE_STORAGE=true`, thiếu URL phải fail. Không fallback sang DATABASE_URL ứng dụng.
 
 Seed ở `backend/prisma/seed.mjs`, khai báo `migrations.seed` trong Prisma config bằng file URL được encode; từ root chạy `npm run seed:courts`, từ backend chạy `npx prisma db seed --config prisma.config.ts`. Cả hai yêu cầu DATABASE_URL tường minh; seed không tự chạy cùng migrate. Audit chỉ đọc nằm ở `backend/prisma/audit-auth-phones.mjs`; `npm run auth:phones:audit` dùng URL từ môi trường (có thể nạp file đã chọn bằng Node --env-file), không tự chọn DB. Security gate cấp repo nằm ở `tools/security-source-check.mjs`.
+
+## PostgreSQL integration cho migration cọc Guest
+
+Lệnh `npm run test:booking:deposit:integration` chỉ dùng `BOOKING_DEPOSIT_DATABASE_TEST_URL`, không fallback sang `DATABASE_URL` hoặc đọc `.env`. Target phải là loopback và database tên `booking_deposit_test`, chưa có bảng public. Test từ chối DB không rỗng, không DROP/TRUNCATE bảng hiện hữu và không cần Redis. Chuẩn bị database test rỗng riêng; suite tự replay các SQL migration lịch sử, chèn snapshot 100% rồi apply SQL migration mới để kiểm upgrade. DB chỉ dành cho suite này; tạo lại DB disposable riêng cho lần chạy tiếp, không tái sử dụng DB ứng dụng.
+
+Đặt `BOOKING_DEPOSIT_REQUIRE_STORAGE=true` để thiếu URL phải FAIL thay vì SKIP. CI tạo database riêng trên PostgreSQL service disposable và bật flag này. Local thiếu URL thì suite SKIP, không phải PASS của migration. Không dùng pretest:e2e, migrate dev/deploy hoặc reset trên DB ứng dụng để chạy suite.

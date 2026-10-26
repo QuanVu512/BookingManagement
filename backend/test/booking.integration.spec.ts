@@ -276,14 +276,14 @@ storageDescribe(
         instant('09:15'),
       );
       expect(stored.totalAmount.toNumber()).toBe(100001);
-      expect(stored.prepaymentPercent.toNumber()).toBe(100);
-      expect(stored.requiredPrepaymentAmount.toNumber()).toBe(100001);
+      expect(stored.prepaymentPercent.toNumber()).toBe(30);
+      expect(stored.requiredPrepaymentAmount.toNumber()).toBe(30000);
       expect((await availability()).status).toBe(200);
       expect(await (await availability()).json()).toMatchObject({
         data: { available: false },
       });
     });
-    it('persists a 30 percent prepayment and rejects a changed percentage on replay', async () => {
+    it('replays a 30 percent deposit and rejects 100 percent at HTTP validation', async () => {
       const payload = { ...input(), prepaymentPercent: 30 };
       const booking = await create(payload);
       const stored = await prisma.booking.findUniqueOrThrow({
@@ -292,11 +292,11 @@ storageDescribe(
       expect(stored.prepaymentPercent.toNumber()).toBe(30);
       expect(stored.requiredPrepaymentAmount.toNumber()).toBe(30000);
       expect((await create(payload)).id).toBe(booking.id);
-      const conflict = await http('bookings', 'POST', {
+      const invalidDeposit = await http('bookings', 'POST', {
         ...payload,
         prepaymentPercent: 100,
       });
-      expect(conflict.status).toBe(409);
+      expect(invalidDeposit.status).toBe(400);
       expect(await prisma.booking.count({ where: { courtId } })).toBe(1);
     });
     it.each([
