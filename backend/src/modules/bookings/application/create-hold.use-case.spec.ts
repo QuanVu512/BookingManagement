@@ -34,7 +34,7 @@ describe('CreateHoldUseCase', () => {
     scheduleMocks.quote.mockReturnValue(courtQuote());
   });
 
-  it('serializes the request, expires the court, and persists one aggregate', async () => {
+  it('serializes the request, expires the court, and persists one aggregate with mandatory 30% deposit', async () => {
     const result = await useCase.execute(command);
     expect(result.id).toBe('booking');
     expect(mocks.lockIdempotency).toHaveBeenCalledWith(
@@ -52,7 +52,8 @@ describe('CreateHoldUseCase', () => {
       expect.objectContaining({
         courtId: 'court',
         totalAmount: 100001,
-        requiredPrepaymentAmount: 100001,
+        prepaymentPercent: 30,
+        requiredPrepaymentAmount: 30000,
       }),
       [
         expect.objectContaining({
@@ -64,12 +65,23 @@ describe('CreateHoldUseCase', () => {
     );
   });
 
+  it('rejects unsupported prepayment percentages like 100 or 50', async () => {
+    await expect(
+      useCase.execute({ ...command, prepaymentPercent: 100 as unknown as number }),
+    ).rejects.toBeInstanceOf(BookingValidationError);
+
+    await expect(
+      useCase.execute({ ...command, prepaymentPercent: 50 as unknown as number }),
+    ).rejects.toBeInstanceOf(BookingValidationError);
+  });
+
   it('replays the original booking without inserting another aggregate', async () => {
     mocks.findReplay.mockResolvedValue({
       id: 'existing',
       courtId: 'court',
       startsAt: new Date(command.startsAt),
       endsAt: new Date(command.endsAt),
+      prepaymentPercent: 30,
     });
     const replayed = storedBooking({ id: 'existing', status: 'EXPIRED' });
     mocks.readBooking.mockResolvedValue(replayed);

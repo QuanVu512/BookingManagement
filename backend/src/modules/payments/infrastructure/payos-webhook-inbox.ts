@@ -71,7 +71,31 @@ export class PayosWebhookInbox {
         status: 'RECEIVED',
       },
       select: { id: true },
+    }).catch((error: unknown) => {
+      // BLK concurrent ingest: unique dedup thắng — trả DUPLICATE thay 500.
+      const code =
+        typeof error === 'object' && error !== null
+          ? String((error as { code?: string }).code ?? '')
+          : '';
+      if (code === 'P2002') {
+        return null;
+      }
+      throw error;
     });
+    if (!created) {
+      const existingAfter =
+        deduplicationKey
+          ? await this.prisma.paymentWebhookEvent.findFirst({
+              where: { deduplicationKey },
+              select: { id: true },
+            })
+          : null;
+      return {
+        eventId: existingAfter?.id ?? 'unknown',
+        status: 'DUPLICATE',
+        deduplicationKey,
+      };
+    }
     return {
       eventId: created.id,
       status: 'RECEIVED',

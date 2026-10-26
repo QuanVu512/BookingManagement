@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service.js';
 import { PAYMENT_TRANSACTION_OPTIONS } from '../payment.constants.js';
-import { cancellationRefundFor } from '../domain/money.js';
+import { quoteAggregateCancellation } from '../../bookings/domain/cancellation-policy.js';
 
 /**
  * BE-PAY-13/14 — Refund orchestration (MIG-04, MIG-19).
@@ -67,34 +67,43 @@ export class RefundOrchestration {
         orderBy: { createdAt: 'asc' },
       });
       const receiptIds = receipts.map((receipt) => receipt.id);
-      const reserved = await transaction.refundRequest.findMany({
+      const holds = await transaction.refundRequest.findMany({
         where: {
           paymentTransactionId: { in: receiptIds },
-          status: { in: ['REQUESTED', 'APPROVED', 'PROCESSING'] },
+          status: { in: ['REQUESTED', 'APPROVED', 'PROCESSING', 'COMPLETED'] },
         },
-        select: { paymentTransactionId: true, amount: true },
+        select: { paymentTransactionId: true, amount: true, status: true },
       });
-      const reservedByReceipt = new Map(
-        reserved.map((row) => [row.paymentTransactionId, Number(row.amount.toString())]),
-      );
+      // C08: single source of truth tại bookings/domain/cancellation-policy —
+      // phí 10% một lần trên aggregate, phân bổ FIFO.
+      const reservedByReceipt: Record<string, number> = {};
+      const completedByReceipt: Record<string, number> = {};
+      for (const row of holds) {
+        const amount = Number(row.amount.toString());
+        const key = String(row.paymentTransactionId);
+        if (String(row.status) === 'COMPLETED') {
+          completedByReceipt[key] = (completedByReceipt[key] ?? 0) + amount;
+        } else {
+          reservedByReceipt[key] = (reservedByReceipt[key] ?? 0) + amount;
+        }
+      }
       const total = Number(booking.totalAmount.toString());
-      const lines = receipts
-        .map((receipt) => {
-          const credited = Number(receipt.amount.toString());
-          const alreadyReserved = reservedByReceipt.get(receipt.id) ?? 0;
-          const refundable = Math.max(credited - alreadyReserved, 0);
-          if (refundable <= 0) return null;
-          const { penaltyAmount, refundAmount } = cancellationRefundFor({
-            totalAmount: total,
-            creditedAmount: Math.min(credited, total),
-          });
-          return {
-            receiptId: receipt.id,
-            refundAmount: Math.min(refundAmount, refundable),
-            penaltyAmount,
-          };
-        })
-        .filter((line) => line !== null);
+      const policy = quoteAggregateCancellation({
+        totalAmount: total,
+        penaltyPercent: 10,
+        receipts: receipts.map((receipt) => ({
+          receiptId: receipt.id,
+          creditedAmount: Number(receipt.amount.toString()),
+        })),
+        reservedByReceipt,
+        completedByReceipt,
+      });
+      const lines = policy.lines.map((line, index) => ({
+        receiptId: line.receiptId,
+        refundAmount: line.refundAmount,
+        // Ghi penalty tổng vào line đầu để audit hiển thị đúng một lần.
+        penaltyAmount: index === 0 ? policy.penaltyAmount : 0,
+      }));
       const moneyRevision = this.revisionOf(
         receipts.map((receipt) => ({
           id: receipt.id,
@@ -102,7 +111,9 @@ export class RefundOrchestration {
           verification: String(receipt.verificationStatus),
           allocation: String(receipt.allocationStatus),
         })),
-        reserved.map((row) => `${row.paymentTransactionId}:${row.amount.toString()}`),
+        holds.map(
+          (row) => `${row.paymentTransactionId}:${row.amount.toString()}:${String(row.status)}`,
+        ),
       );
       return {
         quoteId: randomUUID(),

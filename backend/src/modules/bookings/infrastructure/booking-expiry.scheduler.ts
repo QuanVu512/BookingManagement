@@ -6,6 +6,9 @@ import {
   BOOKING_EXPIRY_JOB,
   BOOKING_EXPIRY_QUEUE,
   BOOKING_EXPIRY_SCHEDULER_ID,
+  BOOKING_SETTLE_JOB,
+  BOOKING_SETTLE_SCHEDULER_ID,
+  DEFAULT_BOOKING_SETTLE_INTERVAL_MS,
 } from '../booking.constants.js';
 import { bookingExpiryIntervalMs } from './booking-expiry.config.js';
 
@@ -38,5 +41,24 @@ export class BookingExpiryScheduler implements OnModuleInit {
       },
     );
     this.logger.log(`Booking expiry sweep scheduled every ${every}ms.`);
+    // D03 settle sweep: cadence cố định 60s (độ trễ hoàn tất/NO_SHOW tối đa
+    // ~1 phút sau endsAt — ngưỡng vận hành, không phải chính sách giá).
+    await this.queue.upsertJobScheduler(
+      BOOKING_SETTLE_SCHEDULER_ID,
+      { every: DEFAULT_BOOKING_SETTLE_INTERVAL_MS },
+      {
+        name: BOOKING_SETTLE_JOB,
+        data: {},
+        opts: {
+          attempts: 3,
+          backoff: { type: 'exponential', delay: 5_000 },
+          removeOnComplete: 100,
+          removeOnFail: 200,
+        },
+      },
+    );
+    this.logger.log(
+      `Booking settle sweep scheduled every ${DEFAULT_BOOKING_SETTLE_INTERVAL_MS}ms.`,
+    );
   }
 }

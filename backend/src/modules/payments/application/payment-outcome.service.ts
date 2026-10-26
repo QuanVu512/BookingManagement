@@ -71,6 +71,12 @@ export interface BookingPaymentDetail {
     status: string;
     amount: number;
     checkoutUrl: string | null;
+    /**
+     * C07 — true khi intent CREATING nhưng chưa có checkoutUrl (provider
+     * create chưa hoàn tất sau commit). UI dùng để đề xuất tạo lại thanh
+     * toán thay vì hiển thị trạng thái chờ chết.
+     */
+    recoveryRequired: boolean;
   } | null;
   activeRefunds: { refundRequestId: string; amount: number; status: string }[];
 }
@@ -309,6 +315,11 @@ export class PaymentOutcomeService {
             status: String(activeRequest.status),
             amount: Number(activeRequest.amount.toString()),
             checkoutUrl: activeRequest.checkoutUrl,
+            // C07: CREATING không link = intent mồ côi sau crash — UI đề xuất
+            // tạo lại thay vì chờ. Các trạng thái khác giữ nguyên hành vi.
+            recoveryRequired:
+              String(activeRequest.status) === 'CREATING' &&
+              activeRequest.checkoutUrl == null,
           }
         : null,
       activeRefunds: refunds
@@ -370,6 +381,18 @@ export class PaymentOutcomeService {
             where: { paymentTransactionId: { in: ids }, status: 'COMPLETED' },
             select: { amount: true },
           });
+    // C07 — refund-sum fix: reserved gồm REQUESTED/APPROVED/PROCESSING
+    // (đồng nhất với bookingDetail), không hardcode 0.
+    const reserved =
+      ids.length === 0
+        ? []
+        : await this.prisma.refundRequest.findMany({
+            where: {
+              paymentTransactionId: { in: ids },
+              status: { in: ['REQUESTED', 'APPROVED', 'PROCESSING'] },
+            },
+            select: { amount: true },
+          });
     const summary = summarizeBookingMoney({
       totalAmount: Number(booking.totalAmount.toString()),
       allocatedReceiptAmounts: receipts.map((receipt) =>
@@ -393,7 +416,10 @@ export class PaymentOutcomeService {
           totalAmount: summary.total,
           paidAmount: summary.netCredited,
           refundedAmount: summary.refundedCompleted,
-          reservedRefundAmount: 0,
+          reservedRefundAmount: reserved.reduce(
+            (sum, refund) => sum + Number(refund.amount.toString()),
+            0,
+          ),
           balanceAmount: summary.balanceDue,
           currency: booking.currency,
         },

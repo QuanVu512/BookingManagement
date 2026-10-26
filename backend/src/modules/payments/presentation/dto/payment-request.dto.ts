@@ -13,7 +13,7 @@ import {
 /**
  * BE-PAY-08 — DTO tạo payment request E5 (MIG-10, MIG-12).
  * Body idempotencyKey là canonical; percent explicit từ client v2
- * (client cũ thiếu percent → default 100 ở rollout).
+ * (client cũ thiếu percent → default 100 ở rollout; v3 mặc định 30).
  */
 export class CreatePaymentRequestDto {
   @ApiProperty({ format: 'uuid' })
@@ -24,10 +24,11 @@ export class CreatePaymentRequestDto {
   @IsIn(['PREPAYMENT', 'BALANCE'])
   purpose!: 'PREPAYMENT' | 'BALANCE';
 
-  @ApiProperty({ enum: [30, 100], default: 100 })
+  @ApiPropertyOptional({ enum: [30, 100], default: 30 })
+  @IsOptional()
   @IsInt()
   @IsIn([30, 100])
-  prepaymentPercent!: 30 | 100;
+  prepaymentPercent?: 30 | 100;
 
   @ApiProperty({
     enum: ['PAYOS_TRANSFER', 'MANUAL_BANK_TRANSFER', 'CASH'],

@@ -56,19 +56,11 @@ export class VerifyReceiptUseCase {
     funds: VerifiedFunds,
     idempotencyKey: string,
   ): Promise<AllocationResult> {
-    const allocated = await this.payments.withTransaction((transaction, store) =>
+    // BLK-01: allocate + confirm/expiry-routing trong MỘT tx nguyên tử dưới
+    // advisory lock — không còn cửa sổ crash/expiry giữa 2 tx.
+    return this.payments.withTransaction((transaction, store) =>
       this.allocateInTransaction(transaction, store, bookingId, funds, idempotencyKey),
     );
-    // Confirm ở tx riêng sau allocate: advisory lock serialize với concurrent
-    // confirmer/expirer; conditional update chống double-confirm (BE-PAY-11).
-    if (allocated.status === 'ALLOCATED' && this.coordinator) {
-      const confirmation = await this.coordinator.confirmIfEligible(bookingId);
-      return {
-        ...allocated,
-        confirmEligible: confirmation.result !== 'NOT_ELIGIBLE',
-      };
-    }
-    return allocated;
   }
 
   private async allocateInTransaction(
@@ -107,6 +99,53 @@ export class VerifyReceiptUseCase {
           'Khoản tiền trùng reference nhưng lệch số tiền — đã chuyển đối soát, không ghi nhận thêm.',
         );
       }
+      // Idempotent replay: thử confirm trong cùng tx nếu đủ điều kiện.
+      const dupSummary = summarizeBookingMoney({
+        totalAmount: money.totalAmount,
+        allocatedReceiptAmounts: money.allocatedReceiptAmounts,
+        completedRefundAmounts: money.completedRefundAmounts,
+      });
+      const dupEligible =
+        money.status === 'HOLDING' &&
+        money.holdExpiresAt !== null &&
+        decidedAt < money.holdExpiresAt &&
+        dupSummary.netCredited >= money.requiredPrepaymentAmount &&
+        money.requiredPrepaymentAmount > 0;
+      if (dupEligible) {
+        const dupRow = await transaction.booking.findUnique({
+          where: { id: bookingId },
+          select: { version: true },
+        });
+        const dupChanged = await transaction.booking.updateMany({
+          where: {
+            id: bookingId,
+            status: 'HOLDING',
+            version: dupRow?.version ?? 0,
+            holdExpiresAt: { gt: decidedAt },
+          },
+          data: { status: 'CONFIRMED', confirmedAt: decidedAt, version: { increment: 1 } },
+        });
+        if (dupChanged.count) {
+          await transaction.bookingStatusHistory.create({
+            data: {
+              bookingId,
+              fromStatus: 'HOLDING',
+              toStatus: 'CONFIRMED',
+              actorType: 'SYSTEM',
+              reason: 'Đủ tiền trả trước đã xác minh (replay).',
+            },
+          });
+          await transaction.outboxEvent.create({
+            data: {
+              aggregateType: 'BOOKING',
+              aggregateId: bookingId,
+              eventType: 'booking.confirmed',
+              payload: { bookingId },
+            },
+          });
+          return { receiptId: duplicate.id, status: 'DUPLICATE', confirmEligible: true };
+        }
+      }
       return { receiptId: duplicate.id, status: 'DUPLICATE', confirmEligible: false };
     }
 
@@ -131,6 +170,35 @@ export class VerifyReceiptUseCase {
       completedRefundAmounts: money.completedRefundAmounts,
     });
 
+    // BLK-D: booking terminal (EXPIRED/CANCELLED) → không ALLOCATED; tạo
+    // obligation REFUND_REQUIRED idempotent để đối soát hoàn.
+    if (money.status === 'EXPIRED' || money.status === 'CANCELLED') {
+      await transaction.paymentTransaction.update({
+        where: { id: receiptId },
+        data: { allocationStatus: 'REFUND_REQUIRED', reviewReason: 'LATE_PAYMENT_REVIEW' },
+      });
+      const key = `late-payment:${receiptId}`;
+      const existingRefund = await transaction.refundRequest.findUnique({
+        where: { idempotencyKey: key },
+        select: { id: true },
+      });
+      if (!existingRefund) {
+        await transaction.refundRequest.create({
+          data: {
+            paymentTransactionId: receiptId,
+            reasonType: 'LATE_PAYMENT',
+            reason: 'Tiền về sau khi booking kết thúc — chờ đối soát hoàn.',
+            amount: funds.amount,
+            currency: funds.currency,
+            method: 'MANUAL_BANK_TRANSFER',
+            status: 'REQUESTED',
+            idempotencyKey: key,
+          },
+        });
+      }
+      return { receiptId, status: 'REFUND_REQUIRED', confirmEligible: false };
+    }
+
     // MIG-03: chỉ allocate toàn bộ khi không vượt nghĩa vụ còn lại.
     if (!canAllocateWholeReceipt(funds.amount, summary.balanceDue)) {
       await transaction.paymentTransaction.update({
@@ -145,8 +213,8 @@ export class VerifyReceiptUseCase {
       data: { allocationStatus: 'ALLOCATED' },
     });
 
-    // MIG-01/MIG-14: confirm-eligibility theo snapshot server, decidedAt
-    // lấy sau lock. Transition booking do coordinator thực hiện cùng tx.
+    // MIG-01/MIG-14 + BLK-01: confirm-eligibility và transition CONFIRMED
+    // trong CÙNG tx (conditional update + history + outbox).
     const netAfter = summary.netCredited + funds.amount;
     const confirmEligible =
       money.status === 'HOLDING' &&
@@ -154,7 +222,43 @@ export class VerifyReceiptUseCase {
       decidedAt < money.holdExpiresAt &&
       netAfter >= money.requiredPrepaymentAmount &&
       money.requiredPrepaymentAmount > 0;
-    return { receiptId, status: 'ALLOCATED', confirmEligible };
+    if (!confirmEligible) {
+      return { receiptId, status: 'ALLOCATED', confirmEligible: false };
+    }
+    const bookingRow = await transaction.booking.findUnique({
+      where: { id: bookingId },
+      select: { version: true, status: true, holdExpiresAt: true },
+    });
+    const changed = await transaction.booking.updateMany({
+      where: {
+        id: bookingId,
+        status: 'HOLDING',
+        version: bookingRow?.version ?? 0,
+        holdExpiresAt: { gt: decidedAt },
+      },
+      data: { status: 'CONFIRMED', confirmedAt: decidedAt, version: { increment: 1 } },
+    });
+    if (!changed.count) {
+      return { receiptId, status: 'ALLOCATED', confirmEligible: false };
+    }
+    await transaction.bookingStatusHistory.create({
+      data: {
+        bookingId,
+        fromStatus: 'HOLDING',
+        toStatus: 'CONFIRMED',
+        actorType: 'SYSTEM',
+        reason: 'Đủ tiền trả trước đã xác minh.',
+      },
+    });
+    await transaction.outboxEvent.create({
+      data: {
+        aggregateType: 'BOOKING',
+        aggregateId: bookingId,
+        eventType: 'booking.confirmed',
+        payload: { bookingId },
+      },
+    });
+    return { receiptId, status: 'ALLOCATED', confirmEligible: true };
   }
 
   async readRequest(

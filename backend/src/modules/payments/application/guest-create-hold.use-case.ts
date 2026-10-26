@@ -25,7 +25,7 @@ export interface GuestCreateHoldInput {
   customerName: string;
   customerPhone: string;
   customerEmail: string;
-  prepaymentPercent: number;
+  prepaymentPercent?: number;
   idempotencyKey: string;
 }
 
@@ -41,10 +41,8 @@ export interface GuestHoldResult {
 }
 
 /**
- * E3 — Guest hold 100% + token MANAGE_BOOKING (MIG-11).
- * - Public; guest 100-only (422 GUEST_PREPAYMENT_100_ONLY).
- * - HOLDING với userId NULL; CHECK DB bookings_guest_full_prepayment_check
- *   buộc prepayment 100% ở tầng DB.
+ * E3 — Guest hold 30% deposit + token MANAGE_BOOKING.
+ * - Public; mandatory 30% deposit on court rental price for all bookings.
  * - Token SHA-256 hash ở DB, raw trả một lần; không revoke khi cancel.
  */
 @Injectable()
@@ -63,10 +61,11 @@ export class GuestCreateHoldUseCase {
   }
 
   async execute(input: GuestCreateHoldInput): Promise<GuestHoldResult> {
-    if (input.prepaymentPercent !== 100) {
+    const percent = input.prepaymentPercent ?? 30;
+    if (percent !== 30) {
       throw new BadRequestException({
-        code: 'GUEST_PREPAYMENT_100_ONLY',
-        message: 'Khách vãng lai chỉ thanh toán 100%.',
+        code: 'GUEST_PREPAYMENT_30_ONLY',
+        message: 'Khách vãng lai bắt buộc thanh toán đặt cọc 30%.',
       });
     }
     try {
@@ -123,7 +122,7 @@ export class GuestCreateHoldUseCase {
     const court = await this.schedule.getActiveSchedule(input.courtId, transaction);
     const quote = this.schedule.quote(court, startsAt, endsAt);
     const total = quote.totalAmount;
-    const required = prepaymentAmountFor(total, 100);
+    const required = prepaymentAmountFor(total, 30);
     const bookingCode = `BK-${randomUUID().replaceAll('-', '').slice(0, 24)}`;
     const holdExpiresAt = new Date(now.getTime() + HOLD_DURATION_MS);
 
@@ -141,7 +140,7 @@ export class GuestCreateHoldUseCase {
         endsAt,
         cleanupMinutes: court.cleanupMinutes,
         totalAmount: total,
-        prepaymentPercent: 100,
+        prepaymentPercent: 30,
         requiredPrepaymentAmount: required,
         status: 'HOLDING',
         holdExpiresAt,
@@ -199,17 +198,22 @@ export class GuestCreateHoldUseCase {
       bookingCode: string;
       holdExpiresAt: Date;
       totalAmount: { toString(): string } | number;
+      requiredPrepaymentAmount?: { toString(): string } | number;
     },
     rawToken: string | null,
     tokenExpiresAt: Date | null,
     now: Date,
   ): GuestHoldResult {
+    const totalAmount = Number(booking.totalAmount.toString());
+    const prepaymentAmount = booking.requiredPrepaymentAmount != null
+      ? Number(booking.requiredPrepaymentAmount.toString())
+      : Math.floor((totalAmount * 30 + 50) / 100);
     return {
       bookingId: booking.id,
       bookingCode: booking.bookingCode,
       holdExpiresAt: booking.holdExpiresAt.toISOString(),
-      totalAmount: Number(booking.totalAmount.toString()),
-      prepaymentAmount: Number(booking.totalAmount.toString()),
+      totalAmount,
+      prepaymentAmount,
       accessToken: rawToken ?? '',
       accessTokenExpiresAt: tokenExpiresAt ? tokenExpiresAt.toISOString() : '',
       serverNow: now.toISOString(),

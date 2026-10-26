@@ -3,6 +3,7 @@ import { InjectQueue, Processor, WorkerHost } from '@nestjs/bullmq';
 import type { Job, Queue } from 'bullmq';
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service.js';
 import { BookingConfirmationCoordinator } from './booking-confirmation-coordinator.js';
+import { CreatePaymentRequestUseCase } from './create-payment-request.use-case.js';
 import { VerifyReceiptUseCase } from './verify-receipt.use-case.js';
 import { PayosWebhookInbox } from '../infrastructure/payos-webhook-inbox.js';
 import { PayosGatewayAdapter } from '../infrastructure/payos-gateway.adapter.js';
@@ -30,6 +31,7 @@ export class PaymentsJobScheduler implements OnModuleInit {
     const schedules: { id: string; every: number }[] = [
       { id: 'expiry-sweep', every: 60_000 },
       { id: 'webhook-retry', every: 60_000 },
+      { id: 'creating-recovery', every: 300_000 },
       { id: 'terminal-watch', every: 900_000 },
       { id: 'cancel-retry', every: 900_000 },
       { id: 'outbox-dispatch', every: 30_000 },
@@ -58,6 +60,7 @@ export class PaymentsWorker extends WorkerHost {
     private readonly receipts: VerifyReceiptUseCase,
     private readonly inbox: PayosWebhookInbox,
     private readonly gateway: PayosGatewayAdapter,
+    private readonly paymentRequests: CreatePaymentRequestUseCase,
   ) {
     super();
   }
@@ -68,6 +71,8 @@ export class PaymentsWorker extends WorkerHost {
         return this.expirySweep();
       case 'webhook-retry':
         return this.webhookRetry();
+      case 'creating-recovery':
+        return this.creatingRecovery();
       case 'terminal-watch':
         return this.terminalWatch();
       case 'cancel-retry':
@@ -191,6 +196,53 @@ export class PaymentsWorker extends WorkerHost {
   }
 
   /**
+   * C07 creating-recovery: CREATING quá 5 phút mà vẫn chưa có provider link
+   * (crash/timeout sau commit, terminal-watch không thấy vì thiếu linkId).
+   * - Booking terminal → đóng intent EXPIRED (conditional, không xóa facts).
+   * - Booking còn hiệu lực + gateway cấu hình → thử fill link đúng một lần
+   *   qua recoverOrphanedIntent (fill-once có điều kiện, thua race thì thôi).
+   * - Gateway lỗi/chưa cấu hình → giữ CREATING cho lần quét sau; không bao
+   *   giờ suy FAILED ở đây (MIG-09).
+   */
+  private async creatingRecovery(): Promise<{ recovered: number; expired: number }> {
+    if (!this.gateway.isConfigured()) return { recovered: 0, expired: 0 };
+    const cutoff = new Date(Date.now() - 5 * 60_000);
+    const orphans = await this.prisma.paymentRequest.findMany({
+      where: {
+        status: 'CREATING',
+        providerPaymentLinkId: null,
+        updatedAt: { lt: cutoff },
+      },
+      select: { id: true, referenceId: true },
+      orderBy: { updatedAt: 'asc' },
+      take: 50,
+    });
+    let recovered = 0;
+    let expired = 0;
+    for (const row of orphans) {
+      const booking = await this.prisma.booking.findUnique({
+        where: { id: row.referenceId },
+        select: { status: true },
+      });
+      if (!booking || booking.status === 'EXPIRED' || booking.status === 'CANCELLED') {
+        const closed = await this.prisma.paymentRequest.updateMany({
+          where: { id: row.id, status: 'CREATING' },
+          data: { status: 'EXPIRED' },
+        });
+        expired += closed.count;
+        continue;
+      }
+      try {
+        const result = await this.paymentRequests.recoverOrphanedIntent(row.id);
+        if (result && result.status !== 'CREATING') recovered += 1;
+      } catch {
+        // Provider/db tạm lỗi → lần quét sau; không đổi state nội bộ.
+      }
+    }
+    return { recovered, expired };
+  }
+
+  /**
    * Terminal-watch (MIG-08): query provider NGOÀI tx cho request live quá
    * 15 phút; áp kết quả qua canonical receipt path sau recheck. Chưa cấu
    * hình provider → skip (không suy gì cả).
@@ -292,11 +344,13 @@ export class PaymentsWorker extends WorkerHost {
     let quarantined = 0;
     for (const event of due) {
       if (event.attemptCount >= MAX_OUTBOX_ATTEMPTS) {
+        // BLK quarantine starvation: nextRetryAt far-future thay NULL để batch
+        // sau không chọn lại rows đã quarantine.
         await this.prisma.outboxEvent.update({
           where: { id: event.id },
           data: {
             lastError: 'OUTBOX_QUARANTINED: quá số lần publish, chờ ops xử lý.',
-            nextRetryAt: null,
+            nextRetryAt: new Date(Date.now() + 7 * 24 * 60 * 60_000),
           },
         });
         quarantined += 1;

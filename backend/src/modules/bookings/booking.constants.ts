@@ -7,6 +7,10 @@ export const MAX_BOOKINGS_PER_PAGE = 50;
 export const BOOKING_EXPIRY_QUEUE = 'booking-expiry';
 export const BOOKING_EXPIRY_JOB = 'expire-eligible-holds';
 export const BOOKING_EXPIRY_SCHEDULER_ID = 'booking-expiry-sweep';
+/** D03 settle sweep: CHECKED_IN→COMPLETED + CONFIRMED quá endsAt→NO_SHOW. */
+export const BOOKING_SETTLE_JOB = 'settle-eligible-bookings';
+export const BOOKING_SETTLE_SCHEDULER_ID = 'booking-settle-sweep';
+export const DEFAULT_BOOKING_SETTLE_INTERVAL_MS = 60_000;
 export const DEFAULT_BOOKING_EXPIRY_INTERVAL_MS = 15_000;
 export const MIN_BOOKING_EXPIRY_INTERVAL_MS = 5_000;
 export const MAX_BOOKING_EXPIRY_INTERVAL_MS = 300_000;

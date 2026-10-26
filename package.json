@@ -60,7 +60,8 @@
     "test:frontend": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js --config frontend/jest.config.js --runInBand",
     "test:backend:contract": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js --config backend/jest.config.js --runInBand --runTestsByPath backend/test/validation-response.e2e-spec.ts",
     "test:frontend:contract": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js --config frontend/jest.config.js --runInBand --runTestsByPath frontend/__tests__/frontend-auth-validation.spec.ts frontend/__tests__/frontend-network.spec.ts",
-    "test:auth:storage": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js --config backend/jest.config.js --runInBand --runTestsByPath backend/src/modules/auth/auth-storage.integration.spec.ts"
+    "test:auth:storage": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js --config backend/jest.config.js --runInBand --runTestsByPath backend/src/modules/auth/auth-storage.integration.spec.ts",
+    "test:payments:integration": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js --config backend/jest.config.js --runInBand --runTestsByPath backend/test/payments-coordinator.integration.spec.ts"
   },
   "dependencies": {
     "@nestjs/bullmq": "~12.0.0",

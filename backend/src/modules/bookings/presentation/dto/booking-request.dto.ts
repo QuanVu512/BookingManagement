@@ -44,13 +44,13 @@ export class CreateBookingDto extends BookingWindowDto {
 
   @ApiProperty({
     description:
-      '30 hoặc 100. Client cũ thiếu field → server default 100 (rollout, MIG-10).',
-    enum: [30, 100],
+      'Chính sách đặt cọc bắt buộc 30% cho mọi lượt đặt sân mới. Bỏ trống server tự mặc định 30.',
+    enum: [30],
     required: false,
-    default: 100,
+    default: 30,
   })
   @IsOptional()
   @IsInt()
-  @IsIn([30, 100])
-  prepaymentPercent?: 30 | 100;
+  @IsIn([30])
+  prepaymentPercent?: 30;
 }

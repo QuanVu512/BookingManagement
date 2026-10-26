@@ -6,7 +6,7 @@ import {
   Logger,
   ServiceUnavailableException,
 } from '@nestjs/common';
-import { randomUUID } from 'node:crypto';
+import { randomUUID, createHash } from 'node:crypto';
 import { ConfigService } from '@nestjs/config';
 import type { TransactionContext } from '../../../infrastructure/prisma/transaction-context.js';
 import {
@@ -25,7 +25,7 @@ import {
 export interface CreatePaymentRequestInput {
   bookingId: string;
   purpose: 'PREPAYMENT' | 'BALANCE';
-  prepaymentPercent: 30 | 100;
+  prepaymentPercent?: 30 | 100;
   method: 'PAYOS_TRANSFER' | 'MANUAL_BANK_TRANSFER' | 'CASH';
   idempotencyKey: string;
   actorUserId?: string | null;
@@ -81,6 +81,28 @@ export class CreatePaymentRequestUseCase {
       return created;
     }
     return this.attachProviderLink(created);
+  }
+
+  /**
+   * C07 — Phục hồi intent CREATING mồ côi (reconciler/worker gọi).
+   * Đọc lại row; chỉ fill link khi row VẪN CREATING + PAYOS + chưa có link.
+   * Mọi nhánh còn lại trả nguyên trạng — không bao giờ suy FAILED ở đây.
+   */
+  async recoverOrphanedIntent(
+    requestId: string,
+  ): Promise<StoredPaymentRequest | null> {
+    const current = await this.payments.withTransaction((transaction, store) =>
+      store.readPaymentRequest(transaction, requestId),
+    );
+    if (
+      !current ||
+      current.status !== 'CREATING' ||
+      current.method !== 'PAYOS_TRANSFER' ||
+      current.providerPaymentLinkId != null
+    ) {
+      return current;
+    }
+    return this.attachProviderLink(current);
   }
 
   private async attachProviderLink(
@@ -160,7 +182,8 @@ export class CreatePaymentRequestUseCase {
   }
 
   private validateInput(input: CreatePaymentRequestInput): void {
-    if (!isAllowedPrepaymentPercent(input.prepaymentPercent)) {
+    const percent = input.prepaymentPercent ?? 30;
+    if (!isAllowedPrepaymentPercent(percent)) {
       throw new BadRequestException(
         `prepaymentPercent chỉ nhận ${ALLOWED_PREPAYMENT_PERCENTS.join('/')}.`,
       );
@@ -183,13 +206,37 @@ export class CreatePaymentRequestUseCase {
     await store.lockBookingMoney(transaction, input.bookingId);
     const now = await store.databaseNow(transaction);
 
-    // MIG-12: authorize trước replay. Tạm thời: booking thuộc subject;
-    // readBookingMoney trả null khi booking không tồn tại → 404 ở dưới.
+    // MIG-12: authorize trước replay. Booking thuộc subject mới được tạo request.
     const money = await store.readBookingMoney(transaction, input.bookingId);
     if (!money) {
       throw new BadRequestException('Booking không tồn tại.');
     }
-    void subject;
+    const ownerUserId = (money as { userId?: string | null }).userId ?? null;
+    if (subject.userId !== null) {
+      if (ownerUserId === null || ownerUserId !== subject.userId) {
+        throw new BadRequestException('Booking không tồn tại.');
+      }
+    } else if (ownerUserId !== null) {
+      throw new BadRequestException('Booking không tồn tại.');
+    }
+
+    const percent = input.prepaymentPercent ?? 30;
+    if (
+      money.requiredPrepaymentAmount > 0 &&
+      money.requiredPrepaymentAmount !==
+        Math.min(
+          (await import('../domain/money.js')).prepaymentAmountFor(
+            money.totalAmount,
+            percent,
+          ),
+          money.totalAmount,
+        ) &&
+      input.purpose === 'PREPAYMENT'
+    ) {
+      throw new ConflictException(
+        'Phần trăm trả trước không khớp snapshot booking (409).',
+      );
+    }
 
     const replay = await store.findRequestReplay(
       transaction,
@@ -226,7 +273,7 @@ export class CreatePaymentRequestUseCase {
     const amount =
       input.purpose === 'PREPAYMENT'
         ? Math.min(
-            prepaymentAmountFor(money.totalAmount, input.prepaymentPercent),
+            prepaymentAmountFor(money.totalAmount, percent),
             summary.balanceDue,
           )
         : summary.balanceDue;
@@ -262,24 +309,28 @@ export class CreatePaymentRequestUseCase {
     subject: { userId: string | null },
     input: CreatePaymentRequestInput,
   ): string {
-    return [
+    // BLK-02: VARCHAR(100) — hash SHA-256 cố định 64 ký tự thay nối chuỗi dài.
+    const raw = [
       subject.userId ?? 'guest',
       input.bookingId,
       input.purpose,
       input.method,
-      String(input.prepaymentPercent),
+      String(input.prepaymentPercent ?? 30),
       input.idempotencyKey,
     ].join(':');
+    return createHash('sha256').update(raw).digest('hex');
   }
 
   private assertSameIntent(
     replay: StoredPaymentRequest,
     input: CreatePaymentRequestInput,
   ): void {
+    const percent = input.prepaymentPercent ?? 30;
     if (
       replay.referenceId !== input.bookingId ||
       replay.purpose !== input.purpose ||
-      replay.method !== input.method
+      replay.method !== input.method ||
+      Number((replay as { prepaymentPercent?: unknown }).prepaymentPercent ?? percent) !== percent
     ) {
       throw new ConflictException(
         'Khóa idempotency đã dùng cho ý định thu khác (409).',

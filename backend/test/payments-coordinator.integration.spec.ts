@@ -40,6 +40,53 @@ const courtId = randomUUID();
 const userA = randomUUID();
 const userB = randomUUID();
 
+// C00-Correction-1: bookings sở hữu fixture IDs để cleanup đúng phạm vi.
+let ownedBookingIds: string[] = [];
+// C00-Correction-1: mỗi booking chiếm slot riêng, tránh exclusion conflict
+// giữa các ACTIVE occupancies trên cùng sân.
+let slotSeq = 0;
+function nextSlot(): { startsAt: Date; endsAt: Date; occupiedUntil: Date } {
+  const base = Date.UTC(2035, 0, 8, 1, 0, 0) + slotSeq * 3 * 3_600_000;
+  slotSeq += 1;
+  const startsAt = new Date(base);
+  const endsAt = new Date(base + 3_600_000);
+  const occupiedUntil = new Date(base + 75 * 60_000);
+  return { startsAt, endsAt, occupiedUntil };
+}
+
+async function makeUser(
+  prisma: PrismaService,
+  id: string,
+  suffix: string,
+): Promise<void> {
+  // C00-Correction-1: user FK thật (bookings/refunds/receipts Restrict).
+  await prisma.user.upsert({
+    where: { id },
+    update: {},
+    create: {
+      id,
+      username: `test-${suffix}-${id.slice(0, 8)}`,
+      phone: `090${String(Math.abs(hashCode(id)) % 10_000_000).padStart(7, '0')}`,
+      email: `test-${suffix}-${id.slice(0, 8)}@example.com`,
+      passwordHash: 'test-hash',
+    },
+  });
+}
+
+function hashCode(value: string): number {
+  let hash = 0;
+  for (let i = 0; i < value.length; i += 1) {
+    hash = (hash * 31 + value.charCodeAt(i)) | 0;
+  }
+  return hash;
+}
+
+async function makeStaff(prisma: PrismaService): Promise<string> {
+  const id = randomUUID();
+  await makeUser(prisma, id, 'staff');
+  return id;
+}
+
 async function fixtures(prisma: PrismaService): Promise<void> {
   await prisma.branch.upsert({
     where: { id: branchId },
@@ -62,11 +109,14 @@ async function fixtures(prisma: PrismaService): Promise<void> {
       name: 'Court 1',
     },
   });
+  await makeUser(prisma, userA, 'a');
+  await makeUser(prisma, userB, 'b');
 }
 
 async function makeBooking(
   prisma: PrismaService,
   overrides: {
+    // C00-Correction-1: 'userId' in overrides phân biệt guest null tường minh.
     userId?: string | null;
     holdExpiresAt?: Date;
     status?: 'HOLDING' | 'CANCELLED' | 'CONFIRMED';
@@ -75,27 +125,29 @@ async function makeBooking(
   } = {},
 ): Promise<string> {
   const now = new Date();
+  const slot = nextSlot();
+  const status = overrides.status ?? 'HOLDING';
   const row = await prisma.booking.create({
     data: {
       bookingCode: `BK-${randomUUID().replaceAll('-', '').slice(0, 24)}`,
-      userId: overrides.userId ?? userA,
+      userId: 'userId' in overrides ? overrides.userId ?? null : userA,
       courtId,
       branchId,
       source: 'CUSTOMER_WEB',
       customerName: 'Test User',
       customerEmail: 'test@example.com',
       customerPhone: '0900000001',
-      startsAt: new Date('2035-01-08T01:00:00Z'),
-      endsAt: new Date('2035-01-08T02:00:00Z'),
+      startsAt: slot.startsAt,
+      endsAt: slot.endsAt,
       cleanupMinutes: 15,
       totalAmount: overrides.total ?? 150_000,
       prepaymentPercent: 30,
       requiredPrepaymentAmount: overrides.required ?? 45_000,
-      status: overrides.status ?? 'HOLDING',
+      status,
       holdExpiresAt:
         overrides.holdExpiresAt ?? new Date(now.getTime() + 300_000),
       cancellationRule: 'BEFORE_START',
-      cancellationDeadlineAt: new Date('2035-01-08T01:00:00Z'),
+      cancellationDeadlineAt: slot.startsAt,
       policyVersion: 'test-v1',
       policyAcceptedAt: now,
       idempotencyKey: randomUUID(),
@@ -107,10 +159,15 @@ async function makeBooking(
       bookingId: row.id,
       courtId,
       kind: 'BOOKING',
-      occupiedFrom: new Date('2035-01-08T01:00:00Z'),
-      occupiedUntil: new Date('2035-01-08T02:15:00Z'),
+      occupiedFrom: slot.startsAt,
+      occupiedUntil: slot.occupiedUntil,
+      // Booking terminal không giữ ACTIVE — tránh exclusion conflict giả.
+      ...(status === 'HOLDING'
+        ? {}
+        : { state: 'RELEASED', releasedAt: now }),
     },
   });
+  ownedBookingIds.push(row.id);
   return row.id;
 }
 
@@ -144,9 +201,11 @@ async function makeReceipt(
       amount,
       currency: 'VND',
       verificationStatus: 'VERIFIED',
+      // C00-Correction-1: thỏa payment_transactions_verified_timestamps_check.
+      verifiedAt: new Date(),
+      fundsReceivedAt: new Date(),
       allocationStatus: 'ALLOCATED',
       confirmationSource: 'WEBHOOK',
-      fundsReceivedAt: new Date(),
       idempotencyKey: randomUUID(),
     },
     select: { id: true },
@@ -215,17 +274,72 @@ storageDescribe('Payments coordinator + outcome + guest token (real PG)', () => 
   }, 60_000);
 
   beforeEach(async () => {
-    await prisma.refundAttempt.deleteMany({});
-    await prisma.refundRequest.deleteMany({});
-    await prisma.paymentTransaction.deleteMany({});
+    // C00-Correction-1: cleanup đúng fixtures đã tạo, không deleteMany toàn DB.
+    const ids = ownedBookingIds;
+    ownedBookingIds = [];
+    if (ids.length > 0) {
+      const requestIds = (
+        await prisma.paymentRequest.findMany({
+          where: { referenceId: { in: ids } },
+          select: { id: true },
+        })
+      ).map((row) => row.id);
+      const transactionIds =
+        requestIds.length === 0
+          ? []
+          : (
+              await prisma.paymentTransaction.findMany({
+                where: { paymentRequestId: { in: requestIds } },
+                select: { id: true },
+              })
+            ).map((row) => row.id);
+      const refundIds =
+        transactionIds.length === 0
+          ? []
+          : (
+              await prisma.refundRequest.findMany({
+                where: { paymentTransactionId: { in: transactionIds } },
+                select: { id: true },
+              })
+            ).map((row) => row.id);
+      if (refundIds.length > 0) {
+        await prisma.refundAttempt.deleteMany({
+          where: { refundRequestId: { in: refundIds } },
+        });
+        await prisma.refundRequest.deleteMany({
+          where: { id: { in: refundIds } },
+        });
+      }
+      if (transactionIds.length > 0) {
+        await prisma.paymentTransaction.deleteMany({
+          where: { id: { in: transactionIds } },
+        });
+      }
+      if (requestIds.length > 0) {
+        await prisma.paymentRequest.deleteMany({
+          where: { id: { in: requestIds } },
+        });
+      }
+      await prisma.paymentAuditLog.deleteMany({
+        where: { bookingId: { in: ids } },
+      });
+      await prisma.outboxEvent.deleteMany({
+        where: { aggregateId: { in: ids } },
+      });
+      await prisma.bookingStatusHistory.deleteMany({
+        where: { bookingId: { in: ids } },
+      });
+      await prisma.courtOccupancy.deleteMany({
+        where: { bookingId: { in: ids } },
+      });
+      await prisma.bookingAccessToken.deleteMany({
+        where: { bookingId: { in: ids } },
+      });
+      await prisma.booking.deleteMany({ where: { id: { in: ids } } });
+    }
+    // paymentWebhookEvent không link booking: giữ deleteMany trong DB test
+    // dùng một lần đã gate loopback (ghi chú, không lan sang DB khác).
     await prisma.paymentWebhookEvent.deleteMany({});
-    await prisma.paymentRequest.deleteMany({});
-    await prisma.paymentAuditLog.deleteMany({});
-    await prisma.outboxEvent.deleteMany({});
-    await prisma.bookingStatusHistory.deleteMany({});
-    await prisma.courtOccupancy.deleteMany({ where: { bookingId: { not: undefined } } });
-    await prisma.bookingAccessToken.deleteMany({});
-    await prisma.booking.deleteMany({});
   });
 
   afterAll(async () => {
@@ -305,7 +419,8 @@ storageDescribe('Payments coordinator + outcome + guest token (real PG)', () => 
     expect(await tokens.verifyManageToken(issued.rawToken, otherId)).toBeNull();
     await tokens.revokeToken(issued.tokenId);
     expect(await tokens.verifyManageToken(issued.rawToken, bookingId)).toBeNull();
-    // Hết hạn: insert trực tiếp token quá hạn.
+    // Hết hạn: createdAt 2h trước, expiresAt 1h trước — thỏa
+    // booking_access_tokens_expiry_after_creation_check mà vẫn hết hạn.
     const { createHash } = await import('node:crypto');
     const raw = `${'a'.repeat(64)}`;
     await prisma.bookingAccessToken.create({
@@ -313,7 +428,8 @@ storageDescribe('Payments coordinator + outcome + guest token (real PG)', () => 
         bookingId,
         purpose: 'MANAGE_BOOKING',
         tokenHash: createHash('sha256').update(raw).digest('hex'),
-        expiresAt: new Date(Date.now() - 1_000),
+        createdAt: new Date(Date.now() - 2 * 3_600_000),
+        expiresAt: new Date(Date.now() - 3_600_000),
       },
     });
     expect(await tokens.verifyManageToken(raw, bookingId)).toBeNull();
@@ -388,7 +504,7 @@ storageDescribe('Payments coordinator + outcome + guest token (real PG)', () => 
   });
 
   it('E14 thu CASH theo dư nợ server + replay idempotent', async () => {
-    const staffId = randomUUID();
+    const staffId = await makeStaff(prisma);
     const bookingId = await makeBooking(prisma);
     const first = await staffBalance.execute({
       bookingId,
@@ -416,7 +532,7 @@ storageDescribe('Payments coordinator + outcome + guest token (real PG)', () => 
   });
 
   it('E14 stale amount và đã đủ tiền bị từ chối', async () => {
-    const staffId = randomUUID();
+    const staffId = await makeStaff(prisma);
     const bookingId = await makeBooking(prisma);
     await expect(
       staffBalance.execute({
@@ -444,7 +560,7 @@ storageDescribe('Payments coordinator + outcome + guest token (real PG)', () => 
   });
 
   it('E16 allocate guards: chưa verify / đã allocate / refund flow', async () => {
-    const staffId = randomUUID();
+    const staffId = await makeStaff(prisma);
     const bookingId = await makeBooking(prisma);
     const request = await prisma.paymentRequest.create({
       data: {
@@ -544,8 +660,8 @@ storageDescribe('Payments coordinator + outcome + guest token (real PG)', () => 
   });
 
   it('E18/E19 four-eyes, double-approve, reject chặn attempt live', async () => {
-    const requester = randomUUID();
-    const approver = randomUUID();
+    const requester = await makeStaff(prisma);
+    const approver = await makeStaff(prisma);
     const bookingId = await makeBooking(prisma);
     const receiptId = await makeReceipt(prisma, bookingId, 45_000);
     const refund = await prisma.refundRequest.create({

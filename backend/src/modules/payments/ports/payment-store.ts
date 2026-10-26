@@ -62,6 +62,7 @@ export interface ReceiptIngest {
 
 export interface BookingMoneyView {
   bookingId: string;
+  userId?: string | null;
   status: string;
   totalAmount: number;
   requiredPrepaymentAmount: number;

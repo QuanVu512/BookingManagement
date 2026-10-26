@@ -95,7 +95,9 @@ import {
     RefundOrchestration,
     BookingConfirmationCoordinator,
     PaymentOutcomeService,
+    PaymentAuditLogger,
     GuestTokenService,
+    GuestTokenGuard,
   ],
 })
 export class PaymentsModule {}

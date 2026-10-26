@@ -107,6 +107,16 @@ export class PrismaBookingStore extends BookingStore {
     });
     let transitioned = 0;
     for (const booking of expired) {
+      // BLK-03: booking đã có receipt VERIFIED do coordinator xử lý (kèm
+      // obligations) — legacy sweep bỏ qua để không mất tiền.
+      const credited = await transaction.paymentTransaction.findFirst({
+        where: {
+          paymentRequest: { referenceId: booking.id },
+          verificationStatus: 'VERIFIED',
+        },
+        select: { id: true },
+      });
+      if (credited) continue;
       const changed = await transaction.booking.updateMany({
         where: {
           id: booking.id,

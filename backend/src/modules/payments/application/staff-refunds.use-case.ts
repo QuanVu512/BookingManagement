@@ -98,6 +98,32 @@ export class StaffRefundsUseCase {
     };
     ip?: string;
   }) {
+    // BLK-05: self-approval denial phải persist ngoài tx nghiệp vụ (tx rollback
+    // sẽ xóa audit nếu log trong tx rồi throw).
+    const precheck = await this.prisma.refundRequest.findUnique({
+      where: { id: input.refundId },
+      select: { id: true, status: true, requestedByUserId: true },
+    });
+    if (
+      precheck &&
+      precheck.requestedByUserId !== null &&
+      precheck.requestedByUserId === input.approverUserId
+    ) {
+      await this.audit.log({
+        actorType: 'STAFF',
+        actorUserId: input.approverUserId,
+        action: 'approve',
+        entityType: 'refund_request',
+        entityId: precheck.id,
+        ip: input.ip,
+        result: 'DENIED',
+        detail: { reason: 'SELF_APPROVAL' },
+      });
+      throw new ForbiddenException({
+        code: 'SELF_APPROVAL_FORBIDDEN',
+        message: 'Người yêu cầu không được tự duyệt.',
+      });
+    }
     return this.prisma.$transaction(async (transaction) => {
       const refund = await transaction.refundRequest.findUnique({
         where: { id: input.refundId },
@@ -119,15 +145,7 @@ export class StaffRefundsUseCase {
         refund.requestedByUserId !== null &&
         refund.requestedByUserId === input.approverUserId
       ) {
-        await this.audit.logInTransaction(transaction, {
-          actorType: 'STAFF',
-          actorUserId: input.approverUserId,
-          action: 'approve',
-          entityType: 'refund_request',
-          entityId: refund.id,
-          result: 'DENIED',
-          detail: { reason: 'SELF_APPROVAL' },
-        });
+        // Đã audit ngoài tx ở precheck; vẫn chặn trong tx chống race đổi requester.
         throw new ForbiddenException({
           code: 'SELF_APPROVAL_FORBIDDEN',
           message: 'Người yêu cầu không được tự duyệt.',

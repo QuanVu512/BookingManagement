@@ -78,7 +78,7 @@ export class CreateHoldUseCase {
       command.idempotencyKey,
     );
     if (!existing) return null;
-    const percent = command.prepaymentPercent ?? 100;
+    const percent = command.prepaymentPercent ?? 30;
     if (
       existing.courtId !== command.courtId ||
       existing.startsAt.getTime() !== Date.parse(command.startsAt) ||
@@ -105,19 +105,21 @@ export class CreateHoldUseCase {
       throw new BookingValidationError(
         'Giờ bắt đầu phải cách hiện tại ít nhất 5 phút.',
       );
+    if (
+      command.prepaymentPercent !== undefined &&
+      command.prepaymentPercent !== 30
+    ) {
+      throw new BookingValidationError('Tỷ lệ đặt cọc bắt buộc là 30%.');
+    }
     const court = await this.schedule.getActiveSchedule(
       command.courtId,
       transaction,
     );
     const quote = this.schedule.quote(court, startsAt, endsAt);
     const customer = await store.loadCustomer(transaction, command.userId);
-    // E2: snapshot immutable percent; thiếu → default 100 (rollout MIG-10);
-    // required = half-up 30% hoặc toàn phần, tính từ tổng server.
-    const percent = command.prepaymentPercent ?? 100;
-    const required =
-      percent === 30
-        ? Math.floor((quote.totalAmount * 30 + 50) / 100)
-        : quote.totalAmount;
+    // Mandatory 30% deposit policy on court rental price for all users:
+    const percent = 30;
+    const required = Math.floor((quote.totalAmount * 30 + 50) / 100);
     const draft: BookingDraft = {
       bookingCode: `BK-${randomUUID().replaceAll('-', '').slice(0, 24)}`,
       userId: customer.id,

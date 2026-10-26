@@ -138,6 +138,7 @@ export class PrismaPaymentStore extends PaymentStore {
       where: { id: bookingId },
       select: {
         id: true,
+        userId: true,
         status: true,
         totalAmount: true,
         requiredPrepaymentAmount: true,
@@ -166,6 +167,7 @@ export class PrismaPaymentStore extends PaymentStore {
           });
     return {
       bookingId: booking.id,
+      userId: (booking as { userId?: string | null }).userId ?? null,
       status: String(booking.status),
       totalAmount: Number(booking.totalAmount.toString()),
       requiredPrepaymentAmount: Number(
@@ -210,6 +212,8 @@ export class PrismaPaymentStore extends PaymentStore {
     transaction: TransactionContext,
     ingest: ReceiptIngest,
   ): Promise<string> {
+    // F04: thỏa CHECK verified_at/funds_received_at cho VERIFIED.
+    const now = new Date();
     const row = await transaction.paymentTransaction.create({
       data: {
         paymentRequestId: ingest.paymentRequestId,
@@ -220,6 +224,8 @@ export class PrismaPaymentStore extends PaymentStore {
         amount: ingest.amount,
         currency: ingest.currency,
         verificationStatus: 'VERIFIED',
+        verifiedAt: now,
+        verifiedByUserId: ingest.recordedByUserId,
         allocationStatus: 'UNALLOCATED',
         confirmationSource: ingest.confirmationSource,
         fundsReceivedAt: ingest.fundsReceivedAt,

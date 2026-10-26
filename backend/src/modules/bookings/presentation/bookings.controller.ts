@@ -22,7 +22,13 @@ import { CurrentUser } from '../../auth/decorators/current-user.decorator.js';
 import { CreateHoldUseCase } from '../application/create-hold.use-case.js';
 import { ListMyBookingsUseCase } from '../application/list-my-bookings.use-case.js';
 import { CancelHoldUseCase } from '../application/cancel-hold.use-case.js';
+import { RequestPaidCancellationUseCase } from '../application/request-paid-cancellation.use-case.js';
+import { ApplyPaidCancellationUseCase } from '../application/apply-paid-cancellation.use-case.js';
 import { CreateBookingDto } from './dto/booking-request.dto.js';
+import {
+  ApplyCancelDto,
+  RequestCancelQuoteDto,
+} from './dto/cancel-request.dto.js';
 import {
   BookingResponseDto,
   MyBookingsResponseDto,
@@ -41,6 +47,8 @@ export class BookingsController {
     private readonly createHold: CreateHoldUseCase,
     private readonly listMine: ListMyBookingsUseCase,
     private readonly cancelHold: CancelHoldUseCase,
+    private readonly requestCancelQuote: RequestPaidCancellationUseCase,
+    private readonly applyCancel: ApplyPaidCancellationUseCase,
   ) {}
 
   @Post()
@@ -104,5 +112,50 @@ export class BookingsController {
     } catch (error: unknown) {
       return rethrowBookingHttpError(error);
     }
+  }
+
+  @Post(':id/cancel-quote')
+  @Header('Cache-Control', 'no-store, private')
+  @ApiOperation({ summary: 'C08: báo phí hủy có hoàn (persist quote + consent)' })
+  async cancelQuote(
+    @CurrentUser('userId') userId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() input: RequestCancelQuoteDto,
+  ) {
+    const quote = await this.requestCancelQuote.execute({
+      bookingId: id,
+      actorUserId: userId,
+      actorType: 'CUSTOMER',
+      reason: input.reason,
+      idempotencyKey: input.idempotencyKey,
+    });
+    return {
+      success: true,
+      data: {
+        ...quote,
+        expiresAt: quote.expiresAt.toISOString(),
+      },
+    };
+  }
+
+  @Post(':id/cancel-apply')
+  @Header('Cache-Control', 'no-store, private')
+  @ApiOperation({ summary: 'C08: áp dụng hủy có hoàn (explicit consent)' })
+  async cancelApply(
+    @CurrentUser('userId') userId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() input: ApplyCancelDto,
+  ) {
+    return {
+      success: true,
+      data: await this.applyCancel.execute({
+        bookingId: id,
+        quoteId: input.quoteId,
+        accepted: input.accepted,
+        actorUserId: userId,
+        actorType: 'CUSTOMER',
+        idempotencyKey: input.idempotencyKey,
+      }),
+    };
   }
 }

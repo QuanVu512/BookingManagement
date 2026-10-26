@@ -13,7 +13,16 @@ import {
 import { ApiOperation } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import type { Request } from 'express';
-import { IsEmail, IsString, IsUUID, Length, Matches } from 'class-validator';
+import {
+  IsEmail,
+  IsIn,
+  IsInt,
+  IsOptional,
+  IsString,
+  IsUUID,
+  Length,
+  Matches,
+} from 'class-validator';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard.js';
 import { AuthCsrfGuard } from '../../auth/guards/auth-csrf.guard.js';
 import { RolesGuard } from '../../auth/guards/roles.guard.js';
@@ -33,7 +42,10 @@ export class GuestCreateBookingDto implements GuestCreateHoldInput {
   @IsString() @Length(1, 150) customerName!: string;
   @IsString() @Length(6, 20) customerPhone!: string;
   @IsEmail() customerEmail!: string;
-  prepaymentPercent!: number;
+  @IsOptional()
+  @IsInt()
+  @IsIn([30])
+  prepaymentPercent?: number;
   @IsString()
   @Length(16, 100)
   @Matches(/^[A-Za-z0-9_-]+$/)
@@ -53,7 +65,7 @@ export class GuestBookingsController {
   @HttpCode(201)
   @Throttle({ default: { limit: 10, ttl: 300_000 } })
   @Header('Cache-Control', 'no-store, private')
-  @ApiOperation({ summary: 'E3: guest giữ sân 100% + cấp token' })
+  @ApiOperation({ summary: 'E3: guest giữ sân 30% cọc + cấp token' })
   async create(@Req() request: Request, @Body() input: GuestCreateBookingDto) {
     if (
       request.header('authorization') ||
