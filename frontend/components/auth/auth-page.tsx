@@ -18,6 +18,8 @@ import { useAuthActions } from '../../context/auth-context';
 import { GuestConfirmDialog } from './guest-confirm-dialog';
 import { LoginScreen } from './login-screen';
 import { ArenaLogo } from '../arena/arena-logo';
+import { LegalFooter } from '../../features/legal/components/legal-footer';
+import { CollectionNotice } from '../../features/legal/components/collection-notice';
 
 type FormState = ReturnType<typeof useAuthForm>;
 
@@ -49,6 +51,9 @@ export function AuthShell({
       <Link className={shell.back} href="/">
         ← Về trang chủ
       </Link>
+      <div style={{ width: '100%', maxWidth: '440px', marginTop: '1.5rem' }}>
+        <LegalFooter variant="compact" />
+      </div>
     </main>
   );
 }
@@ -117,6 +122,7 @@ function AuthForm({ form }: { form: FormState }) {
         <fieldset disabled={form.isSubmitting} className={styles.fields}>
           <AccountFields form={form} />
           <PasswordFields form={form} />
+          {registering && <CollectionNotice />}
           <button type="submit" className={`btn btn-primary ${styles.submit}`}>
             {form.isSubmitting && (
               <span className={styles.spinner} aria-hidden="true" />

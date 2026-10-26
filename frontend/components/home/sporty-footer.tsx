@@ -1,5 +1,8 @@
+import React from 'react';
+import Link from 'next/link';
 import { ArenaLogo } from '../arena/arena-logo';
 import { ArenaLocationButton } from '../arena/arena-location';
+import { CookiePreferencesTrigger } from '../../features/legal/components/cookie-preferences-trigger';
 
 function FooterBrand() {
   return (
@@ -10,7 +13,7 @@ function FooterBrand() {
       <div>
         <strong>SMASH ARENA PICKLEBALL</strong>
         <small>
-          Hệ thống đặt sân & tổ chức giải đấu thể thao chuyên nghiệp
+          Hệ thống đặt sân & quản lý lịch thi đấu thể thao trực tuyến
         </small>
       </div>
     </div>
@@ -23,14 +26,20 @@ export function SportyFooter({
   linkPrefix?: string;
 }) {
   return (
-    <footer className="arena-footer" id="about">
+    <footer className="arena-footer" id="about" aria-label="Chân trang hệ thống">
       <div className="arena-wide">
         <FooterBrand />
-        <nav aria-label="Điều hướng chân trang">
-          <a href="/">Trang chủ</a>
+        <nav aria-label="Điều hướng chân trang" style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', alignItems: 'center' }}>
+          <Link href="/">Trang chủ</Link>
           <a href="/#facilities">Tiện ích</a>
-          <a href="/booking">Đặt sân</a>
-          <a href="/bookings">Lịch của tôi</a>
+          <Link href="/booking">Đặt sân</Link>
+          <Link href="/bookings">Lịch của tôi</Link>
+          <Link href="/support">Hỗ trợ</Link>
+          <Link href="/privacy">Quyền riêng tư</Link>
+          <Link href="/terms">Điều khoản</Link>
+          <Link href="/cookies">Cookie</Link>
+          <Link href="/refund-policy">Hoàn tiền</Link>
+          <CookiePreferencesTrigger />
           <ArenaLocationButton label="Vị trí cụm sân" />
         </nav>
         <p>

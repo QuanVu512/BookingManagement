@@ -38,7 +38,7 @@ export function HeroSection({ courts }: { courts?: CourtItem[] } = {}) {
         DỊCH VỤ <span className="arena-shimmer">PICKLEBALL</span>
       </h1>
       <p className="arena-hero-description">
-        Sân đấu chuyên nghiệp & đặt lịch tức thì. Khám phá sân phù hợp, kiểm tra
+        Sân thể thao hiện đại & đặt lịch trực tuyến nhanh chóng. Khám phá sân phù hợp, kiểm tra
         khung giờ và chuẩn bị cho trận đấu của bạn tại SMASH ARENA.
       </p>
       <div className="arena-hero-actions">

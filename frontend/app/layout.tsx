@@ -7,6 +7,7 @@ import '../components/arena/arena-booking.css';
 import '../components/arena/arena-tickets.css';
 import { AuthProvider } from '../context/auth-context';
 import { ThemeProvider } from '../context/theme-context';
+import { CookiePreferencesProvider } from '../features/cookie-consent/components/cookie-preferences-provider';
 
 const inter = Inter({
   subsets: ['latin', 'vietnamese'],
@@ -42,7 +43,9 @@ export default function RootLayout({
           {`try { const saved = localStorage.getItem('smash-arena-theme'); document.documentElement.dataset.theme = saved === 'dark' ? 'dark' : 'light'; document.documentElement.style.colorScheme = document.documentElement.dataset.theme; } catch { document.documentElement.dataset.theme = 'light'; }`}
         </Script>
         <ThemeProvider>
-          <AuthProvider>{children}</AuthProvider>
+          <AuthProvider>
+            <CookiePreferencesProvider>{children}</CookiePreferencesProvider>
+          </AuthProvider>
         </ThemeProvider>
       </body>
     </html>

@@ -1,0 +1,55 @@
+{
+  "kind": "refund-policy",
+  "version": "v1.0",
+  "title": "Chính sách hủy sân, tiền cọc và hoàn tiền",
+  "description": "Quy định minh bạch về các trường hợp hủy sân, mức khấu trừ tiền cọc, điều kiện hoàn tiền và thời gian xử lý.",
+  "effectiveAt": "2026-10-26T00:00:00.000Z",
+  "updatedAt": "2026-10-26T00:00:00.000Z",
+  "locale": "vi",
+  "publicPath": "/refund-policy",
+  "publicationStatus": "PUBLISHED",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "1. Nguyên tắc chung",
+      "content": "BookingManagement áp dụng chính sách đặt cọc, hủy sân và hoàn tiền minh bạch tuân thủ Luật Bảo vệ quyền lợi người tiêu dùng số 19/2023/QH15, Luật Thương mại điện tử số 122/2025/QH15 và Nghị định 248/2026/NĐ-CP, nhằm tối ưu hóa công suất khai thác sân, đảm bảo công bằng cho người chơi khác và bảo vệ quyền lợi hợp pháp của khách hàng."
+    },
+    {
+      "id": "cancellation-cases",
+      "title": "2. Các trường hợp hủy sân và tỷ lệ khấu trừ",
+      "content": "Quy tắc xử lý hủy sân đối với đơn đặt sân ĐÃ XÁC NHẬN (CONFIRMED):",
+      "subsections": [
+        {
+          "id": "standard-cancellation",
+          "title": "2.1. Hủy trước giờ bắt đầu trên 12 tiếng (Hủy thường)",
+          "content": "Khách hàng có thể chủ động gửi yêu cầu hủy trên hệ thống trước thời điểm slot bắt đầu tối thiểu 12 tiếng. Hệ thống giữ lại 10% giá thuê sân làm phí hủy và hoàn trả lại 20% giá thuê sân cho khách hàng (từ 30% tiền cọc đã thanh toán). Phí phạt không tính trên các dịch vụ đi kèm."
+        },
+        {
+          "id": "late-cancellation",
+          "title": "2.2. Hủy sát giờ (Trong vòng 12 tiếng trước khi bắt đầu)",
+          "content": "Trong khoảng thời gian dưới 12 tiếng trước giờ bắt đầu cho đến khi slot kết thúc, hệ thống không cho phép khách hàng tự ý hủy trực tuyến mà phải liên hệ nhân viên tại quầy. Trong trường hợp này, toàn bộ khoản tiền đặt cọc 30% giá thuê sân sẽ bị khấu trừ (tịch thu tiền cọc). Phí phạt không tính trên các dịch vụ đi kèm. Hệ thống tuyệt đối KHÔNG áp dụng mức phạt 50% cũ."
+        },
+        {
+          "id": "no-show-forfeiture",
+          "title": "2.3. Không đến nhận sân (No-Show)",
+          "content": "Nếu toàn bộ khung giờ slot kết thúc mà khách hàng không thực hiện check-in hợp lệ, đơn đặt sân sẽ được hệ thống tự động ghi nhận là Vắng mặt (NO_SHOW). Khách hàng sẽ bị mất toàn bộ khoản tiền cọc 30% giá thuê sân: (a) Khách hàng đã thanh toán 30% cọc: Số tiền được hoàn là 0đ, hệ thống miễn thu 70% giá trị còn lại chưa thanh toán; (b) Đối với đơn lịch sử đã thanh toán 100%: Khấu trừ 30% tiền cọc và tạo nghĩa vụ hoàn trả 70% còn lại cho khách hàng. Không tính phạt trên các dịch vụ đi kèm."
+        }
+      ]
+    },
+    {
+      "id": "checkin-lifecycle",
+      "title": "3. Thời gian chơi và vòng đời Check-in",
+      "content": "Khách hàng có thể check-in đúng giờ hoặc muộn trong suốt thời gian diễn ra slot. Việc check-in muộn không làm kéo dài thời gian kết thúc của sân. Sau khi kết thúc thời gian slot, các đơn đặt sân đã check-in sẽ tự động chuyển sang trạng thái HOÀN TẤT (COMPLETED)."
+    },
+    {
+      "id": "merchant-refund",
+      "title": "4. Các trường hợp hoàn tiền 100% không mất phí",
+      "content": "Khách hàng sẽ được hoàn trả toàn bộ 100% số tiền đã thanh toán mà không bị trừ bất kỳ khoản phí nào trong các trường hợp sau: (a) Sân thể thao phải đóng cửa do bảo trì khẩn cấp, sự cố kỹ thuật hoặc quyết định của cơ quan nhà nước; (b) Khách hàng thanh toán trùng lặp (duplicate payment) hoặc thanh toán thừa so với số tiền cần thu; (c) Lỗi kỹ thuật từ hệ thống cổng thanh toán."
+    },
+    {
+      "id": "refund-method",
+      "title": "5. Phương thức và thời gian hoàn tiền",
+      "content": "Các khoản tiền hoàn được đối soát và xử lý trực tiếp qua quầy giao dịch hoặc chuyển khoản về tài khoản nguồn mà khách hàng đã thực hiện thanh toán trong vòng 3 đến 5 ngày làm việc kể từ thời điểm yêu cầu hoàn tiền được duyệt (APPROVED)."
+    }
+  ]
+}

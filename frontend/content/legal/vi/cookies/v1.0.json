@@ -1,0 +1,55 @@
+{
+  "kind": "cookies",
+  "version": "v1.0",
+  "title": "Chính sách cookie và lưu trữ trình duyệt",
+  "description": "Giải thích chi tiết về mục đích sử dụng cookie, lưu trữ cục bộ và quyền kiểm soát quyền riêng tư của bạn.",
+  "effectiveAt": "2026-10-26T00:00:00.000Z",
+  "updatedAt": "2026-10-26T00:00:00.000Z",
+  "locale": "vi",
+  "publicPath": "/cookies",
+  "publicationStatus": "PUBLISHED",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "1. Khái niệm cookie và lưu trữ cục bộ",
+      "content": "Cookie và các công nghệ lưu trữ trình duyệt (localStorage, sessionStorage) là các tệp dữ liệu nhỏ được lưu trữ trên thiết bị của bạn khi duyệt web, giúp ghi nhớ trạng thái đăng nhập, tùy chọn hiển thị và đảm bảo an toàn cho các giao dịch trực tuyến, tuân thủ Luật Bảo vệ dữ liệu cá nhân số 91/2025/QH15, Nghị định 356/2025/NĐ-CP và Luật Thương mại điện tử số 122/2025/QH15."
+    },
+    {
+      "id": "categories",
+      "title": "2. Phân loại cookie trên hệ thống BookingManagement",
+      "content": "Chúng tôi phân định rõ ràng các nhóm công nghệ lưu trữ theo mục đích cụ thể:",
+      "subsections": [
+        {
+          "id": "necessary",
+          "title": "2.1. Cookie thiết yếu (Necessary Cookies) - Bắt buộc",
+          "content": "Nhóm này đóng vai trò sống còn để vận hành website, bao gồm: token xác thực đăng nhập (auth token), token chống tấn công giả mạo (CSRF protection), mã truy cập phiên đặt sân khách (guest session token) và trạng thái lưu trữ quyết định cookie của bạn. Nhóm này không thể bị vô hiệu hóa vì hệ thống không thể cung cấp dịch vụ đặt sân an toàn nếu thiếu chúng."
+        },
+        {
+          "id": "preferences",
+          "title": "2.2. Tùy chọn giao diện (Preferences)",
+          "content": "Lưu trữ lựa chọn cá nhân của bạn như chế độ sáng/tối (Dark/Light mode) hoặc ghi nhớ tài khoản đăng nhập khi bạn chủ động lựa chọn. Nhóm này chỉ được kích hoạt khi bạn thực hiện hành động cụ thể hoặc cho phép."
+        },
+        {
+          "id": "analytics",
+          "title": "2.3. Thống kê phân tích (Analytics) - Tùy chọn",
+          "content": "Giúp chúng tôi hiểu rõ hơn về lưu lượng truy cập và cải thiện hiệu năng ứng dụng. Hiện tại, hệ thống BookingManagement KHÔNG tích hợp các trình theo dõi phân tích của bên thứ ba (như Google Analytics). Nếu trong tương lai có triển khai, nhóm này sẽ luôn mặc định TẮT và chỉ được kích hoạt sau khi bạn đồng ý."
+        },
+        {
+          "id": "marketing",
+          "title": "2.4. Quảng cáo và Tiếp thị (Marketing) - Tùy chọn",
+          "content": "Dùng để theo dõi hành vi qua các trang web nhằm hiển thị quảng cáo phù hợp. Hệ thống BookingManagement KHÔNG sử dụng cookie tiếp thị hoặc pixel mạng xã hội (như Meta Pixel, TikTok Pixel). Nhóm này luôn mặc định TẮT."
+        }
+      ]
+    },
+    {
+      "id": "management",
+      "title": "3. Cách thức quản lý và thu hồi lựa chọn cookie",
+      "content": "Bạn có toàn quyền kiểm soát cài đặt cookie bất kỳ lúc nào bằng cách nhấp vào nút 'Tùy chọn Cookie' ở chân trang web (Footer). Bạn có thể chấp nhận hoặc từ chối các danh mục tùy chọn mà không làm ảnh hưởng đến tính năng đăng nhập hay đặt sân."
+    },
+    {
+      "id": "browser-controls",
+      "title": "4. Cài đặt trực tiếp trên trình duyệt",
+      "content": "Ngoài giao diện tùy chọn trên website, bạn cũng có thể chặn hoặc xóa cookie thông qua phần cài đặt bảo mật của trình duyệt web (Chrome, Edge, Firefox, Safari). Tuy nhiên, việc chặn toàn bộ cookie (bao gồm cookie thiết yếu) có thể khiến bạn không thể đăng nhập hoặc thanh toán đặt sân."
+    }
+  ]
+}

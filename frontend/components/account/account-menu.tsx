@@ -8,6 +8,7 @@ import styles from './account-menu.module.css';
 const MENU_LINKS = [
   { label: 'Thông tin cá nhân', href: '/account' },
   { label: 'Bảo mật tài khoản', href: '/account/security' },
+  { label: 'Quyền riêng tư & Dữ liệu', href: '/account/privacy' },
   { label: 'Lịch sử đặt sân', href: '/bookings' },
   { label: 'Hóa đơn & thanh toán', href: '/bookings?tab=payments' },
 ] as const;
@@ -23,14 +24,30 @@ export function AccountMenu({
   const menuId = useId();
   const containerRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLUListElement>(null);
   const pathname = usePathname() ?? '';
 
   useEffect(() => {
     if (!open) return;
     const handleKey = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape') return;
-      setOpen(false);
-      buttonRef.current?.focus();
+      if (event.key === 'Escape') {
+        setOpen(false);
+        buttonRef.current?.focus();
+        return;
+      }
+      if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+        event.preventDefault();
+        const items = menuRef.current?.querySelectorAll<HTMLElement>('[role="menuitem"]');
+        if (!items || items.length === 0) return;
+        const currentIndex = Array.from(items).indexOf(document.activeElement as HTMLElement);
+        if (event.key === 'ArrowDown') {
+          const nextIndex = (currentIndex + 1) % items.length;
+          items[nextIndex]?.focus();
+        } else {
+          const prevIndex = (currentIndex - 1 + items.length) % items.length;
+          items[prevIndex]?.focus();
+        }
+      }
     };
     const handlePointer = (event: MouseEvent) => {
       if (!containerRef.current?.contains(event.target as Node)) setOpen(false);
@@ -61,7 +78,7 @@ export function AccountMenu({
         <span className={styles.name}>{user.fullName}</span>
       </button>
       {open && (
-        <ul id={menuId} role="menu" className={styles.menu}>
+        <ul id={menuId} ref={menuRef} role="menu" className={styles.menu}>
           {MENU_LINKS.map((link) => (
             <li key={link.href} role="none">
               <a

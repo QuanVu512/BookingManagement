@@ -1,0 +1,87 @@
+.formContainer {
+  background: var(--surface-card, #151d2e);
+  border: 1px solid var(--line, rgba(255, 255, 255, 0.08));
+  border-radius: var(--radius-md, 14px);
+  padding: 1.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.formGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.label {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--ink, #f8fafc);
+}
+
+.input,
+.select,
+.textarea {
+  background: var(--bg-input, rgba(11, 15, 25, 0.7));
+  border: 1px solid var(--line, rgba(255, 255, 255, 0.12));
+  border-radius: var(--radius-sm, 8px);
+  padding: 0.75rem 1rem;
+  color: var(--ink, #f8fafc);
+  font-size: 0.9375rem;
+  transition: border-color 0.2s;
+}
+
+.input:focus,
+.select:focus,
+.textarea:focus {
+  border-color: var(--accent-volt, #a3e635);
+  outline: none;
+}
+
+.submitBtn {
+  background: var(--accent-volt, #a3e635);
+  color: #070a11;
+  font-weight: 600;
+  padding: 0.75rem 1.5rem;
+  border-radius: var(--radius-sm, 8px);
+  border: none;
+  cursor: pointer;
+  align-self: flex-start;
+  transition: opacity 0.2s;
+}
+
+.submitBtn:hover:not(:disabled),
+.submitBtn:focus-visible {
+  opacity: 0.9;
+  outline: 2px solid var(--accent-neon, #bef264);
+}
+
+.submitBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.errorAlert {
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: #fca5a5;
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius-sm, 8px);
+  font-size: 0.875rem;
+}
+
+.successCard {
+  background: var(--surface-card, #151d2e);
+  border: 1px solid rgba(74, 222, 128, 0.3);
+  border-radius: var(--radius-md, 14px);
+  padding: 1.75rem;
+}
+
+.statusCard {
+  background: var(--surface-card, #151d2e);
+  border: 1px solid var(--line, rgba(255, 255, 255, 0.08));
+  border-radius: var(--radius-md, 14px);
+  padding: 1.5rem;
+  margin-top: 1.5rem;
+}

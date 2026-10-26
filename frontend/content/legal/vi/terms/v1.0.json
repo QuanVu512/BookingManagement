@@ -1,0 +1,72 @@
+{
+  "kind": "terms",
+  "version": "v1.0",
+  "title": "Điều khoản dịch vụ và giao kết đặt sân",
+  "description": "Quy định quyền, nghĩa vụ và quy trình giao kết hợp đồng dịch vụ thuê sân thể thao giữa người dùng và BookingManagement.",
+  "effectiveAt": "2026-10-26T00:00:00.000Z",
+  "updatedAt": "2026-10-26T00:00:00.000Z",
+  "locale": "vi",
+  "publicPath": "/terms",
+  "publicationStatus": "PUBLISHED",
+  "sections": [
+    {
+      "id": "definitions",
+      "title": "1. Định nghĩa và phạm vi áp dụng",
+      "content": "Điều khoản này áp dụng cho toàn bộ hoạt động đăng ký tài khoản, duyệt thông tin, đặt giữ chỗ và sử dụng dịch vụ sân thể thao trên hệ thống BookingManagement, tuân thủ Luật Thương mại điện tử số 122/2025/QH15, Nghị định 248/2026/NĐ-CP, Luật Bảo vệ quyền lợi người tiêu dùng số 19/2023/QH15 và Luật Giao dịch điện tử số 20/2023/QH15. Quy định áp dụng bình đẳng cho cả khách hàng thành viên có tài khoản và khách vãng lai đặt giữ chỗ trực tiếp."
+    },
+    {
+      "id": "booking-process",
+      "title": "2. Quy trình đặt sân và giữ chỗ",
+      "content": "Quy trình giao kết hợp đồng đặt sân diễn ra theo các bước kỹ thuật minh bạch:",
+      "subsections": [
+        {
+          "id": "hold-rule",
+          "title": "2.1. Thời gian giữ chỗ (Hold)",
+          "content": "Khi chọn slot và gửi yêu cầu, hệ thống sẽ cấp thời gian giữ chỗ tối đa 5 phút để bạn hoàn tất thanh toán khoản tiền cọc. Trong thời gian này, slot sân được khóa tạm thời đối với người dùng khác. Nếu hết 5 phút mà chưa nhận được xác nhận thanh toán hợp lệ, giao dịch giữ chỗ sẽ tự động hết hạn (EXPIRED) và giải phóng sân."
+        },
+        {
+          "id": "prepayment-confirmation",
+          "title": "2.2. Khoản tiền cọc bắt buộc và xác nhận đơn",
+          "content": "Mọi người dùng (bao gồm thành viên có tài khoản và khách vãng lai) bắt buộc phải thanh toán khoản tiền đặt cọc đúng 30% giá thuê sân khi tạo đơn đặt sân mới. Khoản 70% giá trị tiền thuê sân còn lại sẽ được thanh toán sau theo quy trình dịch vụ tại cơ sở. Các dịch vụ đi kèm (nước uống, thuê vợt, thiết bị...) không tính vào tiền đặt cọc sân. Đơn đặt sân chỉ chính thức chuyển sang trạng thái ĐÃ XÁC NHẬN (CONFIRMED) sau khi hệ thống ghi nhận biên lai thanh toán cọc hợp lệ từ cổng thanh toán."
+        }
+      ]
+    },
+    {
+      "id": "checkin-usage",
+      "title": "3. Sử dụng sân và quy tắc Check-in",
+      "content": "Để đảm bảo trật tự và quyền lợi cho toàn bộ người chơi:",
+      "subsections": [
+        {
+          "id": "checkin-window",
+          "title": "3.1. Khung giờ Check-in",
+          "content": "Khách hàng có thể thực hiện check-in qua mã QR hoặc tại quầy nhân viên trong suốt khoảng thời gian từ lúc slot bắt đầu (startsAt) cho đến khi slot kết thúc (endsAt). Hệ thống không hỗ trợ check-in trước thời gian bắt đầu quy định."
+        },
+        {
+          "id": "late-checkin",
+          "title": "3.2. Check-in đúng giờ hoặc muộn",
+          "content": "Việc check-in đúng giờ hoặc check-in muộn trong khung giờ slot không làm kéo dài thời gian chơi vượt quá giờ kết thúc đã đặt (endsAt). Sân phải được hoàn trả đúng giờ để đảm bảo thời gian vệ sinh 15 phút cho người chơi kế tiếp."
+        },
+        {
+          "id": "no-show-rule",
+          "title": "3.3. Trường hợp vắng mặt (No-Show)",
+          "content": "Nếu toàn bộ khung giờ slot đã kết thúc mà khách hàng không thực hiện check-in, đơn đặt sân sẽ chuyển sang trạng thái Vắng mặt (NO_SHOW). Khách hàng sẽ bị mất toàn bộ khoản tiền đặt cọc (30% tiền thuê sân) theo chính sách hủy sân và tiền cọc của cơ sở."
+        }
+      ]
+    },
+    {
+      "id": "user-obligations",
+      "title": "4. Trách nhiệm của người sử dụng sân",
+      "content": "Người chơi có trách nhiệm tuân thủ nội quy an toàn tại cụm sân thể thao, giữ gìn tài sản chung, sử dụng trang phục và giày thể thao phù hợp mặt sân, không mang chất gây cháy nổ hoặc chất cấm vào khu vực thể thao."
+    },
+    {
+      "id": "service-limitations",
+      "title": "5. Giới hạn trách nhiệm và sự cố kỹ thuật",
+      "content": "Trong trường hợp bất khả kháng (thiên tai, cắt điện diện rộng, sự cố hạ tầng viễn thông ngoài tầm kiểm soát) hoặc cơ sở phải tạm ngừng phục vụ vì lý do an toàn kỹ thuật, BookingManagement có trách nhiệm thông báo sớm nhất có thể và thực hiện hoàn trả đầy đủ số tiền khách hàng đã thanh toán cho khung giờ bị gián đoạn mà không áp dụng bất kỳ khoản phí phạt nào."
+    },
+    {
+      "id": "dispute-resolution",
+      "title": "6. Giải quyết tranh chấp",
+      "content": "Mọi tranh chấp phát sinh từ giao dịch đặt sân trước hết sẽ được giải quyết thông qua thương lượng và hòa giải trên tinh thần tôn trọng quyền lợi của người tiêu dùng và quy định của pháp luật Việt Nam."
+    }
+  ]
+}

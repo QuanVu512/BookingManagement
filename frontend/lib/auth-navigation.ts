@@ -4,7 +4,7 @@ export const VERIFICATION_EMAIL_KEY = 'booking:verification-email';
 
 export function authReturnPath(): string {
   const next = new URLSearchParams(window.location.search).get('next') ?? '/';
-  return /^\/(?:courts\/[a-zA-Z0-9-]+|booking|bookings|account(?:\/(?:security|payments))?)?$/.test(
+  return /^\/(?:courts\/[a-zA-Z0-9-]+|booking|bookings|privacy(?:\/requests)?|terms|cookies|refund-policy|support|account(?:\/(?:security|payments|privacy))?)?$/.test(
     next,
   )
     ? next
@@ -65,7 +65,16 @@ export function clearVerificationFlow(): void {
   verificationFlow = null;
   try {
     window.sessionStorage.removeItem(VERIFICATION_FLOW_KEY);
+    window.sessionStorage.removeItem(VERIFICATION_EMAIL_KEY);
   } catch {
     // Memory has already been cleared.
+  }
+}
+
+export function clearVerificationEmail(): void {
+  try {
+    window.sessionStorage.removeItem(VERIFICATION_EMAIL_KEY);
+  } catch {
+    // ignore
   }
 }

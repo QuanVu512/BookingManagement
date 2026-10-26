@@ -1,0 +1,55 @@
+{
+  "manifestVersion": "1.0",
+  "generatedAt": "2026-10-26T00:00:00.000Z",
+  "activeBookingBundle": {
+    "id": "bundle-2026-v1",
+    "termsVersion": "v1.0",
+    "refundPolicyVersion": "v1.0",
+    "privacyVersion": "v1.0",
+    "contentHash": "45d23b247d5900e24631011bb9ac0783a7c3939b84d7f2c15dbea0203d4d57d2",
+    "effectiveAt": "2026-10-26T00:00:00.000Z",
+    "published": true
+  },
+  "policies": [
+    {
+      "kind": "privacy",
+      "version": "v1.0",
+      "sha256": "95daa010e5216564537d0608603bfbc3b394ec6128a5f0ca3605c7f74b96dbc1",
+      "effectiveAt": "2026-10-26T00:00:00.000Z",
+      "locale": "vi",
+      "publicPath": "/privacy",
+      "title": "Chính sách quyền riêng tư và bảo vệ dữ liệu cá nhân",
+      "publicationStatus": "PUBLISHED"
+    },
+    {
+      "kind": "terms",
+      "version": "v1.0",
+      "sha256": "8f31fbe661f0ee4db191a4a5d5441cb3b96de35bb2b1678c66d7ea93d447a8e9",
+      "effectiveAt": "2026-10-26T00:00:00.000Z",
+      "locale": "vi",
+      "publicPath": "/terms",
+      "title": "Điều khoản dịch vụ và giao kết đặt sân",
+      "publicationStatus": "PUBLISHED"
+    },
+    {
+      "kind": "cookies",
+      "version": "v1.0",
+      "sha256": "cc86a180475eff7275cf653b23487b4194a07468be994fd92928b2d48cc388fc",
+      "effectiveAt": "2026-10-26T00:00:00.000Z",
+      "locale": "vi",
+      "publicPath": "/cookies",
+      "title": "Chính sách cookie và lưu trữ trình duyệt",
+      "publicationStatus": "PUBLISHED"
+    },
+    {
+      "kind": "refund-policy",
+      "version": "v1.0",
+      "sha256": "88a0292422779b7494aee9ba4074ca7dea299102c8f66d20c69ac6a6ccee2b9d",
+      "effectiveAt": "2026-10-26T00:00:00.000Z",
+      "locale": "vi",
+      "publicPath": "/refund-policy",
+      "title": "Chính sách hủy sân, tiền cọc và hoàn tiền",
+      "publicationStatus": "PUBLISHED"
+    }
+  ]
+}

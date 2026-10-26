@@ -10,6 +10,7 @@ import { LoginForm, type LoginFormState } from './login-form';
 import { LoginIcon } from './login-icons';
 import { ArenaLogo } from '../arena/arena-logo';
 import { LoginWaveBackground } from './login-wave-background';
+import { CookiePreferencesTrigger } from '../../features/legal/components/cookie-preferences-trigger';
 import styles from './login-page.module.css';
 
 function BrandMark() {
@@ -106,7 +107,13 @@ function LoginFooter({
   return (
     <>
       <footer className={styles.footer}>
-        © 2026 SMASH ARENA. Nền tảng đặt sân Pickleball.
+        <div>© 2026 SMASH ARENA. Nền tảng đặt sân Pickleball.</div>
+        <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.5rem', justifyContent: 'center', flexWrap: 'wrap', fontSize: '0.8125rem' }}>
+          <Link href="/privacy">Quyền riêng tư</Link>
+          <Link href="/terms">Điều khoản</Link>
+          <Link href="/cookies">Cookie</Link>
+          <CookiePreferencesTrigger />
+        </div>
       </footer>
       <button
         type="button"

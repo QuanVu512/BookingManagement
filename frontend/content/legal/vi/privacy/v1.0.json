@@ -1,0 +1,70 @@
+{
+  "kind": "privacy",
+  "version": "v1.0",
+  "title": "Chính sách quyền riêng tư và bảo vệ dữ liệu cá nhân",
+  "description": "Mô tả minh bạch các hoạt động thu thập, xử lý, lưu trữ và bảo vệ dữ liệu cá nhân trên nền tảng BookingManagement.",
+  "effectiveAt": "2026-10-26T00:00:00.000Z",
+  "updatedAt": "2026-10-26T00:00:00.000Z",
+  "locale": "vi",
+  "publicPath": "/privacy",
+  "publicationStatus": "PUBLISHED",
+  "sections": [
+    {
+      "id": "intro",
+      "title": "1. Giới thiệu và cam kết",
+      "content": "BookingManagement cam kết tôn trọng quyền riêng tư và bảo vệ dữ liệu cá nhân của người dùng tuân thủ đầy đủ quy định pháp luật Việt Nam hiện hành, bao gồm Luật Bảo vệ dữ liệu cá nhân số 91/2025/QH15 (có hiệu lực từ ngày 01/01/2026), Nghị định 356/2025/NĐ-CP (Điều 42 thay thế Nghị định 13/2023/NĐ-CP), Luật Thương mại điện tử số 122/2025/QH15 và Luật Bảo vệ quyền lợi người tiêu dùng số 19/2023/QH15. Chính sách này giải thích rõ ràng các loại thông tin chúng tôi thu thập, mục đích sử dụng, thời gian lưu trữ và quyền của bạn đối với dữ liệu của mình."
+    },
+    {
+      "id": "data-collected",
+      "title": "2. Dữ liệu cá nhân thu thập thực tế",
+      "content": "Chúng tôi chỉ thu thập các trường thông tin tối thiểu cần thiết để cung cấp dịch vụ đặt sân và quản lý tài khoản:",
+      "subsections": [
+        {
+          "id": "data-account",
+          "title": "2.1. Dữ liệu tài khoản thành viên",
+          "content": "Họ tên, địa chỉ email, số điện thoại, mật khẩu mã hóa (hash qua Argon2id/Bcrypt), vai trò tài khoản và ảnh đại diện (nếu bạn tự nguyện tải lên)."
+        },
+        {
+          "id": "data-booking",
+          "title": "2.2. Dữ liệu đặt sân (Thành viên và Khách vãng lai)",
+          "content": "Họ tên người liên hệ, số điện thoại, địa chỉ email nhận mã đơn/vé điện tử, thông tin khung giờ đặt sân (sân, giờ bắt đầu, giờ kết thúc), mã đơn hàng và mã truy cập phiên khách (Guest Access Token)."
+        },
+        {
+          "id": "data-payment",
+          "title": "2.3. Dữ liệu giao dịch và thanh toán",
+          "content": "Mã đơn hàng, số tiền thanh toán, trạng thái giao dịch qua cổng thanh toán liên kết (ví dụ: payOS), mã giao dịch của cổng và nhật ký biên nhận thanh toán. Hệ thống không lưu trữ thông tin số thẻ tín dụng hay mật khẩu ngân hàng của bạn."
+        },
+        {
+          "id": "data-technical",
+          "title": "2.4. Dữ liệu kỹ thuật và bảo mật",
+          "content": "Mã định danh phiên làm việc (Session/JWT), token chống giả mạo yêu cầu (CSRF token), nhật ký kiểm tra mật khẩu bị rò rỉ (HIBP hash prefix) và lịch sử thao tác quan trọng để đảm bảo an toàn hệ sinh thái."
+        }
+      ]
+    },
+    {
+      "id": "purposes",
+      "title": "3. Mục đích và căn cứ xử lý",
+      "content": "Dữ liệu được xử lý trên các căn cứ pháp lý rõ ràng: (a) Thực hiện hợp đồng dịch vụ đặt sân thể thao; (b) Tuân thủ nghĩa vụ pháp lý về kế toán, thuế và thương mại điện tử; (c) Lợi ích hợp pháp trong việc bảo vệ an toàn thông tin, phòng chống gian lận và hỗ trợ khách hàng."
+    },
+    {
+      "id": "retention",
+      "title": "4. Thời hạn lưu trữ và bảo vệ dữ liệu",
+      "content": "Dữ liệu hồ sơ đặt sân và chứng từ thanh toán được lưu trữ theo quy định pháp luật về kế toán và giải quyết tranh chấp. Dữ liệu phiên tạm thời (như mã OTP xác thực, token giữ chỗ 5 phút) sẽ tự động hết hạn và bị vô hiệu hóa sau thời hạn quy định. Khi tài khoản yêu cầu đóng, hệ thống sẽ chuyển sang trạng thái ngưng hoạt động (CLOSED) và áp dụng quy trình rà soát bảo lưu pháp lý thay vì xóa cứng làm hỏng lịch sử tài chính."
+    },
+    {
+      "id": "sharing",
+      "title": "5. Chia sẻ dữ liệu với bên thứ ba",
+      "content": "Chúng tôi không bán hoặc cho thuê dữ liệu cá nhân của bạn cho bên thứ ba vì mục đích tiếp thị. Dữ liệu chỉ được chia sẻ trong phạm vi cần thiết với: (a) Cổng thanh toán trực tuyến được cấp phép để thực hiện đối soát; (b) Đơn vị cung cấp hạ tầng máy chủ và gửi thư điện tử giao dịch; (c) Cơ quan nhà nước có thẩm quyền khi có yêu cầu hợp pháp."
+    },
+    {
+      "id": "rights",
+      "title": "6. Quyền của chủ thể dữ liệu",
+      "content": "Căn cứ Luật Bảo vệ dữ liệu cá nhân 91/2025/QH15 và Nghị định 356/2025/NĐ-CP, bạn có đầy đủ các quyền: quyền được biết, quyền đồng ý, quyền truy cập/xem và chỉnh sửa thông tin cá nhân trong trang Tài khoản; yêu cầu trích xuất dữ liệu; yêu cầu xóa dữ liệu hoặc đóng tài khoản (trừ dữ liệu chứng từ tài chính bắt buộc lưu trữ theo Luật Kế toán); yêu cầu hạn chế xử lý; rút lại các lựa chọn tùy chọn; và gửi khiếu nại liên quan đến quyền riêng tư qua cổng tiếp nhận tại /privacy/requests hoặc /support."
+    },
+    {
+      "id": "contact",
+      "title": "7. Thông tin liên hệ phụ trách bảo vệ dữ liệu",
+      "content": "Mọi yêu cầu hoặc thắc mắc về quyền riêng tư, vui lòng gửi qua mục Hỗ trợ trực tuyến hoặc liên hệ Bộ phận Bảo vệ dữ liệu cá nhân của BookingManagement tại kênh tiếp nhận chính thức."
+    }
+  ]
+}
