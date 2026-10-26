@@ -60,7 +60,13 @@ function CourtOverview({ court }: { court: CourtItem }) {
   );
 }
 
-export function CourtInfoCard({ court }: { court: CourtItem }) {
+export function CourtInfoCard({
+  court,
+  prepaymentPercent = 30,
+}: {
+  court: CourtItem;
+  prepaymentPercent?: 30 | 100;
+}) {
   if (!court.timezone)
     return (
       <>
@@ -72,6 +78,7 @@ export function CourtInfoCard({ court }: { court: CourtItem }) {
     <LiveBookingPanel
       courtId={court.id}
       timezone={court.timezone}
+      prepaymentPercent={prepaymentPercent}
       detail={{
         name: court.name,
         code: court.code,

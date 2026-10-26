@@ -8,13 +8,18 @@ import { BookingSchedulePicker } from './booking-schedule-picker';
 import { BookingOrderSummary } from './booking-order-summary';
 import { BookingDayStrip } from './booking-day-strip';
 
-function useBookingController(courtId: string, timezone: string) {
+function useBookingController(
+  courtId: string,
+  timezone: string,
+  prepaymentPercent: 30 | 100 = 30,
+) {
   const session = useAuthSession();
   const { openSignIn, refreshSession } = useAuthActions();
   const state = useLiveBooking(
     courtId,
     timezone,
     session.isAuthenticated ? session.user?.id : undefined,
+    prepaymentPercent,
   );
   const signInLabel =
     session.status === 'unknown'
@@ -39,17 +44,19 @@ function useBookingController(courtId: string, timezone: string) {
 export function LiveBookingPanel({
   courtId,
   timezone,
+  prepaymentPercent = 30,
   detail,
 }: {
   courtId: string;
   timezone: string;
+  prepaymentPercent?: 30 | 100;
   detail?: {
     name: string;
     code: string;
     overview: ReactNode;
   };
 }) {
-  const props = useBookingController(courtId, timezone);
+  const props = useBookingController(courtId, timezone, prepaymentPercent);
   const catalog = useServiceCatalog(courtId, props.state.window, timezone);
   if (!detail) return <LiveBookingView {...props} />;
   return (

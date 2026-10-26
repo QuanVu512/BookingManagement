@@ -13,6 +13,7 @@ export interface MyBookingsViewProps {
   signInLabel: string;
   onReload: (cursor?: string) => void;
   onCancel: (id: string) => void;
+  onPaidCancel: () => void;
   onSignIn: () => void;
 }
 
@@ -54,6 +55,7 @@ export function MyBookingsView({
   signInLabel,
   onReload,
   onCancel,
+  onPaidCancel,
   onSignIn,
 }: MyBookingsViewProps) {
   if (sessionLoading)
@@ -72,6 +74,7 @@ export function MyBookingsView({
         bookings={bookings}
         pendingId={pendingId}
         onCancel={onCancel}
+        onPaidCancel={onPaidCancel}
         nextCursor={nextCursor}
       />
       <FeedPagination

@@ -158,7 +158,7 @@ async function createCheckout(
     const request = await createPaymentRequest({
       bookingId,
       purpose: 'PREPAYMENT',
-      prepaymentPercent: 100,
+      prepaymentPercent: 30,
       method: 'PAYOS_TRANSFER',
       idempotencyKey: `booking-checkout:${bookingId}`,
       signal: controller.signal,
@@ -208,7 +208,7 @@ export function checkoutPresentation(checkout: CheckoutState) {
         ? 'Đơn đã kết thúc'
         : checkout.outcome?.reviewRequired
           ? 'Đang kiểm tra thanh toán'
-          : 'Thanh toán đặt sân',
+          : 'Thanh toán đặt cọc 30%',
   };
 }
 

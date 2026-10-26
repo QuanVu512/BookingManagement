@@ -86,7 +86,7 @@ export function newIdempotencyKey(): string {
 export async function createPaymentRequest(input: {
   bookingId: string;
   purpose: PaymentPurpose;
-  prepaymentPercent: 30 | 100;
+  prepaymentPercent?: 30 | 100;
   method: PaymentMethod;
   idempotencyKey: string;
   signal?: AbortSignal;
@@ -97,7 +97,7 @@ export async function createPaymentRequest(input: {
     {
       bookingId: input.bookingId,
       purpose: input.purpose,
-      prepaymentPercent: input.prepaymentPercent,
+      prepaymentPercent: input.prepaymentPercent ?? 30,
       method: input.method,
       idempotencyKey: input.idempotencyKey,
     },
@@ -194,7 +194,7 @@ export async function getGuestPaymentOutcome(input: {
   return parsePaymentOutcome(payload.data);
 }
 
-/** E3: guest giữ sân 100% (public, không cookie/CSRF). */
+/** E3: guest giữ sân 30% (public, không cookie/CSRF). */
 export async function createGuestBooking(input: {
   courtId: string;
   startsAt: string;
@@ -215,7 +215,7 @@ export async function createGuestBooking(input: {
     cache: 'no-store',
     signal,
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ ...input, prepaymentPercent: 100 }),
+    body: JSON.stringify({ ...input, prepaymentPercent: 30 }),
   });
   const payload: unknown = await response.json();
   if (!response.ok || !isRecord(payload) || payload.success !== true) {

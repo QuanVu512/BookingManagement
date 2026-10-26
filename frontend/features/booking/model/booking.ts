@@ -26,6 +26,8 @@ export interface BookingRecord {
   totalAmount: number;
   currency: string;
   priceItems: PriceItem[];
+  prepaymentPercent?: number;
+  requiredPrepaymentAmount?: number;
 }
 export interface Availability {
   serviceItems?: BookingServiceLine[];
@@ -41,6 +43,7 @@ export interface Availability {
 }
 export interface BookingInput {
   services?: ServiceSelection[];
+  prepaymentPercent?: 30 | 100;
   policyAccepted: true;
   courtId: string;
   startsAt: string;

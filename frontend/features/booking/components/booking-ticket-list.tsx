@@ -8,7 +8,7 @@ import { BookingTicket } from './booking-ticket';
 type TicketFilter = 'upcoming' | 'history' | 'cancelled';
 type TicketListProps = Pick<
   MyBookingsViewProps,
-  'bookings' | 'pendingId' | 'onCancel' | 'nextCursor'
+  'bookings' | 'pendingId' | 'onCancel' | 'onPaidCancel' | 'nextCursor'
 >;
 const FILTERS: {
   id: TicketFilter;
@@ -32,10 +32,11 @@ export function BookingTicketList({
   bookings,
   pendingId,
   onCancel,
+  onPaidCancel,
   nextCursor,
 }: Pick<
   MyBookingsViewProps,
-  'bookings' | 'pendingId' | 'onCancel' | 'nextCursor'
+  'bookings' | 'pendingId' | 'onCancel' | 'onPaidCancel' | 'nextCursor'
 >) {
   const [filter, setFilter] = useState<TicketFilter>('upcoming');
   const active = FILTERS.find((item) => item.id === filter) ?? FILTERS[0];
@@ -55,6 +56,7 @@ export function BookingTicketList({
         bookings={visible}
         pendingId={pendingId}
         onCancel={onCancel}
+        onPaidCancel={onPaidCancel}
       />
     </>
   );
@@ -98,6 +100,7 @@ function TicketResults({
   bookings,
   pendingId,
   onCancel,
+  onPaidCancel,
 }: Omit<TicketListProps, 'nextCursor'>) {
   if (!bookings.length)
     return (
@@ -116,6 +119,7 @@ function TicketResults({
           booking={booking}
           pendingId={pendingId}
           onCancel={onCancel}
+          onPaidCancel={onPaidCancel}
         />
       ))}
     </div>

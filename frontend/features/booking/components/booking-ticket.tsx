@@ -11,11 +11,13 @@ import type { BookingRecord } from '../model/booking';
 import { ArenaIcon } from '../../../components/arena/arena-icon';
 import { ArenaDialog } from '../../../components/arena/arena-dialog';
 import { ArenaLocationButton } from '../../../components/arena/arena-location';
+import { CancelPaidBooking } from './cancel-paid-booking';
 
 type TicketProps = {
   booking: BookingRecord;
   pendingId: string;
   onCancel: (id: string) => void;
+  onPaidCancel: () => void;
 };
 
 function TicketDetails({ booking }: Pick<TicketProps, 'booking'>) {
@@ -166,6 +168,11 @@ export function BookingTicket(props: TicketProps) {
           </Link>
           <ArenaLocationButton />
           <CancelHold {...props} />
+          <CancelPaidBooking
+            booking={props.booking}
+            disabled={Boolean(props.pendingId)}
+            onDone={props.onPaidCancel}
+          />
         </div>
       </div>
       <TicketPass booking={props.booking} />

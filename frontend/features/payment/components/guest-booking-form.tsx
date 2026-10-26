@@ -8,6 +8,7 @@ import {
 } from '../../booking/model/booking-time';
 import { BookingDateTimeInput } from '../../booking/components/booking-schedule-picker';
 import { createGuestBooking, newIdempotencyKey } from '../api/payment-service';
+import { TransactionTerms } from '../../legal/components/transaction-terms';
 
 export interface GuestHoldCreated {
   bookingId: string;
@@ -23,7 +24,7 @@ export interface GuestHoldCreated {
 const TOKEN_STORAGE_KEY = 'guest-manage-token';
 
 /**
- * FE-PAY-04 — Form guest giữ sân 100% (MIG-11, MIG-17).
+ * FE-PAY-04 — Form guest giữ sân và đặt cọc 30%.
  * Token lưu sessionStorage theo tab; UI nêu rõ giới hạn: mất token phải
  * liên hệ quầy cấp lại (không có self-serve email). Không hardcode số tiền.
  */
@@ -42,6 +43,7 @@ export function GuestBookingForm({
   const [startsAt, setStartsAt] = useState('');
   const [endsAt, setEndsAt] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [termsAccepted, setTermsAccepted] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [created, setCreated] = useState<GuestHoldCreated | null>(null);
 
@@ -56,6 +58,10 @@ export function GuestBookingForm({
       !endsAt
     ) {
       setError('Vui lòng nhập đầy đủ họ tên, điện thoại, email và khung giờ.');
+      return;
+    }
+    if (!termsAccepted) {
+      setError('Vui lòng đọc và xác nhận đồng ý với Điều khoản dịch vụ và Chính sách hủy/hoàn tiền.');
       return;
     }
     setSubmitting(true);
@@ -93,7 +99,7 @@ export function GuestBookingForm({
 
   return (
     <section aria-label="Đặt sân cho khách vãng lai">
-      <h2>Đặt sân (khách vãng lai — thanh toán 100%)</h2>
+      <h2>Đặt sân (khách vãng lai — đặt cọc 30%)</h2>
       <form onSubmit={submit}>
         <p>
           <label>
@@ -147,17 +153,27 @@ export function GuestBookingForm({
           disabled={submitting}
         />
         {error && <p role="alert">{error}</p>}
+        <TransactionTerms
+          accepted={termsAccepted}
+          onAcceptanceChange={setTermsAccepted}
+          disabled={submitting}
+        />
         <p>
-          <button type="submit" disabled={submitting}>
-            {submitting ? 'Đang giữ chỗ…' : 'Giữ chỗ và thanh toán 100%'}
+          <button
+            type="submit"
+            disabled={submitting || !termsAccepted}
+            aria-label="Giữ chỗ và đặt cọc 30%"
+          >
+            {submitting ? 'Đang giữ chỗ…' : 'Giữ chỗ và đặt cọc 30%'}
           </button>
         </p>
       </form>
       {created && (
         <div role="status">
           <p>
-            Mã đơn <strong>{created.bookingCode}</strong> — số tiền{' '}
-            {formatVnd(created.prepaymentAmount)}.
+            Mã đơn <strong>{created.bookingCode}</strong> — tiền cọc 30%:{' '}
+            {formatVnd(created.prepaymentAmount)} (Tổng giá thuê sân:{' '}
+            {formatVnd(created.totalAmount)}).
           </p>
           <p>
             Mã truy cập đã lưu trong tab này. Nếu mất mã, liên hệ quầy để được

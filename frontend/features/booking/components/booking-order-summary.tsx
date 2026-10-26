@@ -10,6 +10,8 @@ import type {
   BookingServiceLine,
 } from '../model/booking';
 import { ArenaIcon } from '../../../components/arena/arena-icon';
+import { TransactionTerms } from '../../legal/components/transaction-terms';
+import { useState } from 'react';
 
 function CouponField() {
   return (
@@ -55,21 +57,30 @@ function HoldButton({ state, authenticated }: LiveBookingViewProps) {
       disabled={
         !authenticated || !state.quote?.available || Boolean(state.booking)
       }
+      aria-label="Giữ chỗ 5 phút & Thanh toán cọc 30%"
     >
-      {state.busy ? 'Đang xử lý…' : 'Đặt sân'}
+      {state.busy ? 'Đang giữ chỗ…' : 'Giữ chỗ 5 phút & Thanh toán cọc 30%'}
     </button>
   );
 }
 
 function BookingCheckout(props: LiveBookingViewProps) {
+  const [termsAccepted, setTermsAccepted] = useState(false);
+
   return (
     <form
       onSubmit={(event) => {
         event.preventDefault();
+        if (!termsAccepted) return;
         props.onCreate();
       }}
     >
-      <fieldset disabled={props.state.busy}>
+      <TransactionTerms
+        accepted={termsAccepted}
+        onAcceptanceChange={setTermsAccepted}
+        disabled={props.state.busy}
+      />
+      <fieldset disabled={props.state.busy || !termsAccepted}>
         <HoldButton {...props} />
       </fieldset>
       {props.showSignIn && (
@@ -144,31 +155,53 @@ function OrderExtras({
 
 function OrderCourtPrice({ state }: Pick<LiveBookingViewProps, 'state'>) {
   const price = state.booking ?? state.quote;
+  const courtTotal = price
+    ? price.priceItems.reduce((sum, item) => sum + item.amount, 0)
+    : undefined;
+  const deposit =
+    courtTotal !== undefined
+      ? Math.floor((courtTotal * 30 + 50) / 100)
+      : undefined;
+  const remaining =
+    courtTotal !== undefined && deposit !== undefined
+      ? courtTotal - deposit
+      : undefined;
+
   return (
-    <div className="order-section order-price-row">
-      <span>Tiền sân</span>
-      <strong>
-        {price
-          ? formatVnd(
-              price.priceItems.reduce((sum, item) => sum + item.amount, 0),
-            )
-          : '—'}
-      </strong>
+    <div className="order-section">
+      <div className="order-price-row">
+        <span>Tiền thuê sân</span>
+        <strong>{courtTotal !== undefined ? formatVnd(courtTotal) : '—'}</strong>
+      </div>
+      <div className="order-price-row" style={{ color: 'var(--accent-volt, #a3e635)', fontWeight: 600 }}>
+        <span>Đặt cọc bắt buộc (30%)</span>
+        <strong>{deposit !== undefined ? formatVnd(deposit) : '—'}</strong>
+      </div>
+      <div className="order-price-row" style={{ color: 'var(--text-secondary, #94a3b8)', fontSize: '0.875rem' }}>
+        <span>Còn lại tại sân (70%)</span>
+        <strong>{remaining !== undefined ? formatVnd(remaining) : '—'}</strong>
+      </div>
     </div>
   );
 }
 
 function OrderTotal({ state }: Pick<LiveBookingViewProps, 'state'>) {
-  const total =
-    state.booking?.totalAmount ??
-    (state.quote?.available ? state.quote.totalAmount : undefined);
+  const price = state.booking ?? state.quote;
+  const courtTotal = price
+    ? price.priceItems.reduce((sum, item) => sum + item.amount, 0)
+    : undefined;
+  const requiredDeposit =
+    state.booking
+      ? Number(state.booking.requiredPrepaymentAmount ?? (courtTotal !== undefined ? Math.floor((courtTotal * 30 + 50) / 100) : 0))
+      : (courtTotal !== undefined ? Math.floor((courtTotal * 30 + 50) / 100) : undefined);
+
   return (
     <>
       <div className="order-total" aria-live="polite">
-        <span>Tổng tiền thanh toán</span>
-        <strong>{total === undefined ? '—' : formatVnd(total)}</strong>
+        <span>Tiền cọc cần thanh toán (30%)</span>
+        <strong>{requiredDeposit === undefined ? '—' : formatVnd(requiredDeposit)}</strong>
       </div>
-      {total === undefined && (
+      {requiredDeposit === undefined && (
         <p className="detail-muted">
           Kiểm tra lại giá sau khi đổi lịch hoặc dịch vụ.
         </p>

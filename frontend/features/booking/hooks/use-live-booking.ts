@@ -30,6 +30,7 @@ interface BookingContext {
   request: RequestKeyState & { locked: boolean; mounted: boolean };
   courtId: string;
   timezone: string;
+  prepaymentPercent: 30 | 100;
   accountId?: string;
 }
 type BookingAction = 'quote' | 'create';
@@ -57,6 +58,7 @@ async function executeBooking(context: BookingContext, action: BookingAction) {
       timezone: context.timezone,
       window: context.state.window,
       services: context.state.services,
+      prepaymentPercent: context.prepaymentPercent,
     },
     context.request,
   );
@@ -110,6 +112,7 @@ export function useLiveBooking(
   courtId: string,
   timezone: string,
   accountId?: string,
+  prepaymentPercent: 30 | 100 = 30,
 ) {
   const [state, update] = useState<InternalState>(() => ({
     services: [],
@@ -126,6 +129,7 @@ export function useLiveBooking(
     request: request.current,
     courtId,
     timezone,
+    prepaymentPercent,
     accountId,
   };
   return {

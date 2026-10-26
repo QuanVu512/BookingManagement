@@ -38,6 +38,7 @@ export function MyBookingsPanel({
       }
       onReload={(cursor) => void feed.reload(cursor)}
       onCancel={(id) => void feed.cancel(id)}
+      onPaidCancel={() => void feed.reload()}
       onSignIn={signIn}
     />
   );

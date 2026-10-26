@@ -12,6 +12,7 @@ export interface RequestKeyState {
 
 export interface RequestIdentityInput {
   services?: ServiceSelection[];
+  prepaymentPercent?: 30 | 100;
   accountId?: string;
   courtId: string;
   timezone: string;
@@ -24,13 +25,21 @@ export function requestFingerprint({
   timezone,
   window,
   services,
+  prepaymentPercent,
 }: RequestIdentityInput) {
   const startsAt = localInputToIso(window.start, timezone);
   const endsAt = localInputToIso(window.end, timezone);
   const selection = [...(services ?? [])]
     .sort((left, right) => left.productId.localeCompare(right.productId))
     .map(({ productId, quantity }) => [productId, quantity]);
-  return JSON.stringify([accountId, courtId, startsAt, endsAt, selection]);
+  return JSON.stringify([
+    accountId,
+    courtId,
+    startsAt,
+    endsAt,
+    selection,
+    prepaymentPercent ?? 30,
+  ]);
 }
 
 export function bookingRequestInput(
@@ -49,6 +58,7 @@ export function bookingRequestInput(
     courtId: identity.courtId,
     startsAt,
     endsAt,
+    prepaymentPercent: identity.prepaymentPercent ?? 30,
     idempotencyKey: request.key,
     ...(identity.services?.length ? { services: identity.services } : {}),
   };
