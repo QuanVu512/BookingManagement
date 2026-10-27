@@ -15,7 +15,7 @@ const dom = new JSDOM('<!DOCTYPE html><html><body></body></html>', {
 });
 
 (dom.window as any).requestIdleCallback =
-  (dom.window as any).requestIdleCallback || ((cb: any) => setTimeout(cb, 1));
+  (dom.window as any).requestIdleCallback || ((cb: () => void) => setTimeout(() => cb(), 1));
 (dom.window as any).cancelIdleCallback =
   (dom.window as any).cancelIdleCallback || ((id: any) => clearTimeout(id));
 

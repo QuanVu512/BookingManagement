@@ -116,7 +116,7 @@ describe('CancelPaidBooking (C08)', () => {
       calls.push(url);
       if (url.endsWith('/api/auth/csrf'))
         return new Response(
-          JSON.stringify({ success: true, data: { token: 'a'.repeat(64) } }),
+          JSON.stringify({ token: 'a'.repeat(64) }),
         );
       if (url.endsWith('/cancel-quote'))
         return new Response(JSON.stringify(quote));

@@ -42,7 +42,7 @@ export class FilePolicyCatalog implements PolicyCatalogReader, ComplianceConfigR
         }
       }
       throw new Error('Manifest not found in candidate paths');
-    } catch (error) {
+    } catch {
       throw new ServiceUnavailableException({
         code: 'LEGAL_CONFIGURATION_UNAVAILABLE',
         message: 'Không thể nạp manifest chính sách pháp lý.',

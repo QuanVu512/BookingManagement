@@ -88,6 +88,7 @@ describe('RF-06A account navigation and read-only views', () => {
     expect(items).toEqual([
       { text: 'Thông tin cá nhân', href: '/account' },
       { text: 'Bảo mật tài khoản', href: '/account/security' },
+      { text: 'Quyền riêng tư & Dữ liệu', href: '/account/privacy' },
       { text: 'Lịch sử đặt sân', href: '/bookings' },
       { text: 'Hóa đơn & thanh toán', href: '/bookings?tab=payments' },
       { text: 'Đăng xuất', href: null },

@@ -4,7 +4,6 @@ import {
   CONSENT_VALIDITY_DAYS,
   CURRENT_CONSENT_SCHEMA_VERSION,
   CURRENT_COOKIE_POLICY_VERSION,
-  DEFAULT_PREFERENCES,
 } from '../model/consent';
 
 export function readStoredPreferences(): CookiePreferences | null {

@@ -59,7 +59,7 @@ function HoldButton({ state, authenticated }: LiveBookingViewProps) {
       }
       aria-label="Giữ chỗ 5 phút & Thanh toán cọc 30%"
     >
-      {state.busy ? 'Đang giữ chỗ…' : 'Giữ chỗ 5 phút & Thanh toán cọc 30%'}
+      {state.busy ? 'Đang giữ chỗ…' : 'Đặt sân'}
     </button>
   );
 }
@@ -186,22 +186,30 @@ function OrderCourtPrice({ state }: Pick<LiveBookingViewProps, 'state'>) {
 }
 
 function OrderTotal({ state }: Pick<LiveBookingViewProps, 'state'>) {
-  const price = state.booking ?? state.quote;
-  const courtTotal = price
-    ? price.priceItems.reduce((sum, item) => sum + item.amount, 0)
-    : undefined;
+  const total =
+    state.booking?.totalAmount ??
+    (state.quote?.available ? state.quote.totalAmount : undefined);
   const requiredDeposit =
     state.booking
-      ? Number(state.booking.requiredPrepaymentAmount ?? (courtTotal !== undefined ? Math.floor((courtTotal * 30 + 50) / 100) : 0))
-      : (courtTotal !== undefined ? Math.floor((courtTotal * 30 + 50) / 100) : undefined);
+      ? Number(
+          state.booking.requiredPrepaymentAmount ??
+            (total !== undefined ? Math.floor((total * 30 + 50) / 100) : 0),
+        )
+      : total !== undefined
+        ? Math.floor((total * 30 + 50) / 100)
+        : undefined;
 
   return (
     <>
       <div className="order-total" aria-live="polite">
+        <span>Tổng tiền thanh toán</span>
+        <strong>{total === undefined ? '—' : formatVnd(total)}</strong>
+      </div>
+      <div className="order-price-row" style={{ color: 'var(--accent-volt, #a3e635)', fontWeight: 600 }}>
         <span>Tiền cọc cần thanh toán (30%)</span>
         <strong>{requiredDeposit === undefined ? '—' : formatVnd(requiredDeposit)}</strong>
       </div>
-      {requiredDeposit === undefined && (
+      {total === undefined && (
         <p className="detail-muted">
           Kiểm tra lại giá sau khi đổi lịch hoặc dịch vụ.
         </p>

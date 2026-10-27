@@ -53,6 +53,49 @@ Repo có 22 Prisma models, migration SQL, booking MVP và nền tảng backend/f
 
 Auth có thu hồi JWT, CSRF, xác minh email và recovery; xem contract và giới hạn tại [SECURITY](docs/SECURITY.md). Không có refresh rotation. Test trên storage riêng không chứng minh DB ứng dụng, SMTP provider hoặc production đã được nghiệm thu.
 
+## Tiến độ Admin Court (Checkpoint phát triển)
+
+Module Admin Court hiện đang ở trạng thái **PARTIAL (Lưu tiến độ ổn định)**:
+
+### 1. Chức năng đã hoàn thành:
+- **Cơ sở dữ liệu & Constraint:** Bảng `courts` (hỗ trợ `status` ACTIVE/INACTIVE, `courtType` STANDARD/VIP, `cleanupMinutes`), bảng `price_rules` (định nghĩa bảng giá theo ngày trong tuần và khung giờ), bảng `court_occupancies` (hỗ trợ cả hai loại occupancy: `kind = BOOKING` và `kind = BLOCK` cho lịch bảo trì/sự kiện). Khóa loại trừ PostgreSQL exclusion constraint `court_occupancies_no_active_overlap` ngăn chặn triệt để xung đột chồng lấn giờ sân giữa booking và bảo trì.
+- **Phân quyền (RBAC):** Enum vai trò `Role` (`CUSTOMER`, `STAFF`, `MANAGER`, `ADMIN`), các decorator `@Roles()` và guard `RolesGuard`, `JwtAuthGuard`, `AuthCsrfGuard` bảo vệ các endpoint quản trị.
+- **Tính toán bảng giá cốt lõi:** Pure domain service `court-pricing.ts` tính toán giá chính xác với BigInt HALF_UP, không làm sai lệch giá đã chốt của booking.
+- **API truy xuất danh mục sân:** `GET /api/courts` và `GET /api/courts/:id` theo Clean Architecture (use case, presenter, reader adapter).
+- **Nghiệp vụ vận hành Staff/Admin:** `POST /api/staff/bookings/:id/late-cancel` cho phép hủy muộn có kiểm soát cọc và hoàn tiền, các endpoint tra cứu hoàn tiền cho Staff/Manager.
+- **Frontend Dashboard:** Trang `/dashboard` tích hợp Role Guard (chỉ cho phép `ADMIN`, `MANAGER`, `STAFF`), theme toggle, hiển thị thông tin phiên đăng nhập và định danh vai trò.
+
+### 2. Chức năng chưa hoàn thành & Giới hạn hiện tại:
+- **Admin Mutation APIs:** Chưa có endpoint thêm sân (`POST /api/admin/courts`), cập nhật sân/trạng thái (`PATCH /api/admin/courts/:id`), tạo/cập nhật bảng giá (`PriceRule`), hoặc tạo/giải phóng block bảo trì thủ công (`CourtOccupancy` loại `BLOCK`).
+- **Admin Portal UI:** Bảng điều khiển `/dashboard` hiện tại vẫn mang nhãn DEMO đối với các số liệu thống kê và danh sách đặt chỗ mẫu; chưa có màn hình Master Timeline Grid tương tác kéo/thả hay form thêm/sửa sân và lịch bảo trì thực tế.
+
+### 3. Trạng thái kiểm thử:
+- **Tests thực sự PASS:**
+  - 410 backend unit tests PASS (4 skip baseline).
+  - 210 frontend tests PASS (đã đồng bộ các kịch bản rendering, contract và cookie consent).
+  - 100 HTTP contract tests (`test:auth:contract`): 17 backend + 83 frontend.
+  - 31 HTTP auth security tests (`test:auth:security`).
+  - 28 frontend auth rendering tests (`test:auth:ui`).
+  - 85 auth phone normalization parity tests (78 pass, 7 skip) (`test:auth:phones`).
+  - 1 Nest ESM throttler runtime test (`test:backend:runtime`).
+  - Oxlint: 0 errors, 0 warnings trên toàn bộ codebase.
+  - Focused source security check: 546 files, 0 findings.
+  - Build hoàn tất: `nest build` và `next build` (với HTTPS API URL) thành công.
+- **Tests chờ môi trường (BLOCKED / REQUIRE_STORAGE ở local nếu chưa bật service):**
+  - Các suite tích hợp cần container database/redis riêng (`test:auth:storage`, `test:booking:integration`, `test:booking:deposit:integration`) được cấu hình tự động chạy trên GitHub Actions CI với disposable PostgreSQL 16 & Redis 7 services.
+
+### 4. Cách chạy và kiểm tra Admin Court:
+```powershell
+# 1. Khởi động backend API
+npm run start:dev
+
+# 2. Khởi động frontend Web (terminal riêng)
+npm run web:dev
+
+# 3. Đăng nhập tài khoản STAFF hoặc ADMIN và truy cập:
+# http://localhost:4001/dashboard
+```
+
 ## Kiểm tra
 
 ```powershell

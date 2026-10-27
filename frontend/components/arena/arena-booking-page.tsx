@@ -16,7 +16,7 @@ import { ArenaLoadStatus } from './arena-load-status';
 export function ArenaBookingPage() {
   const catalog = useCourtCatalog();
   const [selectedId, setSelectedId] = useState('');
-  const prepaymentPercent: 30 = 30;
+  const prepaymentPercent = 30 as const;
   const [guestHold, setGuestHold] = useState<GuestHoldCreated | null>(null);
   const court =
     catalog.courts.find((item) => item.id === selectedId) ?? catalog.courts[0];
