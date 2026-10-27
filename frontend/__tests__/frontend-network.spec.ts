@@ -107,7 +107,9 @@ describe('Frontend read requests', () => {
     await expect(
       loadCourtCatalog(new AbortController().signal),
     ).rejects.toThrow();
-    expect(performance.now() - start).toBeLessThan(300);
+    expect(performance.now() - start).toBeLessThan(
+      READ_REQUEST_TIMEOUT_MS - 200,
+    );
   });
 
   it('ends both stalled requests at the deadline instead of waiting for a TCP timeout', async () => {

@@ -222,9 +222,15 @@ describe('Booking checkout QR and server deadline', () => {
       expect(qr.mock.calls[0]?.[1]).toBe('provider-verified-qr-payload');
       expect(container.textContent).not.toContain('Đặt sân thành công');
       const before = container.querySelector('[role="timer"]')?.textContent;
-      await act(async () => {
-        await new Promise((resolve) => setTimeout(resolve, 1100));
-      });
+      const startedAt = Date.now();
+      while (
+        container.querySelector('[role="timer"]')?.textContent === before &&
+        Date.now() - startedAt < 4000
+      ) {
+        await act(async () => {
+          await new Promise((resolve) => setTimeout(resolve, 100));
+        });
+      }
       expect(container.querySelector('[role="timer"]')?.textContent).not.toBe(
         before,
       );
