@@ -25,6 +25,8 @@ export default {
           isolatedModules: true,
           strict: true,
           skipLibCheck: true,
+          sourceMap: true,
+          inlineSourceMap: true,
         },
       },
     ],

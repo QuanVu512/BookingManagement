@@ -9,6 +9,7 @@ const dom = new JSDOM('<div id="app"></div>', {
 });
 for (const [name, value] of Object.entries({
   window: dom.window,
+  self: dom.window,
   document: dom.window.document,
   navigator: dom.window.navigator,
   IS_REACT_ACT_ENVIRONMENT: true,
@@ -27,13 +28,13 @@ function render(element: React.ReactElement) {
 }
 
 describe('GuestBookingForm (FE-PAY-04, MIG-11/MIG-17)', () => {
-  it('renders 100%-only guest copy and validates required fields', () => {
+  it('renders 30% deposit guest copy and validates required fields', () => {
     const onCreated = jest.fn();
     const { container, root } = render(
       <GuestBookingForm courtId="court-1" onCreated={onCreated} />,
     );
     expect(container.textContent).toContain('khách vãng lai');
-    expect(container.textContent).toContain('100%');
+    expect(container.textContent).toContain('30%');
     expect(container.textContent).not.toContain('45.000');
     const form = container.querySelector('form');
     expect(form).not.toBeNull();

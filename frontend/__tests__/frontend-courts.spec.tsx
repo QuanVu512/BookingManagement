@@ -15,6 +15,7 @@ const dom = new JSDOM('<div id="app"></div>', {
 });
 for (const [name, value] of Object.entries({
   window: dom.window,
+  self: dom.window,
   document: dom.window.document,
   navigator: dom.window.navigator,
   IS_REACT_ACT_ENVIRONMENT: true,

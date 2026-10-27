@@ -1,7 +1,7 @@
 'use client';
 
-import React from 'react';
-import { useCookiePreferences } from '../../cookie-consent/hooks/use-cookie-preferences';
+import React, { useContext } from 'react';
+import { CookiePreferencesContext } from '../../cookie-consent/hooks/use-cookie-preferences';
 
 interface CookiePreferencesTriggerProps {
   className?: string;
@@ -12,7 +12,8 @@ export const CookiePreferencesTrigger: React.FC<CookiePreferencesTriggerProps> =
   className,
   variant = 'link',
 }) => {
-  const { openPreferencesDialog } = useCookiePreferences();
+  const context = useContext(CookiePreferencesContext);
+  const openPreferencesDialog = context?.openPreferencesDialog ?? (() => {});
 
   if (variant === 'button') {
     return (
