@@ -1,4 +1,4 @@
-import { describe, expect, it } from '@jest/globals';
+import { afterEach, describe, expect, it } from '@jest/globals';
 import { JSDOM } from 'jsdom';
 import { act } from 'react';
 import { SportyFooter } from '../components/home/sporty-footer.js';
@@ -8,7 +8,8 @@ const dom = new JSDOM('<!DOCTYPE html><html><body></body></html>', {
 });
 
 (dom.window as any).requestIdleCallback =
-  (dom.window as any).requestIdleCallback || ((cb: () => void) => setTimeout(() => cb(), 1));
+  (dom.window as any).requestIdleCallback ||
+  ((cb: () => void) => setTimeout(() => cb(), 1));
 (dom.window as any).cancelIdleCallback =
   (dom.window as any).cancelIdleCallback || ((id: any) => clearTimeout(id));
 
@@ -28,11 +29,19 @@ for (const [name, value] of Object.entries({
 
 const { createRoot } = await import('react-dom/client');
 
+let mountedRoot: ReturnType<typeof createRoot> | undefined;
+afterEach(() => {
+  act(() => mountedRoot?.unmount());
+  mountedRoot = undefined;
+  dom.window.document.body.replaceChildren();
+});
+
 describe('SportyFooter Layout & Columns', () => {
   it('render đúng cấu trúc hàng cột, mỗi cột tối đa 3 hàng', () => {
     const container = dom.window.document.createElement('div');
     dom.window.document.body.appendChild(container);
     const root = createRoot(container);
+    mountedRoot = root;
 
     act(() => {
       root.render(<SportyFooter />);
