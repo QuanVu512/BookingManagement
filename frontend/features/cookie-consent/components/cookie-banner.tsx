@@ -23,7 +23,7 @@ export const CookieBanner: React.FC = () => {
         <div className={styles.bannerText}>
           <div className={styles.bannerTitle}>Chúng tôi tôn trọng quyền riêng tư của bạn</div>
           <p style={{ margin: 0 }}>
-            BookingManagement sử dụng các cookie thiết yếu để đảm bảo chức năng đăng nhập, bảo mật và đặt giữ chỗ sân thể thao. Bạn có thể lựa chọn cho phép hoặc từ chối các cookie tùy chọn theo{' '}
+            SMASH ARENA PICKLEBALL sử dụng các cookie thiết yếu để đảm bảo chức năng đăng nhập, bảo mật và đặt giữ chỗ sân pickleball. Bạn có thể lựa chọn cho phép hoặc từ chối các cookie tùy chọn theo{' '}
             <Link
               href="/cookies"
               style={{ color: 'var(--accent-volt, #a3e635)', textDecoration: 'underline' }}

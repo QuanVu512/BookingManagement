@@ -2,7 +2,7 @@
   "kind": "privacy",
   "version": "v1.0",
   "title": "Chính sách quyền riêng tư và bảo vệ dữ liệu cá nhân",
-  "description": "Mô tả minh bạch các hoạt động thu thập, xử lý, lưu trữ và bảo vệ dữ liệu cá nhân trên nền tảng BookingManagement.",
+  "description": "Mô tả minh bạch các hoạt động thu thập, xử lý, lưu trữ và bảo vệ dữ liệu cá nhân trên nền tảng SMASH ARENA PICKLEBALL.",
   "effectiveAt": "2026-10-26T00:00:00.000Z",
   "updatedAt": "2026-10-26T00:00:00.000Z",
   "locale": "vi",
@@ -12,7 +12,7 @@
     {
       "id": "intro",
       "title": "1. Giới thiệu và cam kết",
-      "content": "BookingManagement cam kết tôn trọng quyền riêng tư và bảo vệ dữ liệu cá nhân của người dùng tuân thủ đầy đủ quy định pháp luật Việt Nam hiện hành, bao gồm Luật Bảo vệ dữ liệu cá nhân số 91/2025/QH15 (có hiệu lực từ ngày 01/01/2026), Nghị định 356/2025/NĐ-CP (Điều 42 thay thế Nghị định 13/2023/NĐ-CP), Luật Thương mại điện tử số 122/2025/QH15 và Luật Bảo vệ quyền lợi người tiêu dùng số 19/2023/QH15. Chính sách này giải thích rõ ràng các loại thông tin chúng tôi thu thập, mục đích sử dụng, thời gian lưu trữ và quyền của bạn đối với dữ liệu của mình."
+      "content": "SMASH ARENA PICKLEBALL cam kết tôn trọng quyền riêng tư và bảo vệ dữ liệu cá nhân của người dùng tuân thủ đầy đủ quy định pháp luật Việt Nam hiện hành, bao gồm Luật Bảo vệ dữ liệu cá nhân số 91/2025/QH15 (có hiệu lực từ ngày 01/01/2026), Nghị định 356/2025/NĐ-CP (Điều 42 thay thế Nghị định 13/2023/NĐ-CP), Luật Thương mại điện tử số 122/2025/QH15 và Luật Bảo vệ quyền lợi người tiêu dùng số 19/2023/QH15. Chính sách này giải thích rõ ràng các loại thông tin chúng tôi thu thập, mục đích sử dụng, thời gian lưu trữ và quyền của bạn đối với dữ liệu của mình."
     },
     {
       "id": "data-collected",
@@ -49,7 +49,7 @@
     {
       "id": "retention",
       "title": "4. Thời hạn lưu trữ và bảo vệ dữ liệu",
-      "content": "Dữ liệu hồ sơ đặt sân và chứng từ thanh toán được lưu trữ theo quy định pháp luật về kế toán và giải quyết tranh chấp. Dữ liệu phiên tạm thời (như mã OTP xác thực, token giữ chỗ 5 phút) sẽ tự động hết hạn và bị vô hiệu hóa sau thời hạn quy định. Khi tài khoản yêu cầu đóng, hệ thống sẽ chuyển sang trạng thái ngưng hoạt động (CLOSED) và áp dụng quy trình rà soát bảo lưu pháp lý thay vì xóa cứng làm hỏng lịch sử tài chính."
+      "content": "Dữ liệu hồ sơ đặt sân và chứng từ thanh toán được lưu trữ theo quy định pháp luật về kế toán và giải quyết tranh chấp. Dữ liệu phiên tạm thời (như mã OTP xác thực, token giữ chỗ 5 phút) sẽ tự động hết hạn và bị vô hiệu hóa sau thời hạn quy định. Khi nhận yêu cầu đóng tài khoản, hệ thống chuyển tài khoản sang trạng thái ngưng hoạt động (CLOSED) và thực hiện lưu trữ hồ sơ bảo lưu chứng từ theo đúng quy định pháp luật về kế toán và thương mại điện tử."
     },
     {
       "id": "sharing",
@@ -64,7 +64,7 @@
     {
       "id": "contact",
       "title": "7. Thông tin liên hệ phụ trách bảo vệ dữ liệu",
-      "content": "Mọi yêu cầu hoặc thắc mắc về quyền riêng tư, vui lòng gửi qua mục Hỗ trợ trực tuyến hoặc liên hệ Bộ phận Bảo vệ dữ liệu cá nhân của BookingManagement tại kênh tiếp nhận chính thức."
+      "content": "Mọi yêu cầu hoặc thắc mắc về quyền riêng tư, vui lòng gửi qua mục Hỗ trợ trực tuyến hoặc liên hệ Bộ phận Bảo vệ dữ liệu cá nhân của SMASH ARENA tại kênh tiếp nhận chính thức."
     }
   ]
 }

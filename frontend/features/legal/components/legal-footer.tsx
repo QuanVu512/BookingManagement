@@ -21,7 +21,7 @@ export const LegalFooter: React.FC<LegalFooterProps> = ({
       <footer id={id} className={`${styles.footer} ${styles.footerCompact} ${className || ''}`} aria-label="Chân trang pháp lý">
         <div className={styles.container}>
           <div className={styles.bottomSection}>
-            <div>© {currentYear} BookingManagement. Bảo lưu mọi quyền.</div>
+            <div>© {currentYear} SMASH ARENA PICKLEBALL. Bảo lưu mọi quyền.</div>
             <nav className={styles.compactLinks} aria-label="Liên kết pháp lý rút gọn">
               <Link href="/privacy">Quyền riêng tư</Link>
               <Link href="/terms">Điều khoản</Link>
@@ -40,9 +40,9 @@ export const LegalFooter: React.FC<LegalFooterProps> = ({
       <div className={styles.container}>
         <div className={styles.topSection}>
           <div className={styles.brandCol}>
-            <div className={styles.brandName}>BookingManagement Sports Arena</div>
+            <div className={styles.brandName}>SMASH ARENA PICKLEBALL</div>
             <p className={styles.brandDesc}>
-              Hệ thống đặt sân thể thao, quản lý lịch thi đấu và dịch vụ đặt giữ chỗ trực tuyến tiện lợi, an toàn và minh bạch.
+              Hệ thống đặt sân Pickleball & quản lý lịch thi đấu thể thao trực tuyến SMASH ARENA tiện lợi, an toàn và minh bạch.
             </p>
           </div>
 
@@ -97,7 +97,7 @@ export const LegalFooter: React.FC<LegalFooterProps> = ({
 
         <div className={styles.bottomSection}>
           <div>
-            © {currentYear} BookingManagement. Nền tảng đặt sân thể thao trực tuyến.
+            © {currentYear} SMASH ARENA. Sân đấu & đặt lịch Pickleball trực tuyến.
           </div>
           <div className={styles.compactLinks}>
             <span>Tuân thủ quy định bảo vệ dữ liệu cá nhân (Nghị định 13/2023/NĐ-CP)</span>

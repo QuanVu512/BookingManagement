@@ -16,7 +16,7 @@
     },
     {
       "id": "categories",
-      "title": "2. Phân loại cookie trên hệ thống BookingManagement",
+      "title": "2. Phân loại cookie trên hệ thống SMASH ARENA PICKLEBALL",
       "content": "Chúng tôi phân định rõ ràng các nhóm công nghệ lưu trữ theo mục đích cụ thể:",
       "subsections": [
         {
@@ -32,12 +32,12 @@
         {
           "id": "analytics",
           "title": "2.3. Thống kê phân tích (Analytics) - Tùy chọn",
-          "content": "Giúp chúng tôi hiểu rõ hơn về lưu lượng truy cập và cải thiện hiệu năng ứng dụng. Hiện tại, hệ thống BookingManagement KHÔNG tích hợp các trình theo dõi phân tích của bên thứ ba (như Google Analytics). Nếu trong tương lai có triển khai, nhóm này sẽ luôn mặc định TẮT và chỉ được kích hoạt sau khi bạn đồng ý."
+          "content": "Cookie phân tích hỗ trợ theo dõi hiệu năng hệ thống và nâng cao trải nghiệm sử dụng trên nền tảng. Nhóm cookie này luôn mặc định ở trạng thái TẮT và chỉ hoạt động khi nhận được sự đồng ý từ bạn."
         },
         {
           "id": "marketing",
           "title": "2.4. Quảng cáo và Tiếp thị (Marketing) - Tùy chọn",
-          "content": "Dùng để theo dõi hành vi qua các trang web nhằm hiển thị quảng cáo phù hợp. Hệ thống BookingManagement KHÔNG sử dụng cookie tiếp thị hoặc pixel mạng xã hội (như Meta Pixel, TikTok Pixel). Nhóm này luôn mặc định TẮT."
+          "content": "Cookie quảng cáo và tiếp thị phục vụ hiển thị nội dung phù hợp với nhu cầu của người dùng. Nhóm cookie này luôn mặc định ở trạng thái TẮT và chỉ kích hoạt khi có sự chấp thuận từ bạn."
         }
       ]
     },
@@ -49,7 +49,7 @@
     {
       "id": "browser-controls",
       "title": "4. Cài đặt trực tiếp trên trình duyệt",
-      "content": "Ngoài giao diện tùy chọn trên website, bạn cũng có thể chặn hoặc xóa cookie thông qua phần cài đặt bảo mật của trình duyệt web (Chrome, Edge, Firefox, Safari). Tuy nhiên, việc chặn toàn bộ cookie (bao gồm cookie thiết yếu) có thể khiến bạn không thể đăng nhập hoặc thanh toán đặt sân."
+      "content": "Bạn có thể tùy chỉnh chặn hoặc xóa cookie thông qua phần cài đặt bảo mật của trình duyệt web (Chrome, Edge, Firefox, Safari). Cookie thiết yếu cần được duy trì để đảm bảo quy trình đăng nhập và giao dịch đặt sân diễn ra an toàn, chính xác."
     }
   ]
 }

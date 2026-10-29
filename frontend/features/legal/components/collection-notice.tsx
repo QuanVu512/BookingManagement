@@ -21,7 +21,7 @@ export const CollectionNotice: React.FC<CollectionNoticeProps> = ({
       <Link href="/terms" className={styles.noticeLink} target="_blank" rel="noopener noreferrer">
         Điều khoản dịch vụ
       </Link>
-      <span> của BookingManagement.</span>
+      <span> của SMASH ARENA PICKLEBALL.</span>
     </div>
   );
 };

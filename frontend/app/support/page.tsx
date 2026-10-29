@@ -4,8 +4,8 @@ import { SupportCaseForm } from '../../features/support/components/support-case-
 import { SupportCaseStatusLookup } from '../../features/support/components/support-case-status';
 
 export const metadata: Metadata = {
-  title: 'Trung tâm Hỗ trợ & Tiếp nhận Khiếu nại | BookingManagement',
-  description: 'Cổng hỗ trợ khách hàng, tiếp nhận phản ánh dịch vụ, khiếu nại thanh toán và giải quyết tranh chấp.',
+  title: 'Trung tâm Hỗ trợ & Tiếp nhận Khiếu nại | SMASH ARENA PICKLEBALL',
+  description: 'Cổng hỗ trợ khách hàng, tiếp nhận phản ánh dịch vụ sân pickleball, khiếu nại thanh toán và giải quyết tranh chấp.',
 };
 
 export default function SupportPage() {
@@ -16,7 +16,7 @@ export default function SupportPage() {
           Trung tâm Hỗ trợ & Giải quyết Khiếu nại
         </h1>
         <p style={{ color: 'var(--text-secondary, #94a3b8)', lineHeight: 1.6, marginBottom: '2rem' }}>
-          BookingManagement cam kết lắng nghe và giải quyết nhanh chóng mọi phản hồi của người dùng về dịch vụ sân thể thao, giao dịch thanh toán hoặc chính sách hoàn tiền.
+          SMASH ARENA PICKLEBALL cam kết lắng nghe và giải quyết nhanh chóng mọi phản hồi của người dùng về dịch vụ sân thể thao, giao dịch thanh toán hoặc chính sách hoàn tiền.
         </p>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '2.5rem' }}>

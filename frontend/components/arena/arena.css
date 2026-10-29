@@ -66,9 +66,25 @@
   cursor: not-allowed;
   opacity: 0.45;
 }
-.arena-shell :is(main, footer) {
+.arena-shell :is(main) {
   position: relative;
   z-index: 1;
+}
+.arena-shell :is(footer),
+.arena-footer {
+  position: relative;
+  z-index: 1;
+}
+.arena-shell :is(.arena-modal-backdrop, .arena-guest-modal-backdrop, .arena-qr-backdrop, .arena-modal-overlay) {
+  position: fixed;
+  inset: 0;
+  z-index: 99999 !important;
+}
+.arena-shell:has(.arena-modal-backdrop),
+.arena-shell:has(.arena-guest-modal-backdrop),
+.arena-shell:has(.arena-qr-backdrop),
+.arena-shell:has(.arena-modal-overlay) {
+  z-index: 10000;
 }
 .arena-background {
   position: fixed;
@@ -743,15 +759,26 @@
   margin-top: 64px;
   position: relative;
   z-index: 1;
-  border-top: 1px solid rgb(255 255 255 / 5%);
-  background: rgba(11, 18, 32, 0.95);
-  padding-block: 40px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(11, 18, 32, 0.98);
+  padding-block: 56px 36px;
 }
 .arena-footer > div {
   display: flex;
-  align-items: center;
+  flex-direction: column;
+  gap: 36px;
+}
+.arena-footer-main {
+  display: flex;
   justify-content: space-between;
-  gap: 24px;
+  align-items: flex-start;
+  gap: 48px;
+}
+.arena-footer-brand-col {
+  max-width: 320px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 .arena-footer-brand {
   display: flex;
@@ -759,47 +786,107 @@
   gap: 12px;
 }
 .arena-footer .arena-logo {
-  height: 32px;
-  width: 32px;
-  border-radius: 8px;
+  height: 36px;
+  width: 36px;
+  border-radius: 10px;
   box-shadow: none;
 }
 .arena-footer strong {
-  font-size: 14px;
+  font-size: 16px;
   font-weight: 800;
   color: white;
+  letter-spacing: 0.02em;
 }
 .arena-footer small {
   display: block;
   color: #94a3b8;
-  font-size: 11px;
+  font-size: 13px;
+  line-height: 1.5;
 }
-.arena-footer nav {
+.arena-footer-brand-desc {
+  font-size: 13px;
+  line-height: 1.6;
+  color: #64748b;
+  margin: 0;
+}
+.arena-footer-nav-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(130px, 1fr));
+  gap: 32px;
+  flex: 1;
+  max-width: 780px;
+}
+.arena-footer-col {
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
+  gap: 12px;
+}
+.arena-footer-col-title {
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #e2e8f0;
+  margin: 0;
+}
+.arena-footer-col-links {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.arena-footer-col-links li {
+  display: flex;
   align-items: center;
-  gap: 24px;
 }
-.arena-footer nav > a {
+.arena-footer-col-links a {
   color: #94a3b8;
-  font-size: 12px;
+  font-size: 14px;
+  line-height: 1.5;
   text-decoration: none;
-  transition: color 0.2s;
+  transition: color 0.2s ease;
 }
-.arena-footer nav > a:hover {
+.arena-footer-col-links a:hover {
   color: #10e760;
 }
-.arena-footer nav .arena-button {
+.arena-footer-col-links .arena-location-trigger,
+.arena-footer-col-links button {
   background: none;
   padding: 0;
   border: 0;
-  font-size: 12px;
+  font-size: 14px;
+  font-family: inherit;
   font-weight: 400;
-}
-.arena-footer p {
-  font-size: 11px;
-  text-align: right;
   color: #94a3b8;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+.arena-footer-col-links .arena-location-trigger:hover,
+.arena-footer-col-links button:hover {
+  color: #10e760;
+}
+.arena-footer-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding-top: 24px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+.arena-footer-copyright {
+  font-size: 13px;
+  color: #64748b;
+  margin: 0;
+}
+.arena-footer-note {
+  font-size: 13px;
+  color: #475569;
 }
 .arena-empty {
   padding: 48px 24px;
@@ -971,8 +1058,17 @@
   .arena-hero-stats strong {
     font-size: 18px;
   }
-  .arena-footer > div {
-    flex-wrap: wrap;
+  .arena-footer-main {
+    flex-direction: column;
+    gap: 36px;
+  }
+  .arena-footer-brand-col {
+    max-width: 100%;
+  }
+  .arena-footer-nav-grid {
+    max-width: 100%;
+    grid-template-columns: repeat(4, minmax(110px, 1fr));
+    gap: 24px;
   }
   .arena-section-heading {
     align-items: flex-start;
@@ -1057,14 +1153,18 @@
   .arena-court-title-row {
     flex-wrap: wrap;
   }
-  .arena-footer > div {
+  .arena-footer {
+    padding-block: 44px 28px;
+  }
+  .arena-footer-nav-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 28px 16px;
+  }
+  .arena-footer-bottom {
     flex-direction: column;
-  }
-  .arena-footer p {
+    align-items: center;
     text-align: center;
-  }
-  .arena-footer nav {
-    justify-content: center;
+    gap: 8px;
   }
 }
 @media (max-width: 479px) {
@@ -1124,5 +1224,9 @@
   }
   .arena-facility-card {
     padding: 18px;
+  }
+  .arena-footer-nav-grid {
+    grid-template-columns: 1fr;
+    gap: 24px;
   }
 }

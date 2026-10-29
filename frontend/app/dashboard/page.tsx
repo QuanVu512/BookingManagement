@@ -74,7 +74,7 @@ export default function DashboardPage() {
             textAlign: 'center',
           }}
         >
-          <div style={{ fontSize: '3rem', marginBottom: '16px' }}>🔒</div>
+          <div style={{ fontSize: '3rem', marginBottom: '16px' }}></div>
           <h2
             style={{
               fontSize: '1.4rem',
@@ -151,7 +151,7 @@ export default function DashboardPage() {
             </strong>
           </div>
           <Link href="/" className="btn btn-sm btn-outline-volt">
-            Trang Chủ Khách Hàng 🏟️
+            Trang Chủ Khách Hàng
           </Link>
           <button
             type="button"

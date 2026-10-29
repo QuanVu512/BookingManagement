@@ -2,7 +2,7 @@
   "kind": "terms",
   "version": "v1.0",
   "title": "Điều khoản dịch vụ và giao kết đặt sân",
-  "description": "Quy định quyền, nghĩa vụ và quy trình giao kết hợp đồng dịch vụ thuê sân thể thao giữa người dùng và BookingManagement.",
+  "description": "Quy định quyền, nghĩa vụ và quy trình giao kết hợp đồng dịch vụ thuê sân thể thao giữa người dùng và SMASH ARENA PICKLEBALL.",
   "effectiveAt": "2026-10-26T00:00:00.000Z",
   "updatedAt": "2026-10-26T00:00:00.000Z",
   "locale": "vi",
@@ -12,7 +12,7 @@
     {
       "id": "definitions",
       "title": "1. Định nghĩa và phạm vi áp dụng",
-      "content": "Điều khoản này áp dụng cho toàn bộ hoạt động đăng ký tài khoản, duyệt thông tin, đặt giữ chỗ và sử dụng dịch vụ sân thể thao trên hệ thống BookingManagement, tuân thủ Luật Thương mại điện tử số 122/2025/QH15, Nghị định 248/2026/NĐ-CP, Luật Bảo vệ quyền lợi người tiêu dùng số 19/2023/QH15 và Luật Giao dịch điện tử số 20/2023/QH15. Quy định áp dụng bình đẳng cho cả khách hàng thành viên có tài khoản và khách vãng lai đặt giữ chỗ trực tiếp."
+      "content": "Điều khoản này áp dụng cho toàn bộ hoạt động đăng ký tài khoản, duyệt thông tin, đặt giữ chỗ và sử dụng dịch vụ sân thể thao trên hệ thống SMASH ARENA PICKLEBALL, tuân thủ Luật Thương mại điện tử số 122/2025/QH15, Nghị định 248/2026/NĐ-CP, Luật Bảo vệ quyền lợi người tiêu dùng số 19/2023/QH15 và Luật Giao dịch điện tử số 20/2023/QH15. Quy định áp dụng bình đẳng cho cả khách hàng thành viên có tài khoản và khách vãng lai đặt giữ chỗ trực tiếp."
     },
     {
       "id": "booking-process",
@@ -61,7 +61,7 @@
     {
       "id": "service-limitations",
       "title": "5. Giới hạn trách nhiệm và sự cố kỹ thuật",
-      "content": "Trong trường hợp bất khả kháng (thiên tai, cắt điện diện rộng, sự cố hạ tầng viễn thông ngoài tầm kiểm soát) hoặc cơ sở phải tạm ngừng phục vụ vì lý do an toàn kỹ thuật, BookingManagement có trách nhiệm thông báo sớm nhất có thể và thực hiện hoàn trả đầy đủ số tiền khách hàng đã thanh toán cho khung giờ bị gián đoạn mà không áp dụng bất kỳ khoản phí phạt nào."
+      "content": "Trong trường hợp bất khả kháng (thiên tai, cắt điện diện rộng, sự cố hạ tầng viễn thông ngoài tầm kiểm soát) hoặc cơ sở phải tạm ngừng phục vụ vì lý do an toàn kỹ thuật, SMASH ARENA có trách nhiệm thông báo sớm nhất có thể và thực hiện hoàn trả đầy đủ số tiền khách hàng đã thanh toán cho khung giờ bị gián đoạn mà không áp dụng bất kỳ khoản phí phạt nào."
     },
     {
       "id": "dispute-resolution",

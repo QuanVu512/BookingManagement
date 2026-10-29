@@ -33,9 +33,12 @@ export const LegalPageShell: React.FC<LegalPageShellProps> = ({
               color: 'var(--ink, #f8fafc)',
               textDecoration: 'none',
               letterSpacing: '-0.01em',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.5rem',
             }}
           >
-            ← BookingManagement
+            ← SMASH ARENA PICKLEBALL
           </Link>
           <nav aria-label="Điều hướng chính sách" style={{ display: 'flex', gap: '1rem', fontSize: '0.875rem' }}>
             <Link

@@ -5,8 +5,8 @@ import termsDocument from '../../content/legal/vi/terms/v1.0.json';
 import type { PolicyDocument as PolicyDocType } from '../../features/legal/model/policy-document';
 
 export const metadata: Metadata = {
-  title: 'Điều khoản dịch vụ và giao kết đặt sân | BookingManagement',
-  description: 'Điều khoản dịch vụ, quy tắc giữ chỗ 5 phút, thanh toán đặt cọc và nội quy sử dụng sân thể thao BookingManagement.',
+  title: 'Điều khoản dịch vụ và giao kết đặt sân | SMASH ARENA PICKLEBALL',
+  description: 'Điều khoản dịch vụ, quy tắc giữ chỗ 5 phút, thanh toán đặt cọc và nội quy sử dụng sân pickleball SMASH ARENA.',
 };
 
 export default function TermsPage() {
