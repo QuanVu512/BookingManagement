@@ -19,6 +19,6 @@ import { CourtsController } from './presentation/courts.controller.js';
     { provide: CourtReader, useClass: PrismaCourtReader },
     { provide: CourtScheduleReader, useClass: PrismaCourtScheduleReader },
   ],
-  exports: [CourtScheduleReader, CourtsService],
+  exports: [CourtScheduleReader, CourtsService, ListActiveCourtsUseCase],
 })
 export class CourtsModule {}

@@ -8,6 +8,7 @@ import '../components/arena/arena-tickets.css';
 import { AuthProvider } from '../context/auth-context';
 import { ThemeProvider } from '../context/theme-context';
 import { CookiePreferencesProvider } from '../features/cookie-consent/components/cookie-preferences-provider';
+import { ChatWidget } from '../features/ai-assistant/components/ChatWidget';
 
 const inter = Inter({
   subsets: ['latin', 'vietnamese'],
@@ -44,7 +45,10 @@ export default function RootLayout({
         </Script>
         <ThemeProvider>
           <AuthProvider>
-            <CookiePreferencesProvider>{children}</CookiePreferencesProvider>
+            <CookiePreferencesProvider>
+              {children}
+              <ChatWidget />
+            </CookiePreferencesProvider>
           </AuthProvider>
         </ThemeProvider>
       </body>

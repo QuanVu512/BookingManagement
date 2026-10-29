@@ -1,0 +1,62 @@
+.card {
+  display: flex;
+  gap: 12px;
+  padding: 12px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-active);
+  background: var(--bg-card);
+  box-shadow: var(--shadow-card);
+}
+
+.media img {
+  border-radius: var(--radius-sm);
+  object-fit: cover;
+}
+
+.info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.name {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.type {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.price {
+  margin: 0;
+  color: var(--accent-volt);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.action {
+  margin-top: 4px;
+  align-self: flex-start;
+  background: linear-gradient(
+    135deg,
+    var(--action-bg-start),
+    var(--action-bg-end)
+  );
+  color: var(--action-text);
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: 8px 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.action:focus-visible {
+  outline: 3px solid var(--accent-neon);
+  outline-offset: 2px;
+}
