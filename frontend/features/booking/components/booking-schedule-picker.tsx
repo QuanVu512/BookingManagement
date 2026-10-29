@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import {
   BOOKING_PERIODS,
@@ -27,7 +27,7 @@ import {
 
 type PickerProps = Pick<
   LiveBookingViewProps,
-  'state' | 'onChangeWindow' | 'timezone'
+  'state' | 'onChangeWindow' | 'timezone' | 'occupancy' | 'gridLocked'
 >;
 
 export function BookingDateInput({
