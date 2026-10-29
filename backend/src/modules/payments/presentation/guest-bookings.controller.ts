@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Body,
   Controller,
+  Get,
   Header,
   HttpCode,
   Param,
@@ -32,6 +33,12 @@ import {
   GuestCreateHoldUseCase,
   type GuestCreateHoldInput,
 } from '../application/guest-create-hold.use-case.js';
+import { SendGuestOtpUseCase } from '../application/send-guest-otp.use-case.js';
+import { VerifyGuestOtpUseCase } from '../application/verify-guest-otp.use-case.js';
+import { ResumeGuestIntentUseCase } from '../application/resume-guest-intent.use-case.js';
+import { CancelGuestHoldUseCase } from '../application/cancel-guest-hold.use-case.js';
+import { GetGuestHoldRecoveryUseCase } from '../application/get-guest-hold-recovery.use-case.js';
+import { GuestCheckoutTokenGuard } from '../infrastructure/guest-checkout-token.guard.js';
 import { GuestTokenService } from '../infrastructure/guest-token.service.js';
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service.js';
 
@@ -50,16 +57,126 @@ export class GuestCreateBookingDto implements GuestCreateHoldInput {
   @Length(16, 100)
   @Matches(/^[A-Za-z0-9_-]+$/)
   idempotencyKey!: string;
+  /** Proof một lần từ POST /verify-otp (gop_<64 hex>). */
+  @IsString()
+  @Length(8, 200)
+  otpProof!: string;
+  @IsString()
+  @Length(16, 100)
+  @Matches(/^[A-Za-z0-9_-]+$/)
+  checkoutIntentId!: string;
+  @IsString()
+  @Length(32, 200)
+  recoverySecret!: string;
+  @IsOptional()
+  @IsString()
+  @Length(1, 30)
+  termsVersion?: string;
+}
+
+export class SendGuestOtpDto {
+  @IsEmail()
+  email!: string;
+}
+
+export class VerifyGuestOtpDto {
+  @IsEmail()
+  email!: string;
+
+  @IsString()
+  @Length(6, 6)
+  @Matches(/^[0-9]{6}$/)
+  code!: string;
+}
+
+export class ResumeGuestIntentDto {
+  @IsUUID()
+  checkoutIntentId!: string;
+
+  @IsString()
+  @Length(32, 200)
+  recoverySecret!: string;
 }
 
 /**
  * E3 — Guest booking entry (MIG-11).
  * Public + rate limit 10/IP/5 phút. Có session/JWT → 422 GUEST_JWT_REJECTED
  * (dùng E2). Token MANAGE_BOOKING trả một lần; cancel không revoke.
+ * Bước 2: OTP challenge lưu PostgreSQL; create bắt buộc proof + intent +
+ * recoverySecret; resume/cancel/recovery dùng CheckoutRecoveryToken.
  */
 @Controller('api/guest/bookings')
 export class GuestBookingsController {
-  constructor(private readonly guestHold: GuestCreateHoldUseCase) {}
+  constructor(
+    private readonly guestHold: GuestCreateHoldUseCase,
+    private readonly sendOtpUseCase: SendGuestOtpUseCase,
+    private readonly verifyOtpUseCase: VerifyGuestOtpUseCase,
+    private readonly resumeGuestIntent: ResumeGuestIntentUseCase,
+    private readonly cancelGuestHold: CancelGuestHoldUseCase,
+    private readonly getRecovery: GetGuestHoldRecoveryUseCase,
+  ) {}
+
+  @Post('send-otp')
+  @HttpCode(200)
+  @Throttle({ default: { limit: 5, ttl: 300_000 } })
+  @Header('Cache-Control', 'no-store, private')
+  @ApiOperation({ summary: 'Gửi mã OTP xác thực email cho khách vãng lai' })
+  async sendOtp(@Body() body: SendGuestOtpDto) {
+    const result = await this.sendOtpUseCase.execute(body.email);
+    return {
+      success: true,
+      message: 'Mã xác thực 6 chữ số đã được gửi tới email của bạn.',
+      resendAfterSeconds: result.resendAfterSeconds,
+      expiresAt: result.expiresAt,
+    };
+  }
+
+  @Post('verify-otp')
+  @HttpCode(200)
+  @Throttle({ default: { limit: 10, ttl: 300_000 } })
+  @Header('Cache-Control', 'no-store, private')
+  @ApiOperation({ summary: 'Xác thực mã OTP email khách vãng lai' })
+  async verifyOtp(@Body() body: VerifyGuestOtpDto) {
+    const result = await this.verifyOtpUseCase.execute(body);
+    return {
+      success: true,
+      verified: true,
+      message: 'Xác thực email thành công.',
+      otpProof: result.otpProof,
+      otpProofExpiresAt: result.otpProofExpiresAt,
+    };
+  }
+
+  @Post('resume-intent')
+  @HttpCode(200)
+  @Throttle({ default: { limit: 10, ttl: 300_000 } })
+  @Header('Cache-Control', 'no-store, private')
+  @ApiOperation({ summary: 'Task 2.2: khôi phục hold cũ bằng recoverySecret' })
+  async resumeIntent(@Body() body: ResumeGuestIntentDto) {
+    const result = await this.resumeGuestIntent.execute(body);
+    return { success: true, data: result };
+  }
+
+  @Post(':bookingId/cancel-hold')
+  @HttpCode(200)
+  @UseGuards(GuestCheckoutTokenGuard)
+  @Throttle({ default: { limit: 10, ttl: 300_000 } })
+  @Header('Cache-Control', 'no-store, private')
+  @ApiOperation({ summary: 'Task 2.3: hủy giữ chỗ bằng checkout token' })
+  async cancelHold(@Param('bookingId', ParseUUIDPipe) bookingId: string) {
+    const result = await this.cancelGuestHold.execute(bookingId);
+    return { success: true, data: result };
+  }
+
+  @Get(':bookingId/recovery')
+  @UseGuards(GuestCheckoutTokenGuard)
+  @Throttle({ default: { limit: 30, ttl: 300_000 } })
+  @Header('Cache-Control', 'no-store, private')
+  @ApiOperation({ summary: 'Task 3.2: snapshot phục hồi server-authoritative' })
+  async recovery(@Param('bookingId', ParseUUIDPipe) bookingId: string) {
+    const result = await this.getRecovery.execute(bookingId);
+    return { success: true, data: result };
+  }
 
   @Post()
   @HttpCode(201)
@@ -113,7 +230,8 @@ export class StaffGuestTokenController {
       where: { id: bookingId },
       select: { id: true, userId: true, startsAt: true },
     });
-    if (!booking) return { success: false, error: { code: 'BOOKING_NOT_FOUND' } };
+    if (!booking)
+      return { success: false, error: { code: 'BOOKING_NOT_FOUND' } };
     if (booking.userId !== null) {
       throw new BadRequestException(
         'Booking có tài khoản — không cần guest token.',

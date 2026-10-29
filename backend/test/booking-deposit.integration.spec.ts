@@ -1,16 +1,19 @@
 import 'reflect-metadata';
 import { afterAll, beforeAll, describe, expect, it } from '@jest/globals';
 import { ConfigService } from '@nestjs/config';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import type pg from 'pg';
 import { PrismaService } from '../src/infrastructure/prisma/prisma.service.js';
 import { CreateHoldUseCase } from '../src/modules/bookings/application/create-hold.use-case.js';
 import { PrismaBookingStore } from '../src/modules/bookings/infrastructure/prisma-booking-store.js';
 import { PrismaCourtScheduleReader } from '../src/modules/courts/infrastructure/prisma-court-schedule-reader.js';
 import { GuestCreateHoldUseCase } from '../src/modules/payments/application/guest-create-hold.use-case.js';
+import { PrismaGuestCheckoutStore } from '../src/modules/payments/infrastructure/prisma-guest-checkout-store.js';
+import { GuestTokenService } from '../src/modules/payments/infrastructure/guest-token.service.js';
 import {
   applyDepositMigration,
   applyHistoricalMigrations,
+  applyRemainingMigrations,
   depositFixtures,
   insertSnapshot,
   openDepositDatabase,
@@ -50,6 +53,24 @@ storageDescribe('Guest deposit migration on real isolated PostgreSQL', () => {
     };
   }
 
+  /** Bước 2: mỗi guest hold cần proof còn hạn + intent + recoverySecret. */
+  async function guestIdentity(email = 'guest@example.test') {
+    const otpProof = `gop_${randomBytes(32).toString('hex')}`;
+    await prisma.guestOtpProof.create({
+      data: {
+        email,
+        purpose: 'GUEST_HOLD_CREATE',
+        tokenHash: createHash('sha256').update(otpProof).digest('hex'),
+        expiresAt: new Date(Date.now() + 5 * 60_000),
+      },
+    });
+    return {
+      otpProof,
+      checkoutIntentId: randomUUID(),
+      recoverySecret: randomBytes(32).toString('hex'),
+    };
+  }
+
   async function legacySnapshot() {
     return JSON.stringify(
       await prisma.booking.findMany({
@@ -69,7 +90,13 @@ storageDescribe('Guest deposit migration on real isolated PostgreSQL', () => {
     store = new PrismaBookingStore(prisma);
     const schedule = new PrismaCourtScheduleReader();
     member = new CreateHoldUseCase(store, schedule);
-    guest = new GuestCreateHoldUseCase(prisma, schedule, config);
+    guest = new GuestCreateHoldUseCase(
+      prisma,
+      schedule,
+      config,
+      new PrismaGuestCheckoutStore(prisma),
+      new GuestTokenService(prisma, config),
+    );
     legacyIds = [];
     for (const userId of [fixtures.userId, null]) {
       legacyIds.push(
@@ -97,6 +124,7 @@ storageDescribe('Guest deposit migration on real isolated PostgreSQL', () => {
       'Baseline reproduced: PostgreSQL 23514 bookings_guest_full_prepayment_check rejects guest 30%.',
     );
     await applyDepositMigration(client);
+    await applyRemainingMigrations(client);
   }, 30_000);
 
   afterAll(async () => {
@@ -150,11 +178,11 @@ storageDescribe('Guest deposit migration on real isolated PostgreSQL', () => {
   ] as const)(
     'persists a %s hold with 30%% deposit (input=%s) using real use cases and Prisma',
     async (actor, percent) => {
-      const input = { ...holdInput(), prepaymentPercent: percent };
+      const base = { ...holdInput(), prepaymentPercent: percent };
       const result =
         actor === 'member'
-          ? await member.execute(input)
-          : await guest.execute(input);
+          ? await member.execute(base)
+          : await guest.execute({ ...base, ...(await guestIdentity()) });
       const id = 'bookingId' in result ? result.bookingId : result.id;
       const row = await prisma.booking.findUniqueOrThrow({ where: { id } });
       expect(row.prepaymentPercent.toNumber()).toBe(30);
@@ -171,17 +199,31 @@ storageDescribe('Guest deposit migration on real isolated PostgreSQL', () => {
           where: { bookingId: id, toStatus: 'HOLDING' },
         }),
       ).toBe(1);
-      if (actor === 'guest')
+      if (actor === 'guest') {
         expect(
-          await prisma.bookingAccessToken.count({ where: { bookingId: id } }),
+          await prisma.bookingAccessToken.count({
+            where: { bookingId: id, purpose: 'MANAGE_BOOKING' },
+          }),
         ).toBe(1);
+        expect(
+          await prisma.bookingAccessToken.count({
+            where: { bookingId: id, purpose: 'CHECKOUT_RECOVERY' },
+          }),
+        ).toBe(1);
+      }
     },
   );
 
   it.each(['member', 'guest'] as const)(
     'rejects new %s 100%% holds at the active policy boundary without persisting rows',
     async (actor) => {
-      const input = { ...holdInput(), prepaymentPercent: 100 };
+      const input = {
+        ...holdInput(),
+        prepaymentPercent: 100,
+        // Guest phải có proof hợp lệ để chạm đúng biên chính sách 100%,
+        // không bị chặn sớm bởi kiểm tra proof.
+        ...(actor === 'guest' ? await guestIdentity() : {}),
+      };
       const count = await prisma.booking.count();
       await expect(
         actor === 'member' ? member.execute(input) : guest.execute(input),
@@ -220,12 +262,18 @@ storageDescribe('Guest deposit migration on real isolated PostgreSQL', () => {
   });
 
   it('retains the PostgreSQL exclusion constraint and atomic rollback for a conflicting guest hold', async () => {
-    const input = holdInput();
+    // Giữ nguyên slot của lần gọi đầu: holdInput() tăng slot mỗi lần gọi nên
+    // nếu lấy lại holdInput() sẽ không còn xung đột lịch.
+    const input = { ...holdInput(), ...(await guestIdentity()) };
     const first = await guest.execute(input);
     const bookings = await prisma.booking.count();
     const tokens = await prisma.bookingAccessToken.count();
     await expect(
-      guest.execute({ ...input, idempotencyKey: randomUUID() }),
+      guest.execute({
+        ...input,
+        ...(await guestIdentity()),
+        idempotencyKey: randomUUID(),
+      }),
     ).rejects.toMatchObject({ status: 409 });
     expect(await prisma.booking.count()).toBe(bookings);
     expect(await prisma.bookingAccessToken.count()).toBe(tokens);

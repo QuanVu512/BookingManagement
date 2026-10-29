@@ -61,12 +61,36 @@ export async function applyDepositMigration(client: pg.Client): Promise<void> {
   );
 }
 
+/**
+ * Bước 2: sau deposit migration, tiếp tục áp các migration mới hơn trên cùng
+ * DB disposable để bảng guest checkout (proof/intent/challenge) tồn tại.
+ */
+export async function applyRemainingMigrations(
+  client: pg.Client,
+): Promise<void> {
+  const entries = readdirSync(MIGRATIONS, { withFileTypes: true }).sort(
+    (left, right) => left.name.localeCompare(right.name),
+  );
+  for (const entry of entries) {
+    if (!entry.isDirectory() || entry.name <= DEPOSIT_MIGRATION) continue;
+    await client.query(
+      readFileSync(new URL(`${entry.name}/migration.sql`, MIGRATIONS), 'utf8'),
+    );
+  }
+}
+
 export async function depositFixtures(prisma: PrismaService) {
+  // users.phone là unique; fixture chạy nhiều lần trên cùng DB disposable nên
+  // không dùng số cố định.
+  const phoneDigits = randomUUID()
+    .replace(/[^0-9]/gu, '')
+    .padEnd(9, '0')
+    .slice(0, 9);
   const user = await prisma.user.create({
     data: {
       username: `deposit-${randomUUID()}`,
       email: `${randomUUID()}@example.test`,
-      phone: '+84912345678',
+      phone: `+84${phoneDigits}`,
       passwordHash: 'unused-test-fixture',
     },
   });

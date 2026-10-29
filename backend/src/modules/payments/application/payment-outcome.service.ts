@@ -31,7 +31,13 @@ export interface RefundTrackerItem {
   status: string;
   amount: number;
   reasonType: string;
-  outcomeCode: 'COMPLETED' | 'REJECTED' | 'CANCELLED' | 'UNKNOWN' | 'FAILED' | 'PROCESSING';
+  outcomeCode:
+    | 'COMPLETED'
+    | 'REJECTED'
+    | 'CANCELLED'
+    | 'UNKNOWN'
+    | 'FAILED'
+    | 'PROCESSING';
   actionRequired: string | null;
   destinationAccountLast4: string | null;
   bankTransactionReference: string | null;
@@ -184,7 +190,9 @@ export class PaymentOutcomeService {
   ): Promise<{ items: RefundTrackerItem[] } | null> {
     if (!(await this.ownsBooking(bookingId, subject))) return null;
     const refunds = await this.prisma.refundRequest.findMany({
-      where: { paymentTransaction: { paymentRequest: { referenceId: bookingId } } },
+      where: {
+        paymentTransaction: { paymentRequest: { referenceId: bookingId } },
+      },
       orderBy: { createdAt: 'desc' },
       include: { attempts: { orderBy: { attemptNumber: 'desc' }, take: 1 } },
     });
@@ -201,10 +209,12 @@ export class PaymentOutcomeService {
         else if (status === 'CANCELLED') outcomeCode = 'CANCELLED';
         else if (attemptStatus === 'UNKNOWN') {
           outcomeCode = 'UNKNOWN';
-          actionRequired = 'Yêu cầu hoàn đang được kiểm tra — không chuyển tiền lại.';
+          actionRequired =
+            'Yêu cầu hoàn đang được kiểm tra — không chuyển tiền lại.';
         } else if (attemptStatus === 'FAILED') {
           outcomeCode = 'FAILED';
-          actionRequired = 'Lệnh hoàn chưa thành công — hệ thống đang đối soát.';
+          actionRequired =
+            'Lệnh hoàn chưa thành công — hệ thống đang đối soát.';
         } else if (!refund.destinationBankBin) {
           actionRequired = 'Cần bổ sung tài khoản nhận hoàn.';
         }
@@ -248,7 +258,9 @@ export class PaymentOutcomeService {
     const refunds = await this.prisma.refundRequest.findMany({
       where: { paymentTransactionId: { in: receiptIds } },
     });
-    const completed = refunds.filter((refund) => String(refund.status) === 'COMPLETED');
+    const completed = refunds.filter(
+      (refund) => String(refund.status) === 'COMPLETED',
+    );
     const reserved = refunds.filter((refund) =>
       ['REQUESTED', 'APPROVED', 'PROCESSING'].includes(String(refund.status)),
     );
@@ -279,8 +291,14 @@ export class PaymentOutcomeService {
       prepaymentPercent: Number(booking.prepaymentPercent.toString()),
       customer: {
         name: booking.customerName,
-        phone: subject.userId || subject.guestBookingId ? booking.customerPhone : undefined,
-        email: subject.userId || subject.guestBookingId ? booking.customerEmail : undefined,
+        phone:
+          subject.userId || subject.guestBookingId
+            ? booking.customerPhone
+            : undefined,
+        email:
+          subject.userId || subject.guestBookingId
+            ? booking.customerEmail
+            : undefined,
       },
       paymentSummary: {
         totalAmount: summary.total,
@@ -324,7 +342,9 @@ export class PaymentOutcomeService {
         : null,
       activeRefunds: refunds
         .filter((refund) =>
-          ['REQUESTED', 'APPROVED', 'PROCESSING'].includes(String(refund.status)),
+          ['REQUESTED', 'APPROVED', 'PROCESSING'].includes(
+            String(refund.status),
+          ),
         )
         .map((refund) => ({
           refundRequestId: refund.id,
@@ -338,9 +358,7 @@ export class PaymentOutcomeService {
    * E12 — Staff lookup theo bookingCode/phone (masked).
    * Trả null khi không khớp (caller 404, không phân biệt tồn tại/quyền).
    */
-  async staffLookup(
-    query: string,
-  ): Promise<{
+  async staffLookup(query: string): Promise<{
     bookingId: string;
     queryKind: 'CODE' | 'PHONE';
     dto: {
@@ -427,6 +445,35 @@ export class PaymentOutcomeService {
     };
   }
 
+  /**
+   * Contract F4 — outcome server-side cho recovery snapshot, kể cả khi booking
+   * chưa có payment request (terminal summary). Trả null khi booking không tồn
+   * tại; caller quyết định mã lỗi.
+   */
+  async bookingOutcome(bookingId: string): Promise<{
+    screen: string;
+    reviewRequired: boolean;
+    reviewReasonCode: string | null;
+    netCredited: number;
+    requiredPrepaymentAmount: number;
+  } | null> {
+    const booking = await this.prisma.booking.findUnique({
+      where: { id: bookingId },
+    });
+    if (!booking) return null;
+    const { summary, resolved } = await this.outcomeForBooking(booking);
+    return {
+      screen: resolved.screen,
+      reviewRequired: resolved.reviewRequired,
+      reviewReasonCode:
+        resolved.reviewReasonCode === 'NONE' ? null : resolved.reviewReasonCode,
+      netCredited: summary.netCredited,
+      requiredPrepaymentAmount: Number(
+        booking.requiredPrepaymentAmount.toString(),
+      ),
+    };
+  }
+
   private async buildStatus(
     bookingId: string,
     request: { id: string; paymentCode: string; status: string },
@@ -434,52 +481,7 @@ export class PaymentOutcomeService {
     const booking = await this.prisma.booking.findUniqueOrThrow({
       where: { id: bookingId },
     });
-    const receipts = await this.prisma.paymentTransaction.findMany({
-      where: {
-        paymentRequest: { referenceId: bookingId },
-        verificationStatus: 'VERIFIED',
-      },
-      select: { amount: true, allocationStatus: true, id: true },
-    });
-    const receiptIds = receipts.map((receipt) => receipt.id);
-    const completedRefunds =
-      receiptIds.length === 0
-        ? []
-        : await this.prisma.refundRequest.findMany({
-            where: { paymentTransactionId: { in: receiptIds }, status: 'COMPLETED' },
-            select: { amount: true },
-          });
-    const allocated = receipts
-      .filter((receipt) => String(receipt.allocationStatus) === 'ALLOCATED')
-      .map((receipt) => Number(receipt.amount.toString()));
-    const summary = summarizeBookingMoney({
-      totalAmount: Number(booking.totalAmount.toString()),
-      allocatedReceiptAmounts: allocated,
-      completedRefundAmounts: completedRefunds.map((refund) =>
-        Number(refund.amount.toString()),
-      ),
-    });
-    const facts: OutcomeFacts = {
-      bookingStatus: String(booking.status),
-      requiredPrepaymentAmount: Number(booking.requiredPrepaymentAmount.toString()),
-      netCredited: summary.netCredited,
-      hasRefundRequiredReceipt: receipts.some(
-        (receipt) => String(receipt.allocationStatus) === 'REFUND_REQUIRED',
-      ),
-      hasUnknownOrFailedRefundAttempt: false,
-      hasFailedRefund: false,
-      needsRefundDestination: false,
-    };
-    const unknownFailed = await this.prisma.refundAttempt.count({
-      where: {
-        refundRequest: {
-          paymentTransaction: { paymentRequest: { referenceId: bookingId } },
-        },
-        status: { in: ['UNKNOWN', 'FAILED'] },
-      },
-    });
-    facts.hasUnknownOrFailedRefundAttempt = unknownFailed > 0;
-    const resolved = resolvePaymentOutcome(facts);
+    const { summary, resolved } = await this.outcomeForBooking(booking);
     const [clock] = await this.prisma.$queryRaw<{ now: Date }[]>`
       SELECT clock_timestamp() AS now`;
     return {
@@ -499,5 +501,67 @@ export class PaymentOutcomeService {
         resolved.reviewReasonCode === 'NONE' ? null : resolved.reviewReasonCode,
       screen: resolved.screen,
     };
+  }
+
+  private async outcomeForBooking(booking: {
+    id: string;
+    status: unknown;
+    totalAmount: { toString(): string } | number;
+    requiredPrepaymentAmount: { toString(): string } | number;
+  }): Promise<{
+    summary: ReturnType<typeof summarizeBookingMoney>;
+    resolved: ReturnType<typeof resolvePaymentOutcome>;
+  }> {
+    const receipts = await this.prisma.paymentTransaction.findMany({
+      where: {
+        paymentRequest: { referenceId: booking.id },
+        verificationStatus: 'VERIFIED',
+      },
+      select: { amount: true, allocationStatus: true, id: true },
+    });
+    const receiptIds = receipts.map((receipt) => receipt.id);
+    const completedRefunds =
+      receiptIds.length === 0
+        ? []
+        : await this.prisma.refundRequest.findMany({
+            where: {
+              paymentTransactionId: { in: receiptIds },
+              status: 'COMPLETED',
+            },
+            select: { amount: true },
+          });
+    const allocated = receipts
+      .filter((receipt) => String(receipt.allocationStatus) === 'ALLOCATED')
+      .map((receipt) => Number(receipt.amount.toString()));
+    const summary = summarizeBookingMoney({
+      totalAmount: Number(booking.totalAmount.toString()),
+      allocatedReceiptAmounts: allocated,
+      completedRefundAmounts: completedRefunds.map((refund) =>
+        Number(refund.amount.toString()),
+      ),
+    });
+    const facts: OutcomeFacts = {
+      bookingStatus: String(booking.status),
+      requiredPrepaymentAmount: Number(
+        booking.requiredPrepaymentAmount.toString(),
+      ),
+      netCredited: summary.netCredited,
+      hasRefundRequiredReceipt: receipts.some(
+        (receipt) => String(receipt.allocationStatus) === 'REFUND_REQUIRED',
+      ),
+      hasUnknownOrFailedRefundAttempt: false,
+      hasFailedRefund: false,
+      needsRefundDestination: false,
+    };
+    const unknownFailed = await this.prisma.refundAttempt.count({
+      where: {
+        refundRequest: {
+          paymentTransaction: { paymentRequest: { referenceId: booking.id } },
+        },
+        status: { in: ['UNKNOWN', 'FAILED'] },
+      },
+    });
+    facts.hasUnknownOrFailedRefundAttempt = unknownFailed > 0;
+    return { summary, resolved: resolvePaymentOutcome(facts) };
   }
 }

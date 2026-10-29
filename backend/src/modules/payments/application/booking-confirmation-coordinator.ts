@@ -1,5 +1,7 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service.js';
+import { RedisService } from '../../../infrastructure/redis/redis.service.js';
+import { invalidateCourtDayCache } from '../../bookings/application/get-court-day-occupancies.use-case.js';
 import { PAYMENT_TRANSACTION_OPTIONS } from '../payment.constants.js';
 import { summarizeBookingMoney } from '../domain/money.js';
 
@@ -29,10 +31,14 @@ export type ExitOutcome =
 export class BookingConfirmationCoordinator {
   private readonly logger = new Logger(BookingConfirmationCoordinator.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Optional() private readonly redis?: RedisService,
+  ) {}
 
   async confirmIfEligible(bookingId: string): Promise<ConfirmOutcome> {
-    return this.prisma.$transaction(async (transaction) => {
+    let confirmedCourtId: string | null = null;
+    const outcome: ConfirmOutcome = await this.prisma.$transaction(async (transaction) => {
       await transaction.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('booking-money'), hashtext(${bookingId}))`;
       const [clock] = await transaction.$queryRaw<
         { now: Date }[]
@@ -42,10 +48,15 @@ export class BookingConfirmationCoordinator {
       const booking = await transaction.booking.findUnique({
         where: { id: bookingId },
       });
-      if (!booking) return { result: 'NOT_ELIGIBLE', reason: 'BOOKING_NOT_FOUND' };
-      if (String(booking.status) === 'CONFIRMED') return { result: 'ALREADY_CONFIRMED' };
+      if (!booking)
+        return { result: 'NOT_ELIGIBLE', reason: 'BOOKING_NOT_FOUND' };
+      if (String(booking.status) === 'CONFIRMED')
+        return { result: 'ALREADY_CONFIRMED' };
       if (String(booking.status) !== 'HOLDING') {
-        return { result: 'NOT_ELIGIBLE', reason: `BOOKING_${String(booking.status)}` };
+        return {
+          result: 'NOT_ELIGIBLE',
+          reason: `BOOKING_${String(booking.status)}`,
+        };
       }
       if (!(decidedAt < booking.holdExpiresAt)) {
         return { result: 'NOT_ELIGIBLE', reason: 'HOLD_EXPIRED' };
@@ -64,7 +75,10 @@ export class BookingConfirmationCoordinator {
         receiptIds.length === 0
           ? []
           : await transaction.refundRequest.findMany({
-              where: { paymentTransactionId: { in: receiptIds }, status: 'COMPLETED' },
+              where: {
+                paymentTransactionId: { in: receiptIds },
+                status: 'COMPLETED',
+              },
               select: { amount: true },
             });
       const summary = summarizeBookingMoney({
@@ -78,7 +92,10 @@ export class BookingConfirmationCoordinator {
       });
       const required = Number(booking.requiredPrepaymentAmount.toString());
       if (!(summary.netCredited >= required && required > 0)) {
-        return { result: 'NOT_ELIGIBLE', reason: 'INSUFFICIENT_VERIFIED_FUNDS' };
+        return {
+          result: 'NOT_ELIGIBLE',
+          reason: 'INSUFFICIENT_VERIFIED_FUNDS',
+        };
       }
 
       // Conditional update sở hữu transition (MIG-01): CAS version + recheck
@@ -123,8 +140,16 @@ export class BookingConfirmationCoordinator {
           payload: { bookingId },
         },
       });
+      confirmedCourtId = booking.courtId;
       return { result: 'CONFIRMED' };
     }, PAYMENT_TRANSACTION_OPTIONS);
+    // Day-grid invalidation after commit (fail-open). Without it a cached
+    // HOLDING snapshot would be filtered out after holdExpiresAt even though
+    // the court is still occupied by this CONFIRMED booking.
+    if (confirmedCourtId) {
+      await invalidateCourtDayCache(this.redis, confirmedCourtId);
+    }
+    return outcome;
   }
 
   /**
@@ -133,7 +158,8 @@ export class BookingConfirmationCoordinator {
    * duy nhất nhờ conditional update.
    */
   async expireHoldWithObligations(bookingId: string): Promise<ExitOutcome> {
-    return this.prisma.$transaction(async (transaction) => {
+    let releasedCourtId: string | null = null;
+    const outcome: ExitOutcome = await this.prisma.$transaction(async (transaction) => {
       await transaction.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('booking-money'), hashtext(${bookingId}))`;
       const [clock] = await transaction.$queryRaw<
         { now: Date }[]
@@ -142,7 +168,13 @@ export class BookingConfirmationCoordinator {
 
       const booking = await transaction.booking.findUnique({
         where: { id: bookingId },
-        select: { id: true, status: true, version: true, holdExpiresAt: true },
+        select: {
+          id: true,
+          courtId: true,
+          status: true,
+          version: true,
+          holdExpiresAt: true,
+        },
       });
       if (!booking) return { result: 'ALREADY_FINAL', status: 'NOT_FOUND' };
       if (String(booking.status) !== 'HOLDING') {
@@ -211,7 +243,10 @@ export class BookingConfirmationCoordinator {
         });
         await transaction.paymentTransaction.update({
           where: { id: receipt.id },
-          data: { allocationStatus: 'REFUND_REQUIRED', reviewReason: 'LATE_PAYMENT_REVIEW' },
+          data: {
+            allocationStatus: 'REFUND_REQUIRED',
+            reviewReason: 'LATE_PAYMENT_REVIEW',
+          },
         });
         obligationsCreated += 1;
       }
@@ -223,7 +258,12 @@ export class BookingConfirmationCoordinator {
           payload: { bookingId, obligationsCreated },
         },
       });
+      releasedCourtId = booking.courtId;
       return { result: 'EXPIRED', obligationsCreated };
     }, PAYMENT_TRANSACTION_OPTIONS);
+    if (releasedCourtId) {
+      await invalidateCourtDayCache(this.redis, releasedCourtId);
+    }
+    return outcome;
   }
 }

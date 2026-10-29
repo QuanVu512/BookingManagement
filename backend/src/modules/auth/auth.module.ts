@@ -72,6 +72,7 @@ import { AuthCsrfGuard } from './guards/auth-csrf.guard.js';
     RolesGuard,
     AuthCsrfGuard,
     AuthCsrfService,
+    AuthMailService,
   ],
 })
 export class AuthModule {}

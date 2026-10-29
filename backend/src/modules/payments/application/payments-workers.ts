@@ -5,6 +5,7 @@ import { PrismaService } from '../../../infrastructure/prisma/prisma.service.js'
 import { BookingConfirmationCoordinator } from './booking-confirmation-coordinator.js';
 import { CreatePaymentRequestUseCase } from './create-payment-request.use-case.js';
 import { VerifyReceiptUseCase } from './verify-receipt.use-case.js';
+import { GuestCheckoutReconcileService } from './guest-checkout-reconcile.service.js';
 import { PayosWebhookInbox } from '../infrastructure/payos-webhook-inbox.js';
 import { PayosGatewayAdapter } from '../infrastructure/payos-gateway.adapter.js';
 
@@ -35,6 +36,7 @@ export class PaymentsJobScheduler implements OnModuleInit {
       { id: 'terminal-watch', every: 900_000 },
       { id: 'cancel-retry', every: 900_000 },
       { id: 'outbox-dispatch', every: 30_000 },
+      { id: 'guest-checkout-reconcile', every: 60_000 },
     ];
     for (const schedule of schedules) {
       await this.queue.upsertJobScheduler(
@@ -61,6 +63,7 @@ export class PaymentsWorker extends WorkerHost {
     private readonly inbox: PayosWebhookInbox,
     private readonly gateway: PayosGatewayAdapter,
     private readonly paymentRequests: CreatePaymentRequestUseCase,
+    private readonly guestCheckoutReconcile: GuestCheckoutReconcileService,
   ) {
     super();
   }
@@ -79,6 +82,8 @@ export class PaymentsWorker extends WorkerHost {
         return this.cancelRetry();
       case 'outbox-dispatch':
         return this.outboxDispatch();
+      case 'guest-checkout-reconcile':
+        return this.guestCheckoutReconcile.run();
       default:
         this.logger.warn(`Unknown job ${job.name}; ignoring.`);
         return { ignored: true };
@@ -130,9 +135,19 @@ export class PaymentsWorker extends WorkerHost {
         // Phân biệt transient/permanent: lỗi nghiệp vụ đã rõ (conflict,
         // booking terminal) → IGNORED có audit; lỗi hạ tầng → FAILED retry.
         if (/conflict|not found|terminal/i.test(message)) {
-          await this.inbox.finalize(row.id, claim.generation, 'IGNORED', message);
+          await this.inbox.finalize(
+            row.id,
+            claim.generation,
+            'IGNORED',
+            message,
+          );
         } else {
-          await this.inbox.finalize(row.id, claim.generation, 'FAILED', message);
+          await this.inbox.finalize(
+            row.id,
+            claim.generation,
+            'FAILED',
+            message,
+          );
         }
       }
     }
@@ -159,7 +174,8 @@ export class PaymentsWorker extends WorkerHost {
       throw new Error('Event thiếu signed success/amount — chuyển đối soát.');
     }
     const paymentCode = this.paymentCodeOf(data.description, data.reference);
-    if (!paymentCode) throw new Error('Không khớp paymentCode — chuyển đối soát.');
+    if (!paymentCode)
+      throw new Error('Không khớp paymentCode — chuyển đối soát.');
     const request = await this.prisma.paymentRequest.findUnique({
       where: { paymentCode },
       select: { id: true, referenceId: true, amount: true },
@@ -204,7 +220,10 @@ export class PaymentsWorker extends WorkerHost {
    * - Gateway lỗi/chưa cấu hình → giữ CREATING cho lần quét sau; không bao
    *   giờ suy FAILED ở đây (MIG-09).
    */
-  private async creatingRecovery(): Promise<{ recovered: number; expired: number }> {
+  private async creatingRecovery(): Promise<{
+    recovered: number;
+    expired: number;
+  }> {
     if (!this.gateway.isConfigured()) return { recovered: 0, expired: 0 };
     const cutoff = new Date(Date.now() - 5 * 60_000);
     const orphans = await this.prisma.paymentRequest.findMany({
@@ -224,7 +243,11 @@ export class PaymentsWorker extends WorkerHost {
         where: { id: row.referenceId },
         select: { status: true },
       });
-      if (!booking || booking.status === 'EXPIRED' || booking.status === 'CANCELLED') {
+      if (
+        !booking ||
+        booking.status === 'EXPIRED' ||
+        booking.status === 'CANCELLED'
+      ) {
         const closed = await this.prisma.paymentRequest.updateMany({
           where: { id: row.id, status: 'CREATING' },
           data: { status: 'EXPIRED' },
@@ -262,7 +285,9 @@ export class PaymentsWorker extends WorkerHost {
     let checked = 0;
     for (const row of live) {
       try {
-        const link = await this.gateway.getLink(row.providerPaymentLinkId as string);
+        const link = await this.gateway.getLink(
+          row.providerPaymentLinkId as string,
+        );
         checked += 1;
         for (const transaction of link.transactions ?? []) {
           if (typeof transaction.amount !== 'number') continue;
@@ -289,7 +314,10 @@ export class PaymentsWorker extends WorkerHost {
         }
         if (['CANCELLED', 'EXPIRED', 'FAILED'].includes(link.status)) {
           await this.prisma.paymentRequest.updateMany({
-            where: { id: row.id, status: { in: ['CREATING', 'PENDING', 'PARTIALLY_PAID'] } },
+            where: {
+              id: row.id,
+              status: { in: ['CREATING', 'PENDING', 'PARTIALLY_PAID'] },
+            },
             data: { status: link.status === 'FAILED' ? 'FAILED' : 'EXPIRED' },
           });
         }
@@ -319,7 +347,10 @@ export class PaymentsWorker extends WorkerHost {
       );
       if (!ok) continue;
       const changed = await this.prisma.paymentRequest.updateMany({
-        where: { id: row.id, status: { in: ['CREATING', 'PENDING', 'PARTIALLY_PAID'] } },
+        where: {
+          id: row.id,
+          status: { in: ['CREATING', 'PENDING', 'PARTIALLY_PAID'] },
+        },
         data: { status: 'CANCELLED' },
       });
       cancelled += changed.count;
@@ -332,7 +363,10 @@ export class PaymentsWorker extends WorkerHost {
    * sink thật trong scope này → reschedule backoff có chặn, quarantine sau
    * MAX_OUTBOX_ATTEMPTS cho ops xử lý (không mark published giả).
    */
-  private async outboxDispatch(): Promise<{ claimed: number; quarantined: number }> {
+  private async outboxDispatch(): Promise<{
+    claimed: number;
+    quarantined: number;
+  }> {
     const due = await this.prisma.outboxEvent.findMany({
       where: {
         publishedAt: null,
