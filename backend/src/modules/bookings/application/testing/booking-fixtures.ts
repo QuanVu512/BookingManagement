@@ -6,6 +6,7 @@ import type {
   CourtScheduleReader,
 } from '../../../courts/application/court-schedule-reader.js';
 import { BookingStore, type StoredBooking } from '../../ports/booking-store.js';
+import type { BookingSlotLock } from '../../ports/booking-slot-lock.js';
 
 const transaction: TransactionContext = Object.create(null);
 
@@ -34,6 +35,9 @@ export function createFakeBookingStore() {
     bookings: [],
     nextCursor: null,
   }));
+  const loadBookingOwner = jest.fn<BookingStore['loadBookingOwner']>(
+    async () => 'user',
+  );
   const loadCancellationLookup = jest.fn<
     BookingStore['loadCancellationLookup']
   >(async () => null);
@@ -47,6 +51,9 @@ export function createFakeBookingStore() {
   const hasEffectiveOccupancyConflict = jest.fn<
     BookingStore['hasEffectiveOccupancyConflict']
   >(async () => false);
+  const findEffectiveOccupanciesForRange = jest.fn<
+    BookingStore['findEffectiveOccupanciesForRange']
+  >(async () => []);
   const store: BookingStore = {
     withTransaction: async <Result>(
       work: (
@@ -61,11 +68,13 @@ export function createFakeBookingStore() {
     loadCustomer,
     createHoldAggregate,
     loadMine,
+    loadBookingOwner,
     loadCancellationLookup,
     markCancelled,
     releaseCancelled,
     readBooking,
     hasEffectiveOccupancyConflict,
+    findEffectiveOccupanciesForRange,
   };
   return {
     store,
@@ -77,11 +86,13 @@ export function createFakeBookingStore() {
       loadCustomer,
       createHoldAggregate,
       loadMine,
+      loadBookingOwner,
       loadCancellationLookup,
       markCancelled,
       releaseCancelled,
       readBooking,
       hasEffectiveOccupancyConflict,
+      findEffectiveOccupanciesForRange,
     },
   };
 }
@@ -91,6 +102,32 @@ export function createFakeScheduleReader() {
   const quote = jest.fn<CourtScheduleReader['quote']>();
   const schedule: CourtScheduleReader = { getActiveSchedule, quote };
   return { schedule, mocks: { getActiveSchedule, quote } };
+}
+
+/**
+ * In-memory `BookingSlotLock` fake: the first `acquire` wins until
+ * `release`, mirroring Redis `SET NX PX` for concurrency tests.
+ */
+export function createFakeSlotLock() {
+  const held = new Set<string>();
+  const releasedKeys: string[] = [];
+  const lock: BookingSlotLock = {
+    acquire: async (key: string) => {
+      if (held.has(key)) return null;
+      held.add(key);
+      let released = false;
+      return {
+        key,
+        release: async () => {
+          if (released) return;
+          released = true;
+          held.delete(key);
+          releasedKeys.push(key);
+        },
+      };
+    },
+  };
+  return { lock, held, releasedKeys };
 }
 
 export function courtSchedule(): CourtSchedule {

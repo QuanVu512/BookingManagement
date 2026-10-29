@@ -87,6 +87,15 @@ export interface BookingPage {
   nextCursor: string | null;
 }
 
+export type StoredOccupancyKind = 'HOLDING' | 'CONFIRMED' | 'MAINTENANCE';
+
+export interface StoredOccupancyInterval {
+  startsAt: Date;
+  bufferEndsAt: Date;
+  kind: StoredOccupancyKind;
+  holdExpiresAt: Date | null;
+}
+
 /**
  * Booking aggregate persistence port. It owns transaction boundaries and only
  * exposes operations the Booking use cases actually need.
@@ -141,6 +150,16 @@ export abstract class BookingStore {
     cursor?: string,
   ): Promise<BookingPage>;
 
+  /**
+   * Ownership lookup for a single booking. Returns the stored owner
+   * (`null` for guest bookings) or `null` when the booking is missing.
+   * Callers apply `assertBookingOwnership` and map denial to 404.
+   */
+  abstract loadBookingOwner(
+    transaction: TransactionContext,
+    bookingId: string,
+  ): Promise<string | null | undefined>;
+
   abstract loadCancellationLookup(
     transaction: TransactionContext,
     bookingId: string,
@@ -179,4 +198,19 @@ export abstract class BookingStore {
     occupiedUntil: Date,
     now: Date,
   ): Promise<boolean>;
+
+  /**
+   * Day-grid occupancy snapshot for one court. Returns ACTIVE rows whose
+   * `[occupiedFrom, occupiedUntil)` half-open interval overlaps
+   * `[rangeStart, rangeEnd)`. HOLDING rows past `holdExpiresAt` are excluded
+   * so an expired hold never blocks the grid before the worker catches up.
+   * Zero PII: no customer, user or booking identity leaves this port.
+   */
+  abstract findEffectiveOccupanciesForRange(
+    transaction: TransactionContext,
+    courtId: string,
+    rangeStart: Date,
+    rangeEnd: Date,
+    now: Date,
+  ): Promise<StoredOccupancyInterval[]>;
 }

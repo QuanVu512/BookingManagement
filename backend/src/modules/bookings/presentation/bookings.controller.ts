@@ -18,8 +18,10 @@ import {
 } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard.js';
 import { AuthCsrfGuard } from '../../auth/guards/auth-csrf.guard.js';
+import type { AuthenticatedAccount } from '../../auth/services/auth-session.service.js';
 import { CurrentUser } from '../../auth/decorators/current-user.decorator.js';
 import { CreateHoldUseCase } from '../application/create-hold.use-case.js';
+import { GetMyBookingUseCase } from '../application/get-my-booking.use-case.js';
 import { ListMyBookingsUseCase } from '../application/list-my-bookings.use-case.js';
 import { CancelHoldUseCase } from '../application/cancel-hold.use-case.js';
 import { RequestPaidCancellationUseCase } from '../application/request-paid-cancellation.use-case.js';
@@ -45,6 +47,7 @@ import { presentBooking } from './booking-response.presenter.js';
 export class BookingsController {
   constructor(
     private readonly createHold: CreateHoldUseCase,
+    private readonly getBooking: GetMyBookingUseCase,
     private readonly listMine: ListMyBookingsUseCase,
     private readonly cancelHold: CancelHoldUseCase,
     private readonly requestCancelQuote: RequestPaidCancellationUseCase,
@@ -93,6 +96,34 @@ export class BookingsController {
       data: page.bookings.map(presentBooking),
       nextCursor: page.nextCursor,
     };
+  }
+
+  @Get(':id')
+  @ApiOkResponse({ type: BookingResponseDto })
+  @Header('Cache-Control', 'no-store, private')
+  @ApiOperation({
+    summary: 'Chi tiết đơn của tôi; đơn người khác trả 404',
+  })
+  async detail(
+    @CurrentUser() account: AuthenticatedAccount,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    try {
+      // `userId`/roles come only from the verified JWT (`request.user`);
+      // no `userId` is accepted from body/query.
+      return {
+        success: true,
+        data: presentBooking(
+          await this.getBooking.execute({
+            bookingId: id,
+            requesterUserId: account.userId,
+            requesterRoles: account.roles,
+          }),
+        ),
+      };
+    } catch (error: unknown) {
+      return rethrowBookingHttpError(error);
+    }
   }
 
   @Patch(':id/cancel')

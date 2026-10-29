@@ -1,5 +1,6 @@
 import type { StoredBooking } from '../ports/booking-store.js';
 import type { AvailabilityView } from '../application/quote-availability.use-case.js';
+import type { CourtDayOccupanciesView } from '../application/get-court-day-occupancies.use-case.js';
 
 export function presentBooking(booking: StoredBooking) {
   return {
@@ -28,6 +29,23 @@ export function presentBooking(booking: StoredBooking) {
       durationMinutes: item.durationMinutes,
       pricePerHour: item.pricePerHour,
       amount: item.amount,
+    })),
+  };
+}
+
+export function presentCourtDayOccupancies(view: CourtDayOccupanciesView) {
+  return {
+    courtId: view.courtId,
+    date: view.date,
+    timezone: view.timezone,
+    serverNow: view.serverNow.toISOString(),
+    cleanupMinutes: view.cleanupMinutes,
+    businessHours: view.businessHours,
+    // Zero PII: only interval bounds + public kind cross the wire.
+    occupiedIntervals: view.occupiedIntervals.map((interval) => ({
+      startsAt: interval.startsAt.toISOString(),
+      bufferEndsAt: interval.bufferEndsAt.toISOString(),
+      kind: interval.kind,
     })),
   };
 }

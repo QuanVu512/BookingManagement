@@ -17,6 +17,7 @@ import {
   type ExpiryScope,
   type ReplayBooking,
   type StoredBooking,
+  type StoredOccupancyInterval,
 } from '../ports/booking-store.js';
 
 const bookingInclude = {
@@ -221,6 +222,17 @@ export class PrismaBookingStore extends BookingStore {
     };
   }
 
+  async loadBookingOwner(
+    transaction: TransactionContext,
+    bookingId: string,
+  ): Promise<string | null | undefined> {
+    const row = await transaction.booking.findUnique({
+      where: { id: bookingId },
+      select: { userId: true },
+    });
+    return row?.userId;
+  }
+
   async loadCancellationLookup(
     transaction: TransactionContext,
     bookingId: string,
@@ -291,6 +303,55 @@ export class PrismaBookingStore extends BookingStore {
         actorUserId: userId,
       },
     });
+  }
+
+  async findEffectiveOccupanciesForRange(
+    transaction: TransactionContext,
+    courtId: string,
+    rangeStart: Date,
+    rangeEnd: Date,
+    now: Date,
+  ): Promise<StoredOccupancyInterval[]> {
+    const rows = await transaction.courtOccupancy.findMany({
+      where: {
+        courtId,
+        state: 'ACTIVE',
+        occupiedFrom: { lt: rangeEnd },
+        occupiedUntil: { gt: rangeStart },
+        OR: [
+          { bookingId: null },
+          { booking: { is: { status: { not: 'HOLDING' } } } },
+          {
+            booking: {
+              is: { status: 'HOLDING', holdExpiresAt: { gt: now } },
+            },
+          },
+        ],
+      },
+      select: {
+        occupiedFrom: true,
+        occupiedUntil: true,
+        bookingId: true,
+        booking: { select: { status: true, holdExpiresAt: true } },
+      },
+      orderBy: { occupiedFrom: 'asc' },
+    });
+    return rows.map((row) => ({
+      startsAt: row.occupiedFrom,
+      // occupiedUntil already includes the court cleanup snapshot: never add
+      // buffer a second time when mapping or comparing intervals.
+      bufferEndsAt: row.occupiedUntil,
+      kind:
+        row.bookingId === null
+          ? 'MAINTENANCE'
+          : row.booking?.status === 'HOLDING'
+            ? 'HOLDING'
+            : 'CONFIRMED',
+      holdExpiresAt:
+        row.booking?.status === 'HOLDING'
+          ? (row.booking.holdExpiresAt ?? null)
+          : null,
+    }));
   }
 
   async readBooking(

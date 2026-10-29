@@ -68,4 +68,46 @@ describe('QuoteAvailabilityUseCase', () => {
     expect(result.available).toBe(false);
     expect(result.reason).toContain('5 phút');
   });
+
+  it('serves quote from Redis cache without querying database transaction on rapid clicks', async () => {
+    const fakeClient = {
+      isOpen: true,
+      get: jest.fn<() => Promise<string | null>>().mockResolvedValue(
+        JSON.stringify({
+          available: true,
+          reason: null,
+          serverNow: '2035-01-08T00:00:00.000Z',
+          timezone: 'Asia/Ho_Chi_Minh',
+          cleanupMinutes: 15,
+          occupiedUntil: '2035-01-08T09:15:00.000Z',
+          totalAmount: 200000,
+          currency: 'VND',
+          priceItems: [
+            {
+              startsAt: '2035-01-08T08:00:00.000Z',
+              endsAt: '2035-01-08T09:00:00.000Z',
+              durationMinutes: 60,
+              pricePerHour: 200000,
+              amount: 200000,
+            },
+          ],
+        }),
+      ),
+      set: jest.fn<() => Promise<string>>().mockResolvedValue('OK'),
+    };
+    const cachedUseCase = new QuoteAvailabilityUseCase(
+      store,
+      schedule,
+      { client: fakeClient } as any,
+    );
+
+    const result = await cachedUseCase.execute(query);
+    expect(fakeClient.get).toHaveBeenCalledWith(
+      `avail:${query.courtId}:${query.startsAt}:${query.endsAt}`,
+    );
+    expect(result.totalAmount).toBe(200000);
+    expect(result.serverNow).toBeInstanceOf(Date);
+    // When served from cache, withTransaction is never called
+    expect(mocks.databaseNow).not.toHaveBeenCalled();
+  });
 });

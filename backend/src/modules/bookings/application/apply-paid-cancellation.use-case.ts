@@ -5,11 +5,14 @@ import {
   ForbiddenException,
   GoneException,
   Injectable,
+  Optional,
 } from '@nestjs/common';
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service.js';
+import { RedisService } from '../../../infrastructure/redis/redis.service.js';
 import { PAYMENT_TRANSACTION_OPTIONS } from '../../payments/payment.constants.js';
 import { quoteAggregateCancellation } from '../domain/cancellation-policy.js';
 import { isInLateCancelWindow } from '../domain/deposit-forfeiture.js';
+import { invalidateCourtDayCache } from './get-court-day-occupancies.use-case.js';
 import type { CancellationActorType } from './request-paid-cancellation.use-case.js';
 
 export interface ApplyPaidCancellationInput {
@@ -41,7 +44,10 @@ export interface AppliedCancellationResult {
  */
 @Injectable()
 export class ApplyPaidCancellationUseCase {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Optional() private readonly redis?: RedisService,
+  ) {}
 
   async execute(
     input: ApplyPaidCancellationInput,
@@ -62,7 +68,8 @@ export class ApplyPaidCancellationUseCase {
         message: 'Khóa idempotency không hợp lệ.',
       });
     }
-    return this.prisma.$transaction(async (transaction) => {
+    let releasedCourtId: string | null = null;
+    const result = await this.prisma.$transaction(async (transaction) => {
       await transaction.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('booking-money'), hashtext(${input.bookingId}))`;
       const [clock] = await transaction.$queryRaw<
         { now: Date }[]
@@ -129,7 +136,10 @@ export class ApplyPaidCancellationUseCase {
             message: 'Không có quyền hủy đơn này.',
           });
         }
-      } else if (booking.userId === null || booking.userId !== input.actorUserId) {
+      } else if (
+        booking.userId === null ||
+        booking.userId !== input.actorUserId
+      ) {
         throw new ForbiddenException({
           code: 'NOT_YOUR_BOOKING',
           message: 'Không có quyền hủy đơn này.',
@@ -215,7 +225,9 @@ export class ApplyPaidCancellationUseCase {
         'cancel-v1.0',
       ].sort();
       const rawJoined = revisionParts.join('|');
-      const hashedRevision = createHash('sha256').update(rawJoined).digest('hex');
+      const hashedRevision = createHash('sha256')
+        .update(rawJoined)
+        .digest('hex');
       const revisionMatches =
         quote.paymentSnapshotRevision === hashedRevision ||
         quote.paymentSnapshotRevision === rawJoined;
@@ -253,6 +265,7 @@ export class ApplyPaidCancellationUseCase {
         where: { bookingId: booking.id, state: 'ACTIVE' },
         data: { state: 'RELEASED', releasedAt: decidedAt },
       });
+      releasedCourtId = booking.courtId;
       await transaction.bookingStatusHistory.create({
         data: {
           bookingId: booking.id,
@@ -280,7 +293,9 @@ export class ApplyPaidCancellationUseCase {
       for (const line of policy.lines) {
         if (line.refundAmount <= 0) continue;
         const existing = await transaction.refundRequest.findUnique({
-          where: { idempotencyKey: `cancel-apply:${quote.id}:${line.receiptId}` },
+          where: {
+            idempotencyKey: `cancel-apply:${quote.id}:${line.receiptId}`,
+          },
           select: { id: true },
         });
         if (existing) {
@@ -322,5 +337,11 @@ export class ApplyPaidCancellationUseCase {
         replayed: false,
       };
     }, PAYMENT_TRANSACTION_OPTIONS);
+    // Day-grid invalidation after commit (fail-open). Replay path leaves
+    // releasedCourtId null, so no invalidation is attempted for it.
+    if (releasedCourtId) {
+      await invalidateCourtDayCache(this.redis, releasedCourtId);
+    }
+    return result;
   }
 }

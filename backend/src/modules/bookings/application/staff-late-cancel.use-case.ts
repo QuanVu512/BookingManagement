@@ -3,8 +3,10 @@ import {
   ConflictException,
   ForbiddenException,
   Injectable,
+  Optional,
 } from '@nestjs/common';
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service.js';
+import { RedisService } from '../../../infrastructure/redis/redis.service.js';
 import { PAYMENT_TRANSACTION_OPTIONS } from '../../payments/payment.constants.js';
 import { PaymentAuditLogger } from '../../payments/infrastructure/payment-audit-logger.js';
 import {
@@ -12,6 +14,7 @@ import {
   type DepositForfeitureTxResult,
 } from './deposit-forfeiture-tx.js';
 import { isInLateCancelWindow } from '../domain/deposit-forfeiture.js';
+import { invalidateCourtDayCache } from './get-court-day-occupancies.use-case.js';
 
 /**
  * D16 — Staff hủy muộn trong [startsAt − 12h, endsAt).
@@ -26,6 +29,7 @@ export class StaffLateCancelUseCase {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: PaymentAuditLogger,
+    @Optional() private readonly redis?: RedisService,
   ) {}
 
   async execute(input: {
@@ -54,7 +58,8 @@ export class StaffLateCancelUseCase {
         message: 'Khóa idempotency không hợp lệ.',
       });
     }
-    return this.prisma.$transaction(async (transaction) => {
+    let cancelledCourtId: string | null = null;
+    const result = await this.prisma.$transaction(async (transaction) => {
       await transaction.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('booking-money'), hashtext(${input.bookingId}))`;
       const [clock] = await transaction.$queryRaw<
         { now: Date }[]
@@ -91,6 +96,7 @@ export class StaffLateCancelUseCase {
       }
       const total = Number(booking.totalAmount.toString());
       const reason = input.reason.trim();
+      cancelledCourtId = booking.courtId;
       return applyDepositForfeitureTx(transaction, this.audit, {
         booking: {
           id: booking.id,
@@ -114,5 +120,11 @@ export class StaffLateCancelUseCase {
         requestKey: input.idempotencyKey,
       });
     }, PAYMENT_TRANSACTION_OPTIONS);
+    // Day-grid invalidation after a real mutation (fail-open). Replay leaves
+    // the snapshot untouched, so no invalidation is needed for it.
+    if (!result.replayed && cancelledCourtId) {
+      await invalidateCourtDayCache(this.redis, cancelledCourtId);
+    }
+    return result;
   }
 }

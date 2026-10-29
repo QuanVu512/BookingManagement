@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { CourtScheduleReader } from '../../courts/application/court-schedule-reader.js';
 import type { TransactionContext } from '../../../infrastructure/prisma/transaction-context.js';
@@ -12,6 +12,13 @@ import {
   isExclusionConflictError,
 } from '../domain/booking-errors.js';
 import {
+  SLOT_LOCK_TTL_MS,
+  buildSlotLockKey,
+} from '../domain/booking-slot-key.js';
+import { BookingSlotLock } from '../ports/booking-slot-lock.js';
+import { RedisService } from '../../../infrastructure/redis/redis.service.js';
+import { invalidateCourtDayCache } from './get-court-day-occupancies.use-case.js';
+import {
   BookingStore,
   type BookingDraft,
   type BookingPriceLine,
@@ -21,16 +28,54 @@ import type { CreateHoldCommand } from './booking.commands.js';
 
 @Injectable()
 export class CreateHoldUseCase {
+  private readonly logger = new Logger(CreateHoldUseCase.name);
+
   constructor(
     private readonly bookings: BookingStore,
     private readonly schedule: CourtScheduleReader,
+    @Optional() private readonly slotLock?: BookingSlotLock,
+    @Optional() private readonly redis?: RedisService,
   ) {}
 
   async execute(command: CreateHoldCommand): Promise<StoredBooking> {
+    // Distributed slot lock: two requests for the same court/window contend
+    // on one Redis key. Denial maps to 409 so the client retries another
+    // slot. The DB exclusion constraint stays the authoritative backstop.
+    const lockKey = buildSlotLockKey(
+      command.courtId,
+      command.startsAt,
+      command.endsAt,
+    );
+    let lease: Awaited<ReturnType<BookingSlotLock['acquire']>> | null = null;
+    let lockContended = false;
+    if (this.slotLock) {
+      try {
+        lease = await this.slotLock.acquire(lockKey, SLOT_LOCK_TTL_MS);
+        // Null (not a throw) means SET NX lost the race: another request
+        // holds this court/window. Fail-open adapters return a no-op lease
+        // instead of null, so null always means genuine contention here.
+        lockContended = lease === null;
+      } catch {
+        // Fail open: Redis outage must not take booking down while the
+        // exclusion constraint still rejects overlapping occupancy.
+        this.logger.warn(
+          `Slot lock unavailable for ${lockKey}; proceeding without it.`,
+        );
+      }
+      if (lockContended) {
+        throw new BookingConflictError(
+          'Sân đang được giữ bởi yêu cầu khác trong khung giờ này. Hãy thử lại.',
+        );
+      }
+    }
     try {
-      return await this.bookings.withTransaction((transaction, store) =>
-        this.createInTransaction(transaction, store, command),
+      const created = await this.bookings.withTransaction(
+        (transaction, store) =>
+          this.createInTransaction(transaction, store, command),
       );
+      // Day-grid cache invalidation after commit (best-effort, fail-open).
+      await invalidateCourtDayCache(this.redis, command.courtId);
+      return created;
     } catch (error: unknown) {
       // Only translate the DB exclusion guard that this use case owns. Other
       // failures (including Courts' own 400/404 errors) keep flowing to the
@@ -40,6 +85,8 @@ export class CreateHoldUseCase {
           'Sân vừa được giữ trong khoảng này, kể cả thời gian vệ sinh. Hãy chọn giờ khác.',
         );
       throw error;
+    } finally {
+      if (lease) await lease.release();
     }
   }
 

@@ -89,6 +89,41 @@ describe('CancelHoldUseCase', () => {
     expect(mocks.releaseCancelled).not.toHaveBeenCalled();
   });
 
+  it('invalidates the populated day-grid cache after a successful cancel', async () => {
+    const memory = new Map<string, string>([
+      ['court_day_occupancies:court:2035-01-08', '{"occupiedIntervals":[]}'],
+    ]);
+    const fakeRedis = {
+      client: {
+        isOpen: true,
+        get: async (key: string) => memory.get(key) ?? null,
+        set: async (key: string, value: string) => {
+          memory.set(key, value);
+        },
+        incr: async (key: string) => {
+          const next = Number(memory.get(key) ?? 0) + 1;
+          memory.set(key, String(next));
+          return next;
+        },
+        scan: async (cursor: string, options?: { MATCH?: string }) => {
+          const pattern = (options?.MATCH ?? '').replace(/\*$/, '');
+          return {
+            cursor: '0',
+            keys: [...memory.keys()].filter((key) => key.startsWith(pattern)),
+          };
+        },
+        del: async (keys: string[]) => {
+          for (const key of keys) memory.delete(key);
+        },
+      },
+    };
+    const invalidatingCase = new CancelHoldUseCase(store, fakeRedis as never);
+    await invalidatingCase.execute(command);
+    expect(
+      memory.get('court_day_occupancies:court:2035-01-08'),
+    ).toBeUndefined();
+  });
+
   it.each([
     [
       'already started',
