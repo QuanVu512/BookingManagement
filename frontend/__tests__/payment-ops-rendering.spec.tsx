@@ -33,7 +33,7 @@ describe('GuestBookingForm (FE-PAY-04, MIG-11/MIG-17)', () => {
     const { container, root } = render(
       <GuestBookingForm courtId="court-1" onCreated={onCreated} />,
     );
-    expect(container.textContent).toContain('khách vãng lai');
+    expect(container.textContent?.toLowerCase()).toMatch(/khách chưa có tài khoản|khách vãng lai/);
     expect(container.textContent).toContain('30%');
     expect(container.textContent).not.toContain('45.000');
     const form = container.querySelector('form');

@@ -1,4 +1,4 @@
-﻿import Link from 'next/link';
+import Link from 'next/link';
 import { ArenaShell } from '../../components/arena/arena-shell';
 import { ArenaIcon } from '../../components/arena/arena-icon';
 import { MyBookingsPanel } from '../../features/booking/components/my-bookings-panel';
@@ -28,9 +28,9 @@ function BookingsHeading() {
       <div>
         <p className="arena-eyebrow">
           <ArenaIcon name="ticket" />
-          Lịch thi đấu cá nhân
+          Lịch sử đặt sân & đơn hàng
         </p>
-        <h1>LỊCH CỦA TÔI</h1>
+        <h1>LỊCH SỬ ĐƠN HÀNG</h1>
         <p>Trạng thái đặt sân được cập nhật tự động từ máy chủ.</p>
       </div>
       <Link href="/booking" className="arena-button arena-button-neon">
@@ -42,20 +42,10 @@ function BookingsHeading() {
 }
 
 function BookingsTabs({ tab }: { tab: 'bookings' | 'payments' }) {
+  if (tab !== 'payments') return null;
   return (
     <nav className="arena-history-tabs" aria-label="Khu vực lịch sử đặt sân">
-      <Link
-        href="/bookings"
-        aria-current={tab === 'bookings' ? 'page' : undefined}
-      >
-        Lịch sử đặt sân
-      </Link>
-      <Link
-        href="/bookings?tab=payments"
-        aria-current={tab === 'payments' ? 'page' : undefined}
-      >
-        Hóa đơn & thanh toán
-      </Link>
+      <Link href="/bookings">← Quay lại Lịch sử đơn hàng</Link>
     </nav>
   );
 }

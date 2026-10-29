@@ -6,33 +6,86 @@
 .back {
   display: inline-block;
   margin-bottom: 16px;
+  color: var(--text-secondary);
+  text-decoration: none;
+  font-weight: 500;
+  transition: color 0.15s ease;
+}
+
+.back:hover {
+  color: var(--accent-volt, #a3e635);
 }
 
 .page h1 {
-  margin-bottom: 20px;
+  margin-bottom: 24px;
+  font-size: 1.85rem;
+  font-weight: 800;
+  color: var(--text-primary);
 }
 
 .panel {
   border: 1px solid var(--border-subtle);
   border-radius: 16px;
-  padding: 20px;
-  background: var(--bg-pill);
+  padding: 24px;
+  background: var(--bg-card, #151d2e);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+  margin-bottom: 24px;
+}
+
+.profileHeader {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 20px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.avatar {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, rgba(163, 230, 53, 0.2), rgba(16, 231, 96, 0.15));
+  border: 2px solid var(--accent-volt, #a3e635);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--accent-volt, #a3e635);
+  flex-shrink: 0;
+}
+
+.profileMeta h2 {
+  margin: 0 0 4px;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.profileMeta p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.875rem;
 }
 
 .grid {
   display: grid;
-  grid-template-columns: minmax(140px, 220px) 1fr;
-  gap: 12px 20px;
+  grid-template-columns: minmax(130px, 180px) 1fr;
+  gap: 14px 20px;
   margin: 0;
 }
 
 .grid dt {
   color: var(--text-secondary);
   font-weight: 600;
+  font-size: 0.9rem;
 }
 
 .grid dd {
   margin: 0;
+  color: var(--text-primary);
+  font-weight: 500;
   overflow-wrap: anywhere;
 }
 

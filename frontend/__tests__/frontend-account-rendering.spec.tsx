@@ -73,7 +73,7 @@ afterEach(async () => {
 });
 
 describe('RF-06A account navigation and read-only views', () => {
-  it('renders the five-item disclosure menu with native targets', async () => {
+  it('renders the disclosure menu with native targets', async () => {
     await act(async () => root.render(<AccountMenu user={user} onLogout={logout} />));
     const trigger = document.querySelector('button[aria-haspopup="menu"]');
     expect(trigger?.getAttribute('aria-expanded')).toBe('false');
@@ -87,10 +87,7 @@ describe('RF-06A account navigation and read-only views', () => {
     );
     expect(items).toEqual([
       { text: 'Thông tin cá nhân', href: '/account' },
-      { text: 'Bảo mật tài khoản', href: '/account/security' },
-      { text: 'Quyền riêng tư & Dữ liệu', href: '/account/privacy' },
-      { text: 'Lịch sử đặt sân', href: '/bookings' },
-      { text: 'Hóa đơn & thanh toán', href: '/bookings?tab=payments' },
+      { text: 'Lịch sử đơn hàng', href: '/bookings' },
       { text: 'Đăng xuất', href: null },
     ]);
     expect(document.querySelector('[aria-current="page"]')?.textContent).toBe(
@@ -120,19 +117,20 @@ describe('RF-06A account navigation and read-only views', () => {
     expect(trigger.getAttribute('aria-expanded')).toBe('false');
   });
 
-  it('renders real profile fields without non-functional account CTAs', async () => {
+  it('renders real profile fields without non-functional account CTAs or role/notice', async () => {
     await act(async () => root.render(<AccountProfileView user={user} />));
     const text = document.body.textContent ?? '';
     expect(text).toContain('customer01');
     expect(text).toContain('Nguyen Van A');
     expect(text).toContain('a@example.com');
     expect(text).toContain('0901234567');
-    expect(text).toContain('CUSTOMER');
+    expect(text).not.toContain('Vai trò');
     for (const dead of [
       'Đổi thông tin',
       'Bật 2FA',
       'Xóa tài khoản',
       'Quản lý thiết bị',
+      'Hệ thống chưa hỗ trợ chỉnh sửa hồ sơ trực tiếp',
     ])
       expect(text).not.toContain(dead);
     expect(document.querySelectorAll('button')).toHaveLength(0);

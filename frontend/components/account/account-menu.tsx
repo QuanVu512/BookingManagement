@@ -7,10 +7,7 @@ import styles from './account-menu.module.css';
 
 const MENU_LINKS = [
   { label: 'Thông tin cá nhân', href: '/account' },
-  { label: 'Bảo mật tài khoản', href: '/account/security' },
-  { label: 'Quyền riêng tư & Dữ liệu', href: '/account/privacy' },
-  { label: 'Lịch sử đặt sân', href: '/bookings' },
-  { label: 'Hóa đơn & thanh toán', href: '/bookings?tab=payments' },
+  { label: 'Lịch sử đơn hàng', href: '/bookings' },
 ] as const;
 
 export function AccountMenu({
@@ -61,7 +58,9 @@ export function AccountMenu({
   }, [open]);
 
   const current = (href: string) =>
-    href === '/bookings' ? pathname === '/bookings' : pathname === href;
+    href === '/bookings'
+      ? pathname === '/bookings' || pathname.startsWith('/bookings')
+      : pathname === href;
 
   return (
     <div className={styles.container} ref={containerRef}>
