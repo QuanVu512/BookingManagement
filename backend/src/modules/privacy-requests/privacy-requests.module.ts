@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { AuthModule } from '../auth/auth.module.js';
 import { PrivacyRequestsController } from './presentation/privacy-requests.controller.js';
 import { GuestPrivacyRequestsController } from './presentation/guest-privacy-requests.controller.js';
 import { SubmitPrivacyRequestUseCase } from './application/submit-privacy-request.use-case.js';
@@ -11,7 +12,7 @@ import { PRIVACY_REQUEST_STORE } from './ports/privacy-request-store.js';
 import { PaymentsModule } from '../payments/payments.module.js';
 
 @Module({
-  imports: [PaymentsModule],
+  imports: [AuthModule, PaymentsModule],
   controllers: [PrivacyRequestsController, GuestPrivacyRequestsController],
   providers: [
     InMemoryPrivacyRequestStore,
