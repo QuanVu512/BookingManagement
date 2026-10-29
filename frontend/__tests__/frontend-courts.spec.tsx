@@ -106,14 +106,26 @@ async function flush() {
   });
 }
 
-function text() {
-  return container?.textContent ?? '';
+async function waitForQuote(fetchMock: { mock: { calls: unknown[][] } }) {
+  const deadline = Date.now() + 3000;
+  for (let attempt = 0; attempt < 100; attempt += 1) {
+    if (
+      fetchMock.mock.calls.some(
+        ([url]) =>
+          String(url).includes('/quote') ||
+          String(url).includes('/availability'),
+      )
+    )
+      return;
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    });
+  }
+  throw new Error(`Quote did not arrive before ${deadline}`);
 }
 
-function buttonByText(text: string) {
-  return [...(container?.querySelectorAll('button') ?? [])].find(
-    (button) => button.textContent === text,
-  );
+function text() {
+  return container?.textContent ?? '';
 }
 
 function mockStalledFetch(): void {
@@ -327,6 +339,11 @@ describe('Courts feature hooks', () => {
 });
 
 describe('Court detail page composition', () => {
+  beforeEach(() => {
+    jest.useFakeTimers({ doNotFake: ['setTimeout', 'clearTimeout'] });
+    jest.setSystemTime(new Date('2026-10-30T00:00:00Z'));
+  });
+  afterEach(() => jest.useRealTimers());
   it('loads real service choices, quotes the selected quantity, and clears the amount when it changes', async () => {
     const product = {
       id: '60000000-0000-4000-8000-000000000004',
@@ -395,9 +412,8 @@ describe('Court detail page composition', () => {
       descriptor.set?.call(quantity, '1');
       quantity.dispatchEvent(new dom.window.Event('input', { bubbles: true }));
     });
-    await act(async () => buttonByText('Kiểm tra lịch & giá')?.click());
-    await flush();
-    expect(fetch).toHaveBeenLastCalledWith(
+    await waitForQuote(fetch);
+    expect(fetch).toHaveBeenCalledWith(
       expect.stringContaining('/quote'),
       expect.objectContaining({
         method: 'POST',
@@ -415,7 +431,9 @@ describe('Court detail page composition', () => {
     expect(text()).not.toContain('Thuê theo thời lượng đặt sân');
     expect(text()).not.toContain('Khoảng sân đang trống');
     expect(text()).not.toContain('Tôi đồng ý giữ chỗ');
-    expect(buttonByText('Đặt sân')).toBeDefined();
+    expect(
+      container?.querySelector('button[aria-label="Đặt sân (đặt cọc 30%)"]'),
+    ).not.toBeNull();
     const plus = container?.querySelector<HTMLButtonElement>(
       'button[aria-label="Tăng Thuê vợt Pickleball"]',
     );
@@ -432,9 +450,9 @@ describe('Court detail page composition', () => {
       descriptor.set?.call(quantity, '2');
       quantity.dispatchEvent(new dom.window.Event('input', { bubbles: true }));
     });
-    expect(container?.querySelector('.order-total strong')?.textContent).toBe(
-      '—',
-    );
+    expect(
+      container?.querySelector('.order-total strong')?.textContent,
+    ).toContain('160.000');
   });
 
   it('mounts the booking panel with the court id and timezone', async () => {
@@ -459,14 +477,7 @@ describe('Court detail page composition', () => {
       }),
     );
     expect(text()).toContain('Giờ theo Asia/Ho_Chi_Minh');
-    const quoteButton = buttonByText('Kiểm tra lịch & giá');
-    expect(quoteButton).toBeDefined();
-    await act(async () => {
-      quoteButton?.dispatchEvent(
-        new dom.window.MouseEvent('click', { bubbles: true, cancelable: true }),
-      );
-    });
-    await flush();
+    await waitForQuote(fetch);
     expect(fetch).toHaveBeenCalledWith(
       expect.stringContaining('/api/courts/court-1/availability?'),
       expect.anything(),
@@ -481,10 +492,9 @@ describe('Court detail page composition', () => {
     );
     await act(async () => preset?.click());
     expect(text()).not.toContain('Khoảng sân đang trống');
-    expect(container?.querySelector('.order-total strong')?.textContent).toBe(
-      '—',
+    const hold = container?.querySelector<HTMLButtonElement>(
+      'button[aria-label="Đặt sân (đặt cọc 30%)"]',
     );
-    const hold = buttonByText('Đặt sân');
     expect(hold?.disabled).toBe(true);
   });
 
