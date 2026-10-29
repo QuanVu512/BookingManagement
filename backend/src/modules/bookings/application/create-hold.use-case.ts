@@ -63,9 +63,21 @@ export class CreateHoldUseCase {
         );
       }
       if (lockContended) {
-        throw new BookingConflictError(
-          'Sân đang được giữ bởi yêu cầu khác trong khung giờ này. Hãy thử lại.',
-        );
+        // Wait on the database idempotency lock before rejecting a contender:
+        // a concurrent retry must replay the first committed request.
+        return this.bookings.withTransaction(async (transaction, store) => {
+          await store.lockIdempotency(
+            transaction,
+            command.userId,
+            command.idempotencyKey,
+          );
+          const now = await store.databaseNow(transaction);
+          const replay = await this.replay(transaction, store, command, now);
+          if (replay) return replay;
+          throw new BookingConflictError(
+            'Sân đang được giữ bởi yêu cầu khác trong khung giờ này. Hãy thử lại.',
+          );
+        });
       }
     }
     try {

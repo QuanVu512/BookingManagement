@@ -89,6 +89,28 @@ describe('CreateHoldUseCase slot lock (concurrency)', () => {
     }
   });
 
+  it('replays the committed request when the Redis slot lock is contended', async () => {
+    const { lock } = createFakeSlotLock();
+    const lease = await lock.acquire(expectedKey, 8000);
+    try {
+      const { useCase, mocks } = setup(lock);
+      mocks.findReplay.mockResolvedValue({
+        id: 'booking',
+        courtId: command.courtId,
+        startsAt: new Date(command.startsAt),
+        endsAt: new Date(command.endsAt),
+        prepaymentPercent: 30,
+      });
+      await expect(useCase.execute(command)).resolves.toMatchObject({
+        id: 'booking',
+      });
+      expect(mocks.lockIdempotency).toHaveBeenCalled();
+      expect(mocks.createHoldAggregate).not.toHaveBeenCalled();
+    } finally {
+      await lease?.release();
+    }
+  });
+
   it('always releases the lock, even when the transaction fails', async () => {
     const { lock, releasedKeys } = createFakeSlotLock();
     const { useCase, mocks } = setup(lock);
