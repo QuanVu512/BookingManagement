@@ -43,4 +43,7 @@ export {
   NotificationTemplate,
   NotificationStatus,
   PaymentRequestStatus,
+  GuestOtpProofStatus,
+  GuestCheckoutIntentStatus,
+  OutboxMessageStatus,
 } from '../generated/prisma/enums.js';

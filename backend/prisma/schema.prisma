@@ -84,6 +84,7 @@ enum ActorType {
 enum BookingTokenPurpose {
   CHECKIN
   MANAGE_BOOKING
+  CHECKOUT_RECOVERY
   @@map("booking_token_purpose")
 }
 
@@ -229,6 +230,28 @@ enum PaymentRequestStatus {
   EXPIRED
   FAILED
   @@map("payment_request_status")
+}
+
+enum GuestOtpProofStatus {
+  ACTIVE
+  CONSUMED
+  EXPIRED
+  @@map("guest_otp_proof_status")
+}
+
+enum GuestCheckoutIntentStatus {
+  COMMITTED
+  EXPIRED
+  @@map("guest_checkout_intent_status")
+}
+
+enum OutboxMessageStatus {
+  QUEUED
+  SENDING
+  SENT
+  FAILED
+  EXPIRED_SKIPPED
+  @@map("outbox_message_status")
 }
 
 model User {
@@ -469,6 +492,7 @@ model Booking {
   priceItems BookingPriceItem[] @relation("BookingPriceItem_booking")
   statusHistory BookingStatusHistory[] @relation("BookingStatusHistory_booking")
   accessTokens BookingAccessToken[] @relation("BookingAccessToken_booking")
+  checkoutIntent GuestCheckoutIntent? @relation("GuestCheckoutIntent_booking")
   checkin BookingCheckin? @relation("BookingCheckin_booking")
   cancellationRequests BookingCancellationRequest[] @relation("BookingCancellationRequest_booking")
   paymentRequests PaymentRequest[] @relation("PaymentRequest_booking")
@@ -622,6 +646,134 @@ model BookingAccessToken {
   @@unique([id, bookingId], map: "booking_access_tokens_id_booking_id_key")
   @@index([bookingId, purpose], map: "booking_access_tokens_booking_id_purpose_idx")
   @@map("booking_access_tokens")
+}
+
+/// Bước 2 — OTP challenge 6 số lưu PostgreSQL (thay Map in-memory).
+/// Chỉ lưu hash; code thô không bao giờ vào DB/log. TTL 5 phút, tối đa 5 lần
+/// nhập sai, resend cooldown 60 giây. Challenge cũ bị invalidate khi gửi mới.
+model GuestOtpChallenge {
+  /// ID challenge
+  id String @id(map: "guest_otp_challenges_pkey") @default(dbgenerated("gen_random_uuid()")) @map("id") @db.Uuid
+  /// Email chuẩn hóa lowercase/trim
+  email String @map("email") @db.VarChar(254)
+  /// GUEST_HOLD_CREATE
+  purpose String @default("GUEST_HOLD_CREATE") @map("purpose") @db.VarChar(40)
+  /// SHA-256 của purpose:email:code
+  codeHash String @map("code_hash") @db.Char(64)
+  /// Số lần nhập sai
+  attempts Int @default(0) @map("attempts") @db.SmallInt
+  /// Hết hạn sau 5 phút
+  expiresAt DateTime @map("expires_at") @db.Timestamptz(6)
+  /// Xác thực thành công
+  consumedAt DateTime? @map("consumed_at") @db.Timestamptz(6)
+  /// Bị thay bởi challenge mới hoặc khóa do sai quá số lần
+  invalidatedAt DateTime? @map("invalidated_at") @db.Timestamptz(6)
+  /// Tạo
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([email, createdAt], map: "guest_otp_challenges_email_created_at_idx")
+  @@index([email, expiresAt], map: "guest_otp_challenges_email_expires_at_idx")
+  @@map("guest_otp_challenges")
+}
+
+/// Contract F1 — proof OTP một lần cho guest hold.
+/// PostgreSQL là authority: conditional update ACTIVE->CONSUMED + unique
+/// intent.proof_id thay cho fencing lease Redis.
+model GuestOtpProof {
+  /// ID proof nhúng trong HMAC token
+  id String @id(map: "guest_otp_proofs_pkey") @default(dbgenerated("gen_random_uuid()")) @map("id") @db.Uuid
+  /// Email đã xác thực OTP
+  email String @map("email") @db.VarChar(254)
+  /// GUEST_HOLD_CREATE
+  purpose String @default("GUEST_HOLD_CREATE") @map("purpose") @db.VarChar(40)
+  /// SHA-256 hex của raw proof token
+  tokenHash String @unique(map: "guest_otp_proofs_token_hash_key") @map("token_hash") @db.Char(64)
+  /// ACTIVE, CONSUMED, EXPIRED
+  status GuestOtpProofStatus @default(ACTIVE) @map("status")
+  /// Số thế hệ fencing do DB tăng; chỉ để đối soát
+  fencingGeneration BigInt @default(0) @map("fencing_generation")
+  /// Proof hết hạn (5 phút)
+  expiresAt DateTime @map("expires_at") @db.Timestamptz(6)
+  /// Chỉ set khi commit intent thắng
+  consumedAt DateTime? @map("consumed_at") @db.Timestamptz(6)
+  /// Tạo
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  checkoutIntents GuestCheckoutIntent[] @relation("GuestCheckoutIntent_proof")
+  @@index([email, status, expiresAt], map: "guest_otp_proofs_email_status_expires_at_idx")
+  @@map("guest_otp_proofs")
+}
+
+/// Contract F1/F3 — intent bền vững của một guest hold đã commit.
+model GuestCheckoutIntent {
+  /// UUID do client sinh và giữ cùng recoverySecret
+  checkoutIntentId String @id(map: "guest_checkout_intents_pkey") @map("checkout_intent_id") @db.Uuid
+  /// Một intent cho mỗi booking
+  bookingId String @unique(map: "guest_checkout_intents_booking_id_key") @map("booking_id") @db.Uuid
+  /// Một proof chỉ được dùng cho một intent (invariant: intent luôn có proof)
+  otpProofId String @unique(map: "guest_checkout_intents_otp_proof_id_key") @map("otp_proof_id") @db.Uuid
+  /// SHA-256 hex của recoverySecret (raw chỉ ở client)
+  recoverySecretHash String @map("recovery_secret_hash") @db.Char(64)
+  /// SHA-256 hex của canonical payload v1
+  payloadFingerprint String @map("payload_fingerprint") @db.Char(64)
+  /// Version thuật toán fingerprint
+  fingerprintVersion String @default("v1") @map("fingerprint_version") @db.VarChar(10)
+  /// Thế hệ fencing do DB quản lý
+  fencingGeneration BigInt @default(0) @map("fencing_generation")
+  /// COMMITTED, EXPIRED
+  status GuestCheckoutIntentStatus @default(COMMITTED) @map("status")
+  /// Tạo
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  /// Hết hạn theo token recovery
+  expiresAt DateTime @map("expires_at") @db.Timestamptz(6)
+
+  booking Booking @relation("GuestCheckoutIntent_booking", fields: [bookingId], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "guest_checkout_intents_booking_id_fkey")
+  otpProof GuestOtpProof @relation("GuestCheckoutIntent_proof", fields: [otpProofId], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "guest_checkout_intents_otp_proof_id_fkey")
+  @@index([expiresAt], map: "guest_checkout_intents_expires_at_idx")
+  @@map("guest_checkout_intents")
+}
+
+/// Contract F6 — outbox gửi email recovery, mã hóa AES-256-GCM.
+model OutboxMessage {
+  /// ID job
+  id String @id(map: "outbox_messages_pkey") @default(dbgenerated("gen_random_uuid()")) @map("id") @db.Uuid
+  /// BOOKING, PAYMENT...
+  aggregateType String @map("aggregate_type") @db.VarChar(50)
+  /// Đối tượng sở hữu event
+  aggregateId String @map("aggregate_id") @db.Uuid
+  /// guest.recovery.invite
+  eventType String @map("event_type") @db.VarChar(100)
+  /// Ciphertext AES-256-GCM của payload/link
+  payloadCiphertext Bytes @map("payload_ciphertext") @db.ByteA
+  /// Nonce 12 bytes duy nhất cho mỗi bản ghi
+  iv Bytes @map("iv") @db.ByteA
+  /// Authentication tag 16 bytes
+  authTag Bytes @map("auth_tag") @db.ByteA
+  /// Phiên bản khóa
+  keyVersion String @map("key_version") @db.VarChar(30)
+  /// Tránh tạo hai job cùng event/booking
+  deduplicationKey String @unique(map: "outbox_messages_deduplication_key_key") @map("deduplication_key") @db.VarChar(150)
+  /// QUEUED, SENDING, SENT, FAILED, EXPIRED_SKIPPED
+  status OutboxMessageStatus @default(QUEUED) @map("status")
+  /// Số lần thử
+  attemptCount Int @default(0) @map("attempt_count")
+  /// Lịch retry
+  nextRetryAt DateTime? @map("next_retry_at") @db.Timestamptz(6)
+  /// Deadline của hold/link
+  expiresAt DateTime @map("expires_at") @db.Timestamptz(6)
+  /// Provider đã chấp nhận
+  sentAt DateTime? @map("sent_at") @db.Timestamptz(6)
+  /// Lỗi đã lọc secret/token
+  lastError String? @map("last_error") @db.Text
+  /// Tombstone: set khi purge retention; ciphertext/iv/tag phải zero-length
+  purgedAt DateTime? @map("purged_at") @db.Timestamptz(6)
+  /// Tạo
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  /// Cập nhật
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([status, nextRetryAt], map: "outbox_messages_status_next_retry_at_idx")
+  @@map("outbox_messages")
 }
 
 model BookingCheckin {
