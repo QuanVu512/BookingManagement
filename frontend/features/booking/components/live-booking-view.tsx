@@ -8,6 +8,7 @@ import type {
   BookingWindow,
   LiveBookingState,
 } from '../model/booking';
+import type { OccupancyGridState } from '../hooks/use-court-occupancy-grid';
 
 export interface LiveBookingViewProps {
   state: LiveBookingState;
@@ -19,6 +20,13 @@ export interface LiveBookingViewProps {
   onQuote: () => void;
   onCreate: () => void;
   onSignIn: () => void;
+  /** Day-grid occupancy feed (optional: absent keeps legacy static labels). */
+  courtId?: string;
+  occupancy?: OccupancyGridState | null;
+  /** True when the chosen window overlaps another booking (not self-hold). */
+  gridConflict?: boolean;
+  /** True when the grid failed to load or went stale past the threshold. */
+  gridLocked?: boolean;
 }
 
 function Quote({ quote }: { quote: Availability }) {
@@ -53,6 +61,8 @@ function BookingFields({
   onQuote,
   onCreate,
   timezone,
+  gridConflict,
+  gridLocked,
 }: Pick<
   LiveBookingViewProps,
   | 'state'
@@ -61,6 +71,8 @@ function BookingFields({
   | 'onQuote'
   | 'onCreate'
   | 'timezone'
+  | 'gridConflict'
+  | 'gridLocked'
 >) {
   return (
     <form
@@ -78,7 +90,12 @@ function BookingFields({
         <button type="button" className="btn btn-secondary" onClick={onQuote}>
           Kiểm tra lịch & giá
         </button>
-        <HoldSubmitButton state={state} authenticated={authenticated} />
+        <HoldSubmitButton
+          state={state}
+          authenticated={authenticated}
+          gridConflict={gridConflict}
+          gridLocked={gridLocked}
+        />
       </fieldset>
     </form>
   );
@@ -86,15 +103,25 @@ function BookingFields({
 function HoldSubmitButton({
   state,
   authenticated,
+  gridConflict,
+  gridLocked,
 }: {
   state: LiveBookingState;
   authenticated: boolean;
+  gridConflict?: boolean;
+  gridLocked?: boolean;
 }) {
+  const gridBlocked = gridConflict === true || gridLocked === true;
   return (
     <button
       type="submit"
       className="btn btn-primary"
-      disabled={!authenticated || !state.quote?.available || !!state.booking}
+      disabled={
+        !authenticated ||
+        !state.quote?.available ||
+        !!state.booking ||
+        gridBlocked
+      }
     >
       Đặt sân
     </button>
@@ -165,6 +192,8 @@ export function LiveBookingView({
   onQuote,
   onCreate,
   onSignIn,
+  gridConflict,
+  gridLocked,
 }: LiveBookingViewProps) {
   return (
     <section className="booking-panel" aria-label="Đặt sân">
@@ -173,6 +202,12 @@ export function LiveBookingView({
         Giờ theo {timezone}. Thời lượng linh hoạt theo phút, bắt đầu sau ít nhất
         5 phút.
       </p>
+      {gridConflict === true && !state.booking && (
+        <p role="alert" style={{ color: '#f87171', fontSize: '13px' }}>
+          ⚠️ Khoảng giờ bạn chọn đã bị trùng lịch. Vui lòng điều chỉnh lại khung
+          giờ.
+        </p>
+      )}
       <BookingFields
         timezone={timezone}
         state={state}
@@ -180,6 +215,8 @@ export function LiveBookingView({
         onChangeWindow={onChangeWindow}
         onQuote={onQuote}
         onCreate={onCreate}
+        gridConflict={gridConflict}
+        gridLocked={gridLocked}
       />
       <BookingFeedback
         state={state}

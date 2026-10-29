@@ -312,6 +312,7 @@
   border: 1px solid var(--line-strong);
   border-radius: 7px;
   background: var(--surface-subtle);
+  transition: all 0.15s ease;
 }
 .schedule-presets button[aria-pressed='true'] {
   border-color: var(--accent-volt);
@@ -319,14 +320,48 @@
   color: var(--soft-lime-ink);
   box-shadow: inset 0 0 0 1px var(--accent-volt);
 }
+.schedule-presets button.slot-past,
+.schedule-presets button[data-past='true'],
+.schedule-presets button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  background: rgba(255, 255, 255, 0.02) !important;
+  border-color: rgba(255, 255, 255, 0.07) !important;
+  color: #64748b !important;
+  box-shadow: none !important;
+}
+.schedule-presets button.slot-past:hover,
+.schedule-presets button[data-past='true']:hover {
+  background: rgba(255, 255, 255, 0.02) !important;
+  border-color: rgba(255, 255, 255, 0.07) !important;
+  cursor: not-allowed;
+}
+.slot-status-past {
+  color: #f87171 !important;
+  font-weight: 600;
+  display: inline-block;
+  margin-top: 2px;
+}
+.schedule-custom-wrapper {
+  margin: 12px 0 16px;
+  padding: 14px 16px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm, 10px);
+}
 .schedule-custom {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 16px;
   border: 0;
-  padding: 20px 0;
-  border-top: 1px solid var(--line);
+  padding: 0;
   min-width: 0;
+}
+.schedule-time-error {
+  color: #f87171;
+  font-size: 13px;
+  margin: 8px 0 0;
+  line-height: 1.4;
 }
 .schedule-panel .btn {
   width: 100%;
@@ -556,4 +591,925 @@
   font-size: 1.5rem;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
+}
+
+
+/* ==========================================================================
+   SMASH ARENA — Form Đặt Sân Khách Vãng Lai, OTP Dialog, QR Modal & Pending Alert
+   ========================================================================== */
+
+/* 1. Member Session Badge (Khi đã đăng nhập) */
+.arena-member-session-badge {
+  margin: 24px 0;
+  background: rgba(16, 231, 96, 0.06);
+  border: 1px solid rgba(16, 231, 96, 0.25);
+  border-radius: 14px;
+  padding: 16px 20px;
+}
+.arena-member-session-badge .member-badge-card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.arena-member-session-badge .member-badge-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: rgba(16, 231, 96, 0.15);
+  color: #10e760;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 18px;
+  flex-shrink: 0;
+}
+.arena-member-session-badge strong {
+  color: #ffffff;
+  font-size: 15px;
+}
+.arena-member-session-badge p {
+  margin: 2px 0 0;
+  color: #94a3b8;
+  font-size: 13px;
+}
+
+/* 2. Form Khách Vãng Lai (Guest Booking Form Redesign) */
+.guest-booking-card {
+  margin: 32px 0;
+  padding: 32px;
+  background: rgba(15, 23, 42, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 20px;
+  backdrop-filter: blur(14px);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
+}
+.guest-card-header {
+  margin-bottom: 24px;
+}
+.guest-card-badge-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+.guest-card-badge {
+  background: rgba(16, 231, 96, 0.12);
+  color: #10e760;
+  border: 1px solid rgba(16, 231, 96, 0.3);
+  border-radius: 9999px;
+  padding: 4px 14px;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.guest-card-security-note {
+  color: #94a3b8;
+  font-size: 12px;
+}
+.guest-card-title {
+  font-size: 22px;
+  font-weight: 800;
+  color: #ffffff;
+  margin: 6px 0;
+}
+.guest-card-subtitle {
+  color: #94a3b8;
+  font-size: 14px;
+  line-height: 1.5;
+  margin: 0;
+}
+.guest-form-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+  margin-bottom: 20px;
+}
+.guest-input-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.guest-input-group label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #cbd5e1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.guest-input-group .label-icon {
+  font-size: 14px;
+}
+.guest-input-field {
+  background: rgba(11, 18, 32, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 12px;
+  padding: 12px 16px;
+  color: #ffffff;
+  font-size: 14px;
+  font-family: inherit;
+  outline: none;
+  transition: all 0.2s ease;
+}
+.guest-input-field:focus {
+  border-color: #10e760;
+  box-shadow: 0 0 0 3px rgba(16, 231, 96, 0.2);
+  background: rgba(11, 18, 32, 0.98);
+}
+.guest-input-group .field-hint {
+  font-size: 11px;
+  color: #64748b;
+  margin-top: 2px;
+}
+.guest-datetime-wrapper {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 20px;
+  margin-bottom: 20px;
+}
+.guest-datetime-wrapper fieldset {
+  background: rgba(11, 18, 32, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 14px;
+  padding: 14px 18px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.guest-datetime-wrapper legend {
+  font-size: 13px;
+  font-weight: 600;
+  color: #cbd5e1;
+  padding: 0 6px;
+}
+.guest-form-alert {
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  border-radius: 10px;
+  padding: 12px 16px;
+  color: #f87171;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+.guest-terms-wrapper {
+  margin-bottom: 24px;
+}
+.guest-submit-row {
+  display: flex;
+  justify-content: flex-start;
+}
+.guest-submit-btn {
+  background: linear-gradient(135deg, #10e760 0%, #059669 100%);
+  color: #041008;
+  font-weight: 800;
+  font-size: 15px;
+  padding: 14px 28px;
+  border-radius: 12px;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 18px rgba(16, 231, 96, 0.3);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+.guest-submit-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 24px rgba(16, 231, 96, 0.45);
+}
+.guest-submit-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+.guest-created-banner {
+  margin-top: 24px;
+  padding: 16px 20px;
+  border-radius: 12px;
+  background: rgba(16, 231, 96, 0.08);
+  border: 1px solid rgba(16, 231, 96, 0.25);
+  color: #ffffff;
+}
+.guest-created-note {
+  font-size: 12px;
+  color: #94a3b8;
+  margin-top: 4px;
+}
+
+/* 3. Modal Backdrop & General Dialogs */
+.arena-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(6, 11, 20, 0.85);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  padding: 16px;
+  overflow-y: auto;
+  animation: arenaFadeIn 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.arena-modal-card {
+  background: #0d1527;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 20px;
+  width: 100%;
+  box-shadow: 0 20px 48px rgba(0, 0, 0, 0.6);
+  color: #ffffff;
+  transform: translate3d(0, 0, 0);
+  will-change: transform, opacity;
+  animation: arenaZoomIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* 4. Guest OTP Dialog */
+.guest-otp-card {
+  max-width: 480px;
+  padding: 32px;
+  text-align: center;
+}
+.guest-otp-header {
+  margin-bottom: 24px;
+}
+.guest-otp-icon-wrap {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: rgba(16, 231, 96, 0.12);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 16px;
+}
+.guest-otp-header h3 {
+  font-size: 20px;
+  font-weight: 800;
+  color: #ffffff;
+  margin: 0 0 8px;
+}
+.guest-otp-desc {
+  font-size: 14px;
+  color: #94a3b8;
+  line-height: 1.5;
+  margin: 0;
+}
+.guest-otp-desc strong {
+  color: #10e760;
+}
+.guest-otp-inputs {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  margin: 24px 0;
+}
+.guest-otp-digit {
+  width: 48px;
+  height: 56px;
+  text-align: center;
+  font-size: 22px;
+  font-weight: 800;
+  border-radius: 12px;
+  background: rgba(15, 23, 42, 0.95);
+  border: 2px solid rgba(255, 255, 255, 0.15);
+  color: #10e760;
+  outline: none;
+  transition: all 0.2s ease;
+}
+.guest-otp-digit:focus {
+  border-color: #10e760;
+  box-shadow: 0 0 16px rgba(16, 231, 96, 0.35);
+  background: rgba(15, 23, 42, 1);
+}
+.guest-otp-error {
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  border-radius: 8px;
+  padding: 10px;
+  color: #f87171;
+  font-size: 13px;
+  margin-bottom: 16px;
+}
+.guest-otp-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.guest-otp-resend-row {
+  margin-top: 4px;
+}
+.guest-otp-countdown {
+  font-size: 13px;
+  color: #64748b;
+}
+.guest-otp-countdown strong {
+  color: #94a3b8;
+}
+.guest-otp-resend-btn {
+  background: none;
+  border: none;
+  color: #10e760;
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
+  padding: 4px;
+}
+.guest-otp-cancel-btn {
+  background: none;
+  border: none;
+  color: #64748b;
+  font-size: 13px;
+  cursor: pointer;
+  padding: 6px;
+  transition: color 0.2s;
+}
+.guest-otp-cancel-btn:hover {
+  color: #94a3b8;
+}
+
+/* 5. QR Code Modal (PayOS / VietQR) */
+.arena-qr-card {
+  max-width: 580px;
+  padding: 32px;
+}
+.arena-qr-header {
+  text-align: center;
+  margin-bottom: 24px;
+}
+.arena-qr-badge-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.arena-qr-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(16, 231, 96, 0.12);
+  color: #10e760;
+  border: 1px solid rgba(16, 231, 96, 0.3);
+  border-radius: 9999px;
+  padding: 4px 14px;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+.arena-qr-badge .live-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #10e760;
+  animation: pulse 1.5s infinite;
+}
+.arena-qr-header h2 {
+  font-size: 22px;
+  font-weight: 800;
+  color: #ffffff;
+  margin: 4px 0;
+}
+.arena-qr-subtitle {
+  color: #94a3b8;
+  font-size: 13px;
+  margin: 0;
+}
+.arena-qr-body {
+  display: flex;
+  gap: 24px;
+  align-items: center;
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  padding: 20px;
+  margin-bottom: 24px;
+}
+.arena-qr-canvas-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: #ffffff;
+  padding: 12px;
+  border-radius: 14px;
+  flex-shrink: 0;
+}
+.arena-qr-canvas-box canvas {
+  display: block;
+  width: 180px;
+  height: 180px;
+}
+.arena-qr-timer {
+  background: #0f172a;
+  color: #ffffff;
+  border-radius: 8px;
+  padding: 6px 12px;
+  margin-top: 8px;
+  font-size: 11px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  width: 100%;
+}
+.arena-qr-timer strong {
+  font-size: 14px;
+  color: #10e760;
+}
+.arena-qr-details {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex: 1;
+  font-size: 13px;
+}
+.arena-qr-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  color: #94a3b8;
+}
+.arena-qr-row strong {
+  color: #ffffff;
+  text-align: right;
+}
+.arena-qr-row.highlight {
+  color: #ffffff;
+  padding-top: 6px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+.arena-qr-row.highlight .amount {
+  color: #10e760;
+  font-size: 16px;
+  font-weight: 800;
+}
+.arena-qr-row.muted {
+  font-size: 11px;
+  color: #64748b;
+}
+.arena-qr-code-copy {
+  background: rgba(255, 255, 255, 0.1);
+  padding: 2px 8px;
+  border-radius: 6px;
+  color: #e2e8f0;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+}
+.arena-qr-instructions {
+  background: rgba(16, 231, 96, 0.05);
+  border: 1px solid rgba(16, 231, 96, 0.15);
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 11px;
+  color: #94a3b8;
+  line-height: 1.4;
+  margin-top: 6px;
+}
+.arena-qr-instructions p {
+  margin: 0;
+}
+.arena-qr-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.arena-qr-cancel-row {
+  text-align: center;
+}
+.arena-qr-cancel-trigger {
+  background: none;
+  border: none;
+  color: #ef4444;
+  font-size: 13px;
+  cursor: pointer;
+  padding: 4px;
+}
+.arena-qr-cancel-trigger:hover {
+  text-decoration: underline;
+}
+.arena-qr-confirm-cancel {
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.25);
+  border-radius: 10px;
+  padding: 12px;
+  font-size: 12px;
+  color: #f87171;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: center;
+}
+.arena-qr-confirm-cancel .confirm-btns {
+  display: flex;
+  gap: 10px;
+}
+.btn-danger-confirm {
+  background: #ef4444;
+  color: #ffffff;
+  border: none;
+  border-radius: 6px;
+  padding: 6px 14px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.btn-cancel-back {
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+  border: none;
+  border-radius: 6px;
+  padding: 6px 14px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+/* 6. Pending Booking Alert Banner */
+.arena-pending-alert-banner {
+  background: linear-gradient(90deg, rgba(234, 179, 8, 0.15) 0%, rgba(202, 138, 4, 0.05) 100%);
+  border: 1px solid rgba(234, 179, 8, 0.35);
+  border-radius: 14px;
+  padding: 18px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  margin: 16px 0 24px;
+}
+.arena-pending-alert-content {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.arena-pending-icon-wrap {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: rgba(234, 179, 8, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  flex-shrink: 0;
+}
+.arena-pending-heading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.arena-pending-heading strong {
+  color: #fef08a;
+  font-size: 15px;
+}
+.arena-pending-countdown {
+  background: rgba(234, 179, 8, 0.25);
+  color: #fef08a;
+  border-radius: 9999px;
+  padding: 2px 10px;
+  font-size: 11px;
+  font-weight: 700;
+}
+.arena-pending-desc {
+  margin: 4px 0 0;
+  color: #cbd5e1;
+  font-size: 13px;
+}
+.arena-pending-alert-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+.arena-btn-primary {
+  background: linear-gradient(135deg, #10e760 0%, #059669 100%);
+  color: #041008;
+  font-weight: 700;
+  border-radius: 10px;
+  border: none;
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+.arena-btn-secondary {
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+  font-weight: 600;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+.arena-btn-danger {
+  background: rgba(239, 68, 68, 0.15);
+  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.arena-btn-sm {
+  padding: 8px 16px;
+  font-size: 13px;
+}
+.btn-full {
+  width: 100%;
+  padding: 14px 20px;
+  font-size: 15px;
+}
+
+/* Responsive Breakpoints */
+@media (max-width: 768px) {
+  .guest-form-grid {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+  .guest-datetime-wrapper {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+  .arena-qr-body {
+    flex-direction: column;
+  }
+  .arena-qr-canvas-box {
+    width: 100%;
+  }
+  .arena-pending-alert-banner {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .arena-pending-alert-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+}
+
+/* ==========================================================================
+   Guest Booking Modal (FE-PAY-04 UX Redesign - High Performance Single Modal)
+   ========================================================================== */
+
+@keyframes arenaFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes arenaZoomIn {
+  from {
+    opacity: 0;
+    transform: scale(0.97) translate3d(0, 0, 0);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translate3d(0, 0, 0);
+  }
+}
+
+.arena-guest-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  background: rgba(6, 11, 20, 0.85);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  overflow-y: auto;
+  will-change: opacity;
+  animation: arenaFadeIn 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.arena-guest-modal-card {
+  width: 100%;
+  max-width: 540px;
+  max-height: 90vh;
+  overflow-y: auto;
+  background: #0d1527;
+  border: 1px solid rgba(16, 231, 96, 0.25);
+  border-radius: 20px;
+  padding: 24px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.7);
+  color: #f8fafc;
+  transform: translate3d(0, 0, 0);
+  will-change: transform, opacity;
+  animation: arenaZoomIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.arena-guest-modal-header {
+  margin-bottom: 18px;
+}
+
+.guest-modal-badge-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.arena-modal-close-btn {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #94a3b8;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+
+.arena-modal-close-btn:hover {
+  background: rgba(239, 68, 68, 0.2);
+  border-color: rgba(239, 68, 68, 0.4);
+  color: #f87171;
+}
+
+.guest-modal-title {
+  margin: 0 0 4px;
+  font-size: 20px;
+  font-weight: 700;
+  color: #ffffff;
+  letter-spacing: -0.01em;
+}
+
+.guest-modal-subtitle {
+  margin: 0;
+  font-size: 13px;
+  color: #94a3b8;
+  line-height: 1.5;
+}
+
+/* Court & Schedule Preview */
+.arena-guest-booking-preview {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  padding: 14px 16px;
+  margin-bottom: 18px;
+}
+
+.preview-court-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.preview-court-name {
+  font-size: 14px;
+  color: #f1f5f9;
+}
+
+.preview-change-time-btn {
+  background: transparent;
+  border: 1px solid rgba(16, 231, 96, 0.3);
+  color: #10e760;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.preview-change-time-btn:hover {
+  background: rgba(16, 231, 96, 0.1);
+  border-color: #10e760;
+}
+
+.preview-schedule-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 10px;
+  background: rgba(16, 231, 96, 0.08);
+  border: 1px solid rgba(16, 231, 96, 0.2);
+  border-radius: 8px;
+  font-size: 13px;
+  color: #e2e8f0;
+  margin-bottom: 12px;
+}
+
+.preview-price-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 8px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.price-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.price-item.deposit-highlight {
+  background: rgba(16, 231, 96, 0.06);
+  border: 1px solid rgba(16, 231, 96, 0.2);
+  border-radius: 8px;
+  padding: 6px 10px;
+}
+
+.price-label {
+  font-size: 11px;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.price-value {
+  font-size: 16px;
+  font-weight: 700;
+  color: #10e760;
+}
+
+.price-sub {
+  font-size: 13px;
+  font-weight: 600;
+  color: #cbd5e1;
+}
+
+/* Modal Form & Actions */
+.guest-modal-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.guest-modal-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 6px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.btn-submit-guest {
+  padding: 10px 22px;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+/* Step 2: OTP View inside Single Modal */
+.guest-modal-otp-view {
+  animation: arenaFadeIn 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.guest-otp-notice-box {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: rgba(16, 231, 96, 0.08);
+  border: 1px solid rgba(16, 231, 96, 0.2);
+  border-radius: 12px;
+  padding: 12px 16px;
+}
+
+.otp-icon-small {
+  font-size: 24px;
+  flex-shrink: 0;
+}
+
+@media (max-width: 640px) {
+  .arena-guest-modal-card {
+    padding: 18px 14px;
+    max-height: 94vh;
+  }
+  .guest-modal-actions {
+    flex-direction: column-reverse;
+  }
+  .guest-modal-actions button {
+    width: 100%;
+  }
 }

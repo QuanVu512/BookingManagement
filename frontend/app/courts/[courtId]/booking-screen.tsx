@@ -7,7 +7,13 @@ import { ArenaCourtSwitcher } from '../../../features/courts/components/arena-co
 import { ArenaShell } from '../../../components/arena/arena-shell';
 import { ArenaBookingHeading } from '../../../components/arena/arena-booking-heading';
 
-export function BookingScreen({ courtId }: { courtId: string }) {
+export function BookingScreen({
+  courtId,
+  preselectedWindow,
+}: {
+  courtId: string;
+  preselectedWindow?: { startsAt: string; endsAt: string };
+}) {
   const { court, isLoading, error, retry } = useCourtDetail(courtId);
   return (
     <ArenaShell page="booking">
@@ -28,7 +34,13 @@ export function BookingScreen({ courtId }: { courtId: string }) {
             </button>
           </p>
         )}
-        {court && <CourtInfoCard key={court.id} court={court} />}
+        {court && (
+          <CourtInfoCard
+            key={court.id}
+            court={court}
+            preselectedWindow={preselectedWindow}
+          />
+        )}
       </main>
     </ArenaShell>
   );

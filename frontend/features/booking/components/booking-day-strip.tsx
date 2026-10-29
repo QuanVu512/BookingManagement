@@ -48,10 +48,10 @@ export function BookingDayStrip({
         <button
           key={day.value}
           type="button"
-          disabled={state.busy}
+          disabled={state.busy || Boolean(state.booking)}
           aria-pressed={state.window.start.startsWith(day.value)}
           onClick={() =>
-            onChangeWindow(changeBookingDate(state.window, day.value))
+            onChangeWindow(changeBookingDate(state.window, day.value, timezone))
           }
         >
           <span>{day.label}</span>

@@ -14,7 +14,7 @@ export interface CountdownState {
 interface CountdownInput {
   expiresAt: string | null;
   serverNow: string | null;
-  onExpired: () => void;
+  onExpired?: () => void;
 }
 interface CountdownSample {
   expiry: string;
@@ -40,7 +40,7 @@ function captureCountdown(
 function startCountdown(
   sample: CountdownSample,
   update: (value: number) => void,
-  onExpired: () => void,
+  onExpired?: () => void,
 ) {
   const tick = () => {
     const remaining = Math.max(
@@ -48,7 +48,7 @@ function startCountdown(
       0,
     );
     update(remaining);
-    if (remaining <= 0) onExpired();
+    if (remaining <= 0 && onExpired) onExpired();
     return remaining;
   };
   if (!Number.isFinite(sample.remaining) || tick() <= 0) return;
@@ -64,22 +64,23 @@ export function usePaymentCountdown(input: CountdownInput): CountdownState {
   const callback = useRef(input.onExpired);
   callback.current = input.onExpired;
   useEffect(() => {
-    if (!input.expiresAt || !input.serverNow) return;
+    if (!input.expiresAt) return;
+    const nowStr = input.serverNow || new Date().toISOString();
     const current = captureCountdown(
       input.expiresAt,
-      input.serverNow,
+      nowStr,
       sample.current,
     );
     sample.current = current;
     return startCountdown(current, setRemainingMs, () => {
       if (notified.current === current.expiry) return;
       notified.current = current.expiry;
-      callback.current();
+      callback.current?.();
     });
   }, [input.expiresAt, input.serverNow]);
   return {
     remainingMs,
-    expired: Boolean(input.expiresAt && input.serverNow && remainingMs <= 0),
+    expired: Boolean(input.expiresAt && remainingMs <= 0),
   };
 }
 

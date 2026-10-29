@@ -63,9 +63,20 @@ function CourtOverview({ court }: { court: CourtItem }) {
 export function CourtInfoCard({
   court,
   prepaymentPercent = 30,
+  preselectedWindow,
+  onGuestBook,
 }: {
   court: CourtItem;
   prepaymentPercent?: 30 | 100;
+  preselectedWindow?: { startsAt: string; endsAt: string };
+  onGuestBook?: (params: {
+    courtId: string;
+    courtName?: string;
+    courtCode?: string;
+    window: { start: string; end: string };
+    totalAmount?: number;
+    prepaymentAmount?: number;
+  }) => void;
 }) {
   if (!court.timezone)
     return (
@@ -79,9 +90,12 @@ export function CourtInfoCard({
       courtId={court.id}
       timezone={court.timezone}
       prepaymentPercent={prepaymentPercent}
+      preselectedWindow={preselectedWindow}
+      onGuestBook={onGuestBook}
       detail={{
         name: court.name,
         code: court.code,
+        pricePerHour: court.pricePerHour,
         overview: <CourtOverview court={court} />,
       }}
     />

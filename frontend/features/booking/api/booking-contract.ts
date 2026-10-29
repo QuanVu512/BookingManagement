@@ -71,6 +71,86 @@ export function isAvailability(value: unknown): value is Availability {
   );
 }
 
+import type { OccupiedInterval } from '../model/booking-occupancy';
+
+export interface CourtDayOccupanciesData {
+  courtId: string;
+  date: string;
+  timezone: string;
+  serverNow: string;
+  cleanupMinutes: number;
+  businessHours: {
+    isClosed: boolean;
+    open: string | null;
+    close: string | null;
+  };
+  occupiedIntervals: OccupiedInterval[];
+}
+
+function isOccupiedInterval(value: unknown): value is OccupiedInterval {
+  if (!isRecord(value)) return false;
+  return (
+    typeof value.startsAt === 'string' &&
+    typeof value.bufferEndsAt === 'string' &&
+    Number.isFinite(Date.parse(value.startsAt)) &&
+    Number.isFinite(Date.parse(value.bufferEndsAt)) &&
+    (value.kind === 'HOLDING' ||
+      value.kind === 'CONFIRMED' ||
+      value.kind === 'MAINTENANCE')
+  );
+}
+
+export function parseCourtDayOccupancies(
+  value: unknown,
+): CourtDayOccupanciesData {
+  if (!isRecord(value)) throw new Error('Lịch sân không hợp lệ.');
+  const text = (name: string): string => {
+    const field = value[name];
+    if (typeof field !== 'string' || !field)
+      throw new Error('Lịch sân không hợp lệ.');
+    return field;
+  };
+  const courtId = text('courtId');
+  const date = text('date');
+  const timezone = text('timezone');
+  const serverNow = text('serverNow');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date))
+    throw new Error('Lịch sân không hợp lệ.');
+  if (!Number.isFinite(Date.parse(serverNow)))
+    throw new Error('Lịch sân không hợp lệ.');
+  const cleanupMinutes = value['cleanupMinutes'];
+  if (
+    typeof cleanupMinutes !== 'number' ||
+    !Number.isInteger(cleanupMinutes) ||
+    cleanupMinutes < 0
+  )
+    throw new Error('Lịch sân không hợp lệ.');
+  const hours = value['businessHours'];
+  if (
+    !isRecord(hours) ||
+    typeof hours.isClosed !== 'boolean' ||
+    !(hours.open === null || typeof hours.open === 'string') ||
+    !(hours.close === null || typeof hours.close === 'string')
+  )
+    throw new Error('Lịch sân không hợp lệ.');
+  const intervals = value['occupiedIntervals'];
+  if (!Array.isArray(intervals) || !intervals.every(isOccupiedInterval))
+    throw new Error('Lịch sân không hợp lệ.');
+  return {
+    courtId,
+    date,
+    timezone,
+    serverNow,
+    cleanupMinutes,
+    businessHours: {
+      isClosed: hours.isClosed,
+      open: hours.open,
+      close: hours.close,
+    },
+    occupiedIntervals: intervals,
+  };
+}
+
 export function parseAvailability(
   value: unknown,
   services: ServiceSelection[] = [],

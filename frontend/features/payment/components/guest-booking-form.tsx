@@ -1,5 +1,6 @@
 'use client';
-import { useState } from 'react';
+
+import React, { useRef, useState } from 'react';
 import {
   formatVnd,
   DEFAULT_BOOKING_TIMEZONE,
@@ -7,8 +8,31 @@ import {
   localInputToIso,
 } from '../../booking/model/booking-time';
 import { BookingDateTimeInput } from '../../booking/components/booking-schedule-picker';
-import { createGuestBooking, newIdempotencyKey } from '../api/payment-service';
+import {
+  createGuestBooking,
+  newIdempotencyKey,
+  sendGuestBookingOtp,
+  verifyGuestBookingOtp,
+} from '../api/payment-service';
+import {
+  createGuestCheckoutIdentity,
+  saveGuestCheckoutIdentity,
+  type GuestCheckoutIdentity,
+} from '../api/guest-checkout-identity';
 import { TransactionTerms } from '../../legal/components/transaction-terms';
+import { GuestOtpDialog } from './guest-otp-dialog';
+import {
+  getPendingBooking,
+  savePendingBooking,
+} from '../../booking/components/pending-booking-alert';
+import {
+  resolvePendingGuestAccessToken,
+  saveGuestManageToken,
+} from '../api/guest-manage-token';
+export {
+  GuestBookingModal,
+  type GuestBookingModalProps,
+} from './guest-booking-modal';
 
 export interface GuestHoldCreated {
   bookingId: string;
@@ -24,16 +48,16 @@ export interface GuestHoldCreated {
 const TOKEN_STORAGE_KEY = 'guest-manage-token';
 
 /**
- * FE-PAY-04 — Form guest giữ sân và đặt cọc 30%.
- * Token lưu sessionStorage theo tab; UI nêu rõ giới hạn: mất token phải
- * liên hệ quầy cấp lại (không có self-serve email). Không hardcode số tiền.
+ * FE-PAY-04 — Form guest giữ sân và đặt cọc 30% kèm xác thực OTP Email.
  */
 export function GuestBookingForm({
   courtId,
+  courtName,
   timezone = DEFAULT_BOOKING_TIMEZONE,
   onCreated,
 }: {
   courtId: string;
+  courtName?: string;
   timezone?: string;
   onCreated: (result: GuestHoldCreated) => void;
 }) {
@@ -47,140 +71,274 @@ export function GuestBookingForm({
   const [error, setError] = useState<string | null>(null);
   const [created, setCreated] = useState<GuestHoldCreated | null>(null);
 
-  async function submit(event: React.FormEvent) {
-    event.preventDefault();
+  // OTP Dialog state
+  const [otpModalOpen, setOtpModalOpen] = useState(false);
+
+  // Identity của lượt checkout hiện tại; giữ nguyên qua resend/verify lại OTP.
+  const checkoutIdentityRef = useRef<GuestCheckoutIdentity | null>(null);
+
+  function validateForm(): boolean {
     setError(null);
-    if (
-      !name.trim() ||
-      !phone.trim() ||
-      !email.trim() ||
-      !startsAt ||
-      !endsAt
-    ) {
-      setError('Vui lòng nhập đầy đủ họ tên, điện thoại, email và khung giờ.');
-      return;
+    if (!name.trim()) {
+      setError('Vui lòng nhập họ và tên của bạn.');
+      return false;
+    }
+    if (!phone.trim() || phone.trim().length < 9) {
+      setError('Vui lòng nhập số điện thoại hợp lệ (tối thiểu 9 số).');
+      return false;
+    }
+    if (!email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      setError('Vui lòng nhập địa chỉ email hợp lệ để nhận mã OTP.');
+      return false;
+    }
+    if (!startsAt || !endsAt) {
+      setError('Vui lòng chọn đầy đủ thời gian bắt đầu và kết thúc.');
+      return false;
     }
     if (!termsAccepted) {
-      setError('Vui lòng đọc và xác nhận đồng ý với Điều khoản dịch vụ và Chính sách hủy/hoàn tiền.');
-      return;
+      setError(
+        'Vui lòng đọc và xác nhận đồng ý với Điều khoản dịch vụ và Chính sách hủy & hoàn tiền.',
+      );
+      return false;
     }
-    setSubmitting(true);
     try {
       assertBookableWindow({ start: startsAt, end: endsAt }, timezone);
-      const result = await createGuestBooking({
-        courtId,
-        startsAt: localInputToIso(startsAt, timezone),
-        endsAt: localInputToIso(endsAt, timezone),
-        customerName: name.trim(),
-        customerPhone: phone.trim(),
-        customerEmail: email.trim(),
-        idempotencyKey: newIdempotencyKey(),
-      });
-      try {
-        sessionStorage.setItem(
-          `${TOKEN_STORAGE_KEY}:${result.bookingId}`,
-          result.accessToken,
-        );
-      } catch {
-        // Tab riêng tư: token chỉ tồn tại trong bộ nhớ phiên này.
-      }
-      setCreated(result);
-      onCreated(result);
-    } catch (submitError) {
+    } catch (windowErr) {
       setError(
-        submitError instanceof Error
-          ? submitError.message
-          : 'Không tạo được giữ chỗ.',
+        windowErr instanceof Error
+          ? windowErr.message
+          : 'Khung giờ đặt sân không hợp lệ.',
+      );
+      return false;
+    }
+    return true;
+  }
+
+  function ensureCheckoutIdentity(): GuestCheckoutIdentity {
+    if (!checkoutIdentityRef.current) {
+      checkoutIdentityRef.current = createGuestCheckoutIdentity();
+      saveGuestCheckoutIdentity(checkoutIdentityRef.current);
+    }
+    return checkoutIdentityRef.current;
+  }
+
+  async function handleFormSubmit(event: React.FormEvent) {
+    event.preventDefault();
+    if (!validateForm()) return;
+
+    setSubmitting(true);
+    try {
+      // Bước 1: Gửi mã OTP xác thực qua email trước khi tạo đơn
+      await sendGuestBookingOtp(email.trim());
+      // Sinh và lưu identity trước khi xác thực để lượt này có thể resume.
+      ensureCheckoutIdentity();
+      setOtpModalOpen(true);
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'Không gửi được mã xác thực OTP qua email.',
       );
     } finally {
       setSubmitting(false);
     }
   }
 
+  async function handleVerifyOtp(code: string) {
+    // Bước 2: Xác thực mã OTP
+    const verification = await verifyGuestBookingOtp(email.trim(), code);
+    const identity = ensureCheckoutIdentity();
+
+    // Bước 3: Đã xác thực thành công -> Tiến hành tạo đơn giữ chỗ khách vãng lai
+    const result = await createGuestBooking({
+      courtId,
+      startsAt: localInputToIso(startsAt, timezone),
+      endsAt: localInputToIso(endsAt, timezone),
+      customerName: name.trim(),
+      customerPhone: phone.trim(),
+      customerEmail: email.trim(),
+      idempotencyKey: newIdempotencyKey(),
+      otpProof: verification.otpProof,
+      checkoutIntentId: identity.checkoutIntentId,
+      recoverySecret: identity.recoverySecret,
+    });
+
+    saveGuestCheckoutIdentity({
+      ...identity,
+      bookingId: result.bookingId,
+    });
+
+    saveGuestManageToken(result.bookingId, result.accessToken);
+
+    // Lưu vào pending booking state để phục hồi khi rớt mạng / F5
+    const previousPending = getPendingBooking();
+    savePendingBooking({
+      bookingId: result.bookingId,
+      bookingCode: result.bookingCode,
+      courtId,
+      courtName,
+      startsAt,
+      endsAt,
+      totalAmount: result.totalAmount,
+      prepaymentAmount: result.prepaymentAmount,
+      holdExpiresAt: result.holdExpiresAt,
+      accessToken: resolvePendingGuestAccessToken(previousPending, result),
+      type: 'guest',
+    });
+
+    setCreated(result);
+    setOtpModalOpen(false);
+    onCreated(result);
+  }
+
+  async function handleResendOtp() {
+    await sendGuestBookingOtp(email.trim());
+  }
+
   return (
-    <section aria-label="Đặt sân cho khách vãng lai">
-      <h2>Đặt sân (khách vãng lai — đặt cọc 30%)</h2>
-      <form onSubmit={submit}>
-        <p>
-          <label>
-            Họ tên
+    <section
+      className="guest-booking-card"
+      aria-label="Đặt sân cho khách vãng lai"
+    >
+      <div className="guest-card-header">
+        <div className="guest-card-badge-row">
+          <span className="guest-card-badge">Khách chưa có tài khoản</span>
+          <span className="guest-card-security-note">
+            {' '}
+            Bảo mật OTP qua Email
+          </span>
+        </div>
+        <h2 className="guest-card-title">Đặt sân (khách chưa có tài khoản)</h2>
+        <p className="guest-card-subtitle">
+          Dành cho khách chưa có tài khoản. Hệ thống yêu cầu xác minh email qua
+          mã OTP trước khi giữ chỗ và thanh toán.
+        </p>
+      </div>
+
+      <form onSubmit={handleFormSubmit} className="guest-form">
+        <div className="guest-form-grid">
+          <div className="guest-input-group">
+            <label htmlFor="customerName">
+              <span className="label-icon"></span> Họ và tên
+            </label>
             <input
+              id="customerName"
               name="customerName"
+              className="guest-input-field"
+              placeholder="Nguyễn Văn A"
               value={name}
-              onChange={(event) => setName(event.target.value)}
+              onChange={(e) => setName(e.target.value)}
               autoComplete="name"
+              disabled={submitting}
               required
             />
-          </label>
-        </p>
-        <p>
-          <label>
-            Điện thoại
+          </div>
+
+          <div className="guest-input-group">
+            <label htmlFor="customerPhone">
+              <span className="label-icon"></span> Số điện thoại
+            </label>
             <input
+              id="customerPhone"
               name="customerPhone"
+              type="tel"
+              className="guest-input-field"
+              placeholder="0912 345 678"
               value={phone}
-              onChange={(event) => setPhone(event.target.value)}
+              onChange={(e) => setPhone(e.target.value)}
               autoComplete="tel"
+              disabled={submitting}
               required
             />
-          </label>
-        </p>
-        <p>
-          <label>
-            Email
+          </div>
+
+          <div className="guest-input-group">
+            <label htmlFor="customerEmail">
+              <span className="label-icon"></span> Địa chỉ Email
+            </label>
             <input
+              id="customerEmail"
               name="customerEmail"
               type="email"
+              className="guest-input-field"
+              placeholder="nguyen@example.com"
               value={email}
-              onChange={(event) => setEmail(event.target.value)}
+              onChange={(e) => setEmail(e.target.value)}
               autoComplete="email"
+              disabled={submitting}
               required
             />
-          </label>
-        </p>
-        <BookingDateTimeInput
-          label="Bắt đầu"
-          timezone={timezone}
-          value={startsAt}
-          onChange={setStartsAt}
-          disabled={submitting}
-        />
-        <BookingDateTimeInput
-          label="Kết thúc"
-          timezone={timezone}
-          value={endsAt}
-          onChange={setEndsAt}
-          disabled={submitting}
-        />
-        {error && <p role="alert">{error}</p>}
-        <TransactionTerms
-          accepted={termsAccepted}
-          onAcceptanceChange={setTermsAccepted}
-          disabled={submitting}
-        />
-        <p>
+            <small className="field-hint">
+              Dùng để nhận OTP xác minh và mã QR
+            </small>
+          </div>
+        </div>
+
+        <div className="guest-datetime-wrapper">
+          <BookingDateTimeInput
+            label="Bắt đầu"
+            timezone={timezone}
+            value={startsAt}
+            onChange={setStartsAt}
+            disabled={submitting}
+          />
+          <BookingDateTimeInput
+            label="Kết thúc"
+            timezone={timezone}
+            value={endsAt}
+            onChange={setEndsAt}
+            disabled={submitting}
+          />
+        </div>
+
+        {error && (
+          <div className="guest-form-alert" role="alert">
+            <span className="alert-icon">⚠️</span>
+            <span>{error}</span>
+          </div>
+        )}
+
+        <div className="guest-terms-wrapper">
+          <TransactionTerms
+            accepted={termsAccepted}
+            onAcceptanceChange={setTermsAccepted}
+            disabled={submitting}
+          />
+        </div>
+
+        <div className="guest-submit-row">
           <button
             type="submit"
+            className="guest-submit-btn"
             disabled={submitting || !termsAccepted}
-            aria-label="Giữ chỗ và đặt cọc 30%"
+            aria-label="Tiếp tục & Nhận mã OTP (cọc 30%)"
           >
-            {submitting ? 'Đang giữ chỗ…' : 'Giữ chỗ và đặt cọc 30%'}
+            {submitting ? 'Đang gửi mã OTP…' : 'Tiếp tục & Nhận mã OTP'}
           </button>
-        </p>
+        </div>
       </form>
+
       {created && (
-        <div role="status">
+        <div className="guest-created-banner" role="status">
           <p>
             Mã đơn <strong>{created.bookingCode}</strong> — tiền cọc 30%:{' '}
             {formatVnd(created.prepaymentAmount)} (Tổng giá thuê sân:{' '}
             {formatVnd(created.totalAmount)}).
           </p>
-          <p>
-            Mã truy cập đã lưu trong tab này. Nếu mất mã, liên hệ quầy để được
-            cấp lại sau khi xác minh — không gửi mã qua email tự động.
+          <p className="guest-created-note">
+            Mã truy cập đã được lưu trong phiên này. Mất mã vui lòng liên hệ
+            quầy để được hỗ trợ.
           </p>
         </div>
       )}
+
+      <GuestOtpDialog
+        email={email}
+        isOpen={otpModalOpen}
+        onClose={() => setOtpModalOpen(false)}
+        onVerify={handleVerifyOtp}
+        onResend={handleResendOtp}
+      />
     </section>
   );
 }

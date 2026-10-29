@@ -127,7 +127,7 @@ export function PaymentStatusPanel({
   );
 }
 
-function PaymentQr({ payload }: { payload: string }) {
+export function PaymentQr({ payload }: { payload: string }) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const [error, setError] = useState(false);
   useEffect(() => {

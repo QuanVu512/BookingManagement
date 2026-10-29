@@ -27,7 +27,12 @@ interface InternalState extends LiveBookingState {
 interface BookingContext {
   state: InternalState;
   update: Dispatch<SetStateAction<InternalState>>;
-  request: RequestKeyState & { locked: boolean; mounted: boolean };
+  request: RequestKeyState & {
+    locked: boolean;
+    mounted: boolean;
+    creating?: boolean;
+    quoteSeq?: number;
+  };
   courtId: string;
   timezone: string;
   prepaymentPercent: 30 | 100;
@@ -40,6 +45,7 @@ export function useBookingDateBounds(timezone: string) {
   useEffect(() => {
     const refresh = () => setNow(new Date());
     const timer = setInterval(refresh, BOOKING_REFRESH_MS);
+    timer.unref?.();
     document.addEventListener('visibilitychange', refresh);
     return () => {
       clearInterval(timer);
@@ -75,37 +81,69 @@ async function executeBooking(context: BookingContext, action: BookingAction) {
   return { booking: await createBooking(input), quote: undefined };
 }
 async function runBooking(context: BookingContext, action: BookingAction) {
-  if (context.request.locked) return;
-  context.request.locked = true;
+  if (action === 'create') {
+    if (context.request.creating) return;
+    context.request.creating = true;
+    context.request.locked = true;
+    context.update((previous) => ({ ...previous, busy: true, error: '' }));
+    try {
+      const result = await executeBooking(context, 'create');
+      if (context.request.mounted)
+        context.update((previous) => ({
+          ...previous,
+          ...result,
+          canRetry: false,
+          owner: context.accountId,
+        }));
+    } catch (reason: unknown) {
+      setBookingFailure(context, reason, 'create');
+    } finally {
+      context.request.creating = false;
+      context.request.locked = false;
+      if (context.request.mounted)
+        context.update((previous) => ({ ...previous, busy: false }));
+    }
+    return;
+  }
+
+  // action === 'quote': non-blocking, cancels stale responses via sequence counter
+  const seq = (context.request.quoteSeq = (context.request.quoteSeq ?? 0) + 1);
   context.update((previous) => ({ ...previous, busy: true, error: '' }));
   try {
-    const result = await executeBooking(context, action);
-    if (context.request.mounted)
+    const result = await executeBooking(context, 'quote');
+    if (context.request.mounted && context.request.quoteSeq === seq) {
       context.update((previous) => ({
         ...previous,
         ...result,
-        canRetry: action === 'create' ? false : previous.canRetry,
+        canRetry: previous.canRetry,
         owner: context.accountId,
       }));
+    }
   } catch (reason: unknown) {
-    setBookingFailure(context, reason, action);
+    if (context.request.mounted && context.request.quoteSeq === seq) {
+      setBookingFailure(context, reason, 'quote');
+    }
   } finally {
-    context.request.locked = false;
-    if (context.request.mounted)
+    if (context.request.mounted && context.request.quoteSeq === seq) {
       context.update((previous) => ({ ...previous, busy: false }));
+    }
   }
 }
 function changeWindow(context: BookingContext, window: BookingWindow) {
-  if (context.request.locked) return;
+  if (context.request.creating) return;
   context.request.fingerprint = '';
-  context.update({
+  // Invalidate any in-flight quote since the window just changed
+  context.request.quoteSeq = (context.request.quoteSeq ?? 0) + 1;
+  context.update((previous) => ({
+    ...previous,
     window,
-    services: context.state.services ?? [],
+    services: previous.services ?? [],
     busy: false,
     error: '',
     canRetry: false,
     owner: context.accountId,
-  });
+    quote: undefined,
+  }));
 }
 
 export function useLiveBooking(
@@ -159,6 +197,8 @@ function useRequestLifecycle() {
   const request = useRef<BookingContext['request']>({
     locked: false,
     mounted: true,
+    creating: false,
+    quoteSeq: 0,
     fingerprint: '',
     key: '',
   });

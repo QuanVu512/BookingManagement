@@ -43,19 +43,32 @@ export function assertBookableWindow(
   timezone: string,
   now = new Date(),
 ) {
+  if (!window.start || !window.end) {
+    throw new Error('Vui lòng chọn khung giờ bắt đầu và kết thúc.');
+  }
+  const dateStart = window.start.slice(0, 10);
+  const dateEnd = window.end.slice(0, 10);
   if (
-    [window.start, window.end].every((value) =>
-      isBookableDate(value.slice(0, 10), timezone, now),
+    ![dateStart, dateEnd].every((value) =>
+      isBookableDate(value, timezone, now),
     )
-  )
-    return;
-  const { min, max } = bookingDateBounds(timezone, now);
-  throw new Error(
-    `Chỉ chọn ngày từ ${formatBookingDate(min)} đến ${formatBookingDate(max)}.`,
-  );
+  ) {
+    const { min, max } = bookingDateBounds(timezone, now);
+    throw new Error(
+      `Chỉ chọn ngày từ ${formatBookingDate(min)} đến ${formatBookingDate(max)}.`,
+    );
+  }
+  const timeStart = window.start.slice(11);
+  const timeEnd = window.end.slice(11);
+  if (timeStart && timeEnd && window.start >= window.end) {
+    throw new Error('Giờ kết thúc phải sau giờ bắt đầu.');
+  }
+  if (isWindowInPast(window, timezone, now)) {
+    throw new Error('Khung giờ bắt đầu đã qua thời gian hiện tại.');
+  }
 }
 
-function wallClock(instant: Date, timezone: string) {
+export function wallClock(instant: Date, timezone: string) {
   const parts = new Intl.DateTimeFormat('en-CA', {
     timeZone: timezone,
     year: 'numeric',
@@ -68,6 +81,45 @@ function wallClock(instant: Date, timezone: string) {
   const part = (key: string) =>
     parts.find((value) => value.type === key)?.value;
   return `${part('year')}-${part('month')}-${part('day')}T${part('hour')}:${part('minute')}`;
+}
+
+export function getNowInTimezone(timezone: string, now = new Date()) {
+  const local = wallClock(now, timezone);
+  return {
+    date: local.slice(0, 10),
+    time: local.slice(11, 16),
+    hour: parseInt(local.slice(11, 13), 10),
+    minute: parseInt(local.slice(14, 16), 10),
+    localIso: local,
+  };
+}
+
+export function isSlotInPast(
+  date: string,
+  hour: number,
+  timezone: string,
+  now = new Date(),
+): boolean {
+  if (!date) return false;
+  const current = getNowInTimezone(timezone, now);
+  if (date < current.date) return true;
+  if (date > current.date) return false;
+  const slotStartTime = `${String(hour).padStart(2, '0')}:00`;
+  return slotStartTime <= current.time;
+}
+
+export function isWindowInPast(
+  window: { start: string; end: string },
+  timezone: string,
+  now = new Date(),
+): boolean {
+  if (!window.start) return false;
+  const date = window.start.slice(0, 10);
+  const time = window.start.slice(11, 16);
+  const current = getNowInTimezone(timezone, now);
+  if (date < current.date) return true;
+  if (date > current.date) return false;
+  return time <= current.time;
 }
 export function localInputToIso(value: string, timezone: string) {
   if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(value))
@@ -87,9 +139,33 @@ export function localInputToIso(value: string, timezone: string) {
     throw new Error('Giờ địa phương không hợp lệ trong múi giờ sân.');
   return new Date(instant).toISOString();
 }
-export function initialBookingWindow(timezone: string) {
+export function isoToLocalInput(iso: string, timezone: string) {
+  const instant = new Date(iso);
+  if (!Number.isFinite(instant.getTime())) {
+    throw new Error('Hãy chọn ngày và giờ hợp lệ.');
+  }
+  const local = wallClock(instant, timezone).slice(0, 16);
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(local)) {
+    throw new Error('Hãy chọn ngày và giờ hợp lệ.');
+  }
+  return local;
+}
+export function initialBookingWindow(timezone: string, now = new Date()) {
+  const current = getNowInTimezone(timezone, now);
+  const allHours = [6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22];
+  const upcomingHour = allHours.find((h) => !isSlotInPast(current.date, h, timezone, now));
+
+  if (upcomingHour !== undefined) {
+    const startH = String(upcomingHour).padStart(2, '0');
+    const endH = String(upcomingHour + 1).padStart(2, '0');
+    return {
+      start: `${current.date}T${startH}:00`,
+      end: `${current.date}T${endH}:00`,
+    };
+  }
+
   const tomorrow = wallClock(
-    new Date(Date.now() + 24 * 60 * MINUTE_MS),
+    new Date(now.getTime() + 24 * 60 * MINUTE_MS),
     timezone,
   ).slice(0, 10);
   return { start: `${tomorrow}T08:00`, end: `${tomorrow}T09:00` };

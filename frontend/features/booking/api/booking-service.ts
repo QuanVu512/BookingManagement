@@ -10,6 +10,7 @@ import {
   parseBooking,
   parseBookingPage,
   parseCancelledBooking,
+  parseCourtDayOccupancies,
   parseServiceProducts,
 } from './booking-contract';
 
@@ -95,6 +96,21 @@ export async function loadServiceProducts(
     signal,
   );
   return parseServiceProducts(payload.data);
+}
+
+export async function loadCourtDayOccupancies(
+  courtId: string,
+  date: string,
+  signal?: AbortSignal,
+) {
+  const params = new URLSearchParams({ date });
+  const payload = await request(
+    `courts/${encodeURIComponent(courtId)}/occupancies?${params}`,
+    'GET',
+    undefined,
+    signal,
+  );
+  return parseCourtDayOccupancies(payload.data);
 }
 
 export async function myBookings(signal?: AbortSignal, cursor?: string) {

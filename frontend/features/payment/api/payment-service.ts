@@ -1,4 +1,7 @@
-import { API_BASE_URL, AUTH_REQUEST_TIMEOUT_MS } from '../../../constants/network';
+import {
+  API_BASE_URL,
+  AUTH_REQUEST_TIMEOUT_MS,
+} from '../../../constants/network';
 import { csrfToken } from '../../../services/auth';
 import {
   ApiRequestError,
@@ -48,11 +51,12 @@ async function request(
     headers,
     ...(body ? { body: JSON.stringify(body) } : {}),
   });
-  const payload: unknown =
-    response.status === 204 ? {} : await response.json();
+  const payload: unknown = response.status === 204 ? {} : await response.json();
   if (!response.ok) {
     const code =
-      isRecord(payload) && isRecord(payload.error) && typeof payload.error.code === 'string'
+      isRecord(payload) &&
+      isRecord(payload.error) &&
+      typeof payload.error.code === 'string'
         ? payload.error.code
         : null;
     const message =
@@ -194,7 +198,25 @@ export async function getGuestPaymentOutcome(input: {
   return parsePaymentOutcome(payload.data);
 }
 
-/** E3: guest giữ sân 30% (public, không cookie/CSRF). */
+export interface GuestHoldCreatedResponse {
+  bookingId: string;
+  bookingCode: string;
+  holdExpiresAt: string;
+  totalAmount: number;
+  prepaymentAmount: number;
+  accessToken: string;
+  accessTokenExpiresAt: string;
+  checkoutToken: string;
+  checkoutTokenExpiresAt: string;
+  checkoutIntentId: string;
+  serverNow: string;
+}
+
+/**
+ * E3: guest giữ sân 30% (public, không cookie/CSRF).
+ * Bước 2: bắt buộc kèm `otpProof` từ verify-otp, `checkoutIntentId` và
+ * `recoverySecret` đã sinh trước đó (Contract F1).
+ */
 export async function createGuestBooking(input: {
   courtId: string;
   startsAt: string;
@@ -203,6 +225,9 @@ export async function createGuestBooking(input: {
   customerPhone: string;
   customerEmail: string;
   idempotencyKey: string;
+  otpProof: string;
+  checkoutIntentId: string;
+  recoverySecret: string;
   signal?: AbortSignal;
 }) {
   const signal = AbortSignal.any([
@@ -215,7 +240,19 @@ export async function createGuestBooking(input: {
     cache: 'no-store',
     signal,
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ ...input, prepaymentPercent: 30 }),
+    body: JSON.stringify({
+      courtId: input.courtId,
+      startsAt: input.startsAt,
+      endsAt: input.endsAt,
+      customerName: input.customerName,
+      customerPhone: input.customerPhone,
+      customerEmail: input.customerEmail,
+      idempotencyKey: input.idempotencyKey,
+      otpProof: input.otpProof,
+      checkoutIntentId: input.checkoutIntentId,
+      recoverySecret: input.recoverySecret,
+      prepaymentPercent: 30,
+    }),
   });
   const payload: unknown = await response.json();
   if (!response.ok || !isRecord(payload) || payload.success !== true) {
@@ -225,15 +262,71 @@ export async function createGuestBooking(input: {
         : 'Không tạo được giữ chỗ khách vãng lai.',
     );
   }
-  return payload.data as {
-    bookingId: string;
-    bookingCode: string;
-    holdExpiresAt: string;
-    totalAmount: number;
-    prepaymentAmount: number;
-    accessToken: string;
-    accessTokenExpiresAt: string;
-    serverNow: string;
+  return payload.data as GuestHoldCreatedResponse;
+}
+
+/** Gửi mã OTP xác thực email trước khi tạo đơn đặt sân khách vãng lai */
+export async function sendGuestBookingOtp(email: string) {
+  const signal = AbortSignal.timeout(AUTH_REQUEST_TIMEOUT_MS);
+  const response = await fetch(`${API_BASE_URL}/api/guest/bookings/send-otp`, {
+    method: 'POST',
+    credentials: 'omit',
+    cache: 'no-store',
+    signal,
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email }),
+  });
+  const payload: unknown = await response.json();
+  if (!response.ok || !isRecord(payload) || payload.success !== true) {
+    throw new Error(
+      isRecord(payload) && typeof payload.message === 'string'
+        ? payload.message
+        : 'Không gửi được mã xác thực OTP qua email.',
+    );
+  }
+  return payload as {
+    success: true;
+    message: string;
+    resendAfterSeconds?: number;
+  };
+}
+
+/** Xác thực mã OTP email khách vãng lai, trả proof một lần cho bước tạo hold. */
+export async function verifyGuestBookingOtp(email: string, code: string) {
+  const signal = AbortSignal.timeout(AUTH_REQUEST_TIMEOUT_MS);
+  const response = await fetch(
+    `${API_BASE_URL}/api/guest/bookings/verify-otp`,
+    {
+      method: 'POST',
+      credentials: 'omit',
+      cache: 'no-store',
+      signal,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, code }),
+    },
+  );
+  const payload: unknown = await response.json();
+  if (!response.ok || !isRecord(payload) || payload.success !== true) {
+    throw new Error(
+      isRecord(payload) && typeof payload.message === 'string'
+        ? payload.message
+        : 'Mã OTP không chính xác hoặc đã hết hạn.',
+    );
+  }
+  if (
+    typeof payload.otpProof !== 'string' ||
+    typeof payload.otpProofExpiresAt !== 'string'
+  ) {
+    throw new Error(
+      'Máy chủ không trả mã xác thực email hợp lệ. Vui lòng thử lại.',
+    );
+  }
+  return payload as {
+    success: true;
+    verified: true;
+    message: string;
+    otpProof: string;
+    otpProofExpiresAt: string;
   };
 }
 
@@ -279,7 +372,10 @@ export function staffReconcileRequest(requestId: string) {
 }
 
 /** E17 list refunds (MANAGER/ADMIN). */
-export function staffListRefunds(query: { status?: string; bookingId?: string }) {
+export function staffListRefunds(query: {
+  status?: string;
+  bookingId?: string;
+}) {
   const params = new URLSearchParams();
   if (query.status) params.set('status', query.status);
   if (query.bookingId) params.set('bookingId', query.bookingId);
