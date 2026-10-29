@@ -8,7 +8,7 @@ Tài liệu này định vị nhanh các vùng chính của repository. Dùng n�
 booking-project/
 ├── backend/
 │   ├── src/
-│   │   ├── modules/             # Auth, users, courts, bookings, payments, check-in, notifications
+│   │   ├── modules/             # Auth, users, courts, bookings, payments, ai-assistant, privacy-requests, check-in, notifications
 │   │   ├── infrastructure/      # Prisma, Redis, BullMQ
 │   │   ├── app.module.ts        # Lắp module, rate limit, observability
 │   │   └── main.ts              # Bootstrap, CORS, Swagger, listen
@@ -18,8 +18,9 @@ booking-project/
 │   └── test/                    # E2E Jest
 ├── frontend/
 │   ├── app/                     # Next.js App Router
-│   ├── components/              # UI theo feature
-│   ├── context/                 # AuthContext
+│   ├── components/              # UI components
+│   ├── features/                # UI theo feature (booking, courts, payment, ai-assistant, cookie-consent, legal)
+│   ├── context/                 # AuthContext & ThemeContext
 │   └── types/                   # Kiểu dùng ở frontend
 ├── infra/docker-compose.yml     # PostgreSQL và Redis local
 ├── tests/load/                  # Smoke/load script

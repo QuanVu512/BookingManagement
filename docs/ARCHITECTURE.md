@@ -18,6 +18,8 @@ booking-project/
 │   │   │   ├── courts/
 │   │   │   ├── bookings/
 │   │   │   ├── payments/
+│   │   │   ├── ai-assistant/
+│   │   │   ├── privacy-requests/
 │   │   │   ├── notifications/
 │   │   │   └── check-in/
 │   │   ├── infrastructure/
@@ -63,6 +65,8 @@ backend/dist và frontend/.next được sinh khi build, không commit. Dist cũ
 | Bookings             | Booking, CourtOccupancy, BookingPriceItem, BookingStatusHistory, BookingAccessToken, BookingCancellationRequest |
 | Check-in             | BookingCheckin                                                                                                  |
 | Payments             | PaymentRequest, PaymentTransaction, PaymentWebhookEvent, RefundRequest, RefundAttempt                           |
+| Privacy Requests     | PrivacyRequest (DSR)                                                                                            |
+| AI Assistant         | Knowledge policies, Static Provider, Redis Budget Adapter                                                       |
 | Notifications        | NotificationDelivery                                                                                            |
 | Queue infrastructure | OutboxEvent                                                                                                     |
 

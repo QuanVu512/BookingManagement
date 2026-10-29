@@ -7,28 +7,31 @@ Booking MVP đã triển khai HOLDING 5 phút, expiry qua BullMQ worker kèm sel
 Thiết kế hiện ghi nhận:
 
 1. Booking lưu sân, thời gian bắt đầu/kết thúc, giá và thông tin khách dạng snapshot.
-2. User có tài khoản được chọn trả trước 30% hoặc 100%; guest không tạo user giả, cần tên/email/điện thoại và trả trước 100%.
-3. Booking mới ở `HOLDING` với hạn hoàn tất khoản trả trước 5 phút. Khi đạt điều kiện thanh toán, luồng dự kiến xác nhận booking.
+2. Cả hội viên và khách vãng lai đều áp dụng mức cọc bắt buộc 30% tiền thuê sân (`prepaymentPercent = 30`). Khách vãng lai không tạo user giả, xác thực qua email OTP 6 số và nhận token `MANAGE_BOOKING`.
+3. Booking mới ở `HOLDING` với hạn hoàn tất khoản trả trước 5 phút (300 giây). Khi đạt điều kiện thanh toán, luồng chuyển trạng thái booking sang `CONFIRMED`.
 4. `CourtOccupancy` đại diện khoảng chiếm lịch; snapshot `cleanupMinutes` mặc định 15 phút được cộng vào cuối giờ chơi. SQL exclusion constraint bảo vệ overlap của occupancy `ACTIVE`.
 
 ```mermaid
 stateDiagram-v2
   [*] --> HOLDING
-  HOLDING --> CONFIRMED: đạt khoản trả trước
-  HOLDING --> EXPIRED: hết hạn
+  HOLDING --> CONFIRMED: đạt khoản trả trước 30%
+  HOLDING --> EXPIRED: hết hạn 5 phút
   CONFIRMED --> CHECKED_IN: check-in hợp lệ
   CHECKED_IN --> COMPLETED: kết thúc
-  CONFIRMED --> CANCELLED: quote được chấp nhận và áp dụng
-  CONFIRMED --> NO_SHOW: chính sách còn mở
+  CONFIRMED --> CANCELLED: hủy hợp lệ
+  CONFIRMED --> NO_SHOW: vắng mặt không đến
 ```
 
 Khi hủy hoặc hết hạn, thiết kế yêu cầu occupancy được giải phóng; khoản đến muộn phải vào đối soát, không tự khôi phục booking đã `EXPIRED`/`CANCELLED`.
 
 ## Hủy và hoàn tiền
 
-Thiết kế hiện chọn phí hủy khách bằng 10% tổng giá booking, hoàn phần tiền thực nhận còn lại; khách phải thấy quote và đồng ý trước khi áp dụng. `BookingCancellationRequest` theo dõi quote/consent, còn `RefundRequest` và `RefundAttempt` theo dõi nghĩa vụ và từng lần hoàn. Booking `CANCELLED` không đồng nghĩa tiền đã hoàn.
+Chính sách hoàn hủy chính thức chốt ngày 26/10/2026:
+- **Hủy trước 12 giờ so với giờ chơi (`T - 12h`)**: Khách hàng chịu phí hủy 10% tổng giá thuê sân, hệ thống hoàn lại 20% (trong khoản cọc 30% đã thu).
+- **Hủy trong vòng 12 giờ hoặc vắng mặt (No-show)**: Không hoàn tiền, khách mất toàn bộ khoản đặt cọc 30%.
+- `BookingCancellationRequest` theo dõi quote/consent, còn `RefundRequest` và `RefundAttempt` theo dõi nghĩa vụ và từng lần hoàn. Booking `CANCELLED` không đồng nghĩa tiền đã hoàn.
 
-MVP chỉ hủy HOLDING trước giờ bắt đầu, chưa check-in và không thu phí vì chưa thu tiền. Với booking đã thanh toán/CONFIRMED, mốc hủy, sân chủ động hủy, no-show, đổi lịch, check-in sớm/muộn và rounding/thời hạn/phí hoàn vẫn **OPEN**. Không áp contract giữ chỗ này cho refund.
+MVP chỉ hủy HOLDING trước giờ bắt đầu, chưa check-in và không thu phí vì chưa thu tiền. Luồng hoàn tiền tự động qua cổng thanh toán thuộc stream thanh toán tiếp theo.
 
 ## Thanh toán và check-in
 

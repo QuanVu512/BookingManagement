@@ -6,9 +6,13 @@ Frontend dùng Next.js App Router trong `frontend/`, React và TypeScript. Phiê
 
 | Đường dẫn                                                            | Vai trò hiện tại                                                    |
 | -------------------------------------------------------------------- | ------------------------------------------------------------------- |
-| `frontend/app/`                                                      | Route `/`, `/dashboard`, layout và stylesheet toàn cục              |
+| `frontend/app/`                                                      | Route `/`, `/dashboard`, `/terms`, `/privacy`, layout toàn cục     |
 | `frontend/components/auth/`                                          | Trang login/register/OTP và dialog xác nhận guest                   |
 | `frontend/features/courts/`, `frontend/features/booking/`            | Luồng chọn sân, availability, giữ chỗ và booking của tôi            |
+| `frontend/features/payment/`                                         | Form khách vãng lai, dialog nhập OTP email, modal QR khóa giao diện |
+| `frontend/features/ai-assistant/`                                    | Nút nổi FAB tròn (icon message/robot), popup chat hỏi đáp AI        |
+| `frontend/features/cookie-consent/`                                  | Banner chấp thuận cookie và CookiePreferencesProvider               |
+| `frontend/features/legal/`                                           | Shell trang pháp lý, collection notice và footer pháp lý            |
 | `frontend/components/home/`                                          | Header, catalog sân và các khối trang chủ                           |
 | `frontend/context/auth-context.tsx`                                  | Session state, điều hướng đăng nhập, guest state và auth API        |
 | `frontend/services/auth.ts`, `frontend/services/courts.ts`           | Gọi HTTP, kiểm tra response và timeout/fallback cho các request đọc |

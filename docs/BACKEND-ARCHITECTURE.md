@@ -24,15 +24,17 @@ Booking là mẫu tổ chức module theo `application/`, `ports/`, `infrastruct
 
 ## Module
 
-| Module          | Trạng thái trong source                                                                  |
-| --------------- | ---------------------------------------------------------------------------------------- |
-| `auth`          | Controller/service login, register, session lookup, logout; JWT strategy và guards       |
-| `users`         | Scaffold controller/service; chức năng còn hạn chế                                       |
-| `courts`        | Danh sách/chi tiết ACTIVE, giá từ PriceRule, availability theo khoảng có buffer          |
-| `bookings`      | HOLDING 5 phút, expiry qua worker + self-heal write path, idempotency, list/cancel theo owner; transaction PostgreSQL |
-| `payments`      | Module boundary rỗng; chưa có provider/webhook/refund workflow                           |
-| `check-in`      | Module boundary rỗng; chưa có check-in workflow                                          |
-| `notifications` | Realtime gateway/module; chưa có pipeline gửi email hoàn chỉnh                           |
+| Module             | Trạng thái trong source                                                                                                                              |
+| ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `auth`             | Controller/service login, register, session lookup, logout; JWT strategy và guards; chuẩn hóa số điện thoại VN bằng Pure Regex                      |
+| `users`            | Scaffold controller/service; chức năng còn hạn chế                                                                                                   |
+| `courts`           | Danh sách/chi tiết ACTIVE, domain pricing tính giá theo phút (BigInt HALF_UP), availability theo khoảng có buffer                                     |
+| `bookings`         | HOLDING 5 phút, expiry qua BullMQ worker + self-heal write path, idempotency, cọc 30%, list/cancel theo owner; transaction PostgreSQL                |
+| `payments`         | `GuestBookingsController` cho khách vãng lai, xác thực OTP email (`/send-otp`, `/verify-otp`), cọc 30%; cổng thanh toán PayOS/webhook ở phase sau    |
+| `ai-assistant`     | Q&A Assistant (`/api/ai-assistant/chat`), quản lý hạn mức token qua Redis (`RedisAiBudgetAdapter`), knowledge policies và static provider          |
+| `privacy-requests` | Tiếp nhận và xử lý yêu cầu quyền riêng tư DSR (quyền truy xuất/xóa dữ liệu người dùng) tuân thủ bảo vệ dữ liệu cá nhân                              |
+| `check-in`         | Module boundary; chưa có check-in workflow                                                                                                           |
+| `notifications`    | Realtime gateway/module; chưa có pipeline gửi email hoàn chỉnh                                                                                       |
 
 ## Hạ tầng
 
