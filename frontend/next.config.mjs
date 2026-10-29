@@ -11,18 +11,24 @@ const apiOrigin = resolvePublicApiOrigin(
   process.env.NEXT_PUBLIC_API_URL,
   process.env.NODE_ENV === 'production',
 );
-const reportOnlyPolicy = [
+// Enforced CSP: `unsafe-inline`/`unsafe-eval` stay because Next.js App
+// Router hydration and inlined styles require them without a per-request
+// nonce setup; tightening to nonces/hashes needs browser verification
+// (see docs/SECURITY.md) and must not be done blindly in this static config.
+const cspDirectives = [
   "default-src 'self'",
-  "script-src 'self'",
-  "style-src 'self'",
-  "img-src 'self' data:",
-  "font-src 'self'",
-  `connect-src 'self' ${apiOrigin}`,
+  "script-src 'self' 'unsafe-inline' 'unsafe-eval' https:",
+  "style-src 'self' 'unsafe-inline' https:",
+  "img-src 'self' data: https: blob:",
+  "font-src 'self' https: data:",
+  `connect-src 'self' ${apiOrigin} wss: https:`,
   "object-src 'none'",
   "base-uri 'self'",
   "frame-ancestors 'none'",
   "form-action 'self'",
-].join('; ');
+  'upgrade-insecure-requests',
+];
+const contentSecurityPolicy = cspDirectives.join('; ');
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   poweredByHeader: false,
@@ -33,11 +39,16 @@ const nextConfig = {
         headers: [
           { key: 'X-Content-Type-Options', value: 'nosniff' },
           { key: 'X-Frame-Options', value: 'DENY' },
-          { key: 'Referrer-Policy', value: 'no-referrer' },
           {
-            key: 'Content-Security-Policy-Report-Only',
-            value: reportOnlyPolicy,
+            key: 'Referrer-Policy',
+            value: 'strict-origin-when-cross-origin',
           },
+          {
+            key: 'Permissions-Policy',
+            value:
+              'camera=(), microphone=(), geolocation=(), payment=(), usb=()',
+          },
+          { key: 'Content-Security-Policy', value: contentSecurityPolicy },
         ],
       },
     ];
