@@ -4,20 +4,20 @@ Frontend dùng Next.js App Router trong `frontend/`, React và TypeScript. Phiê
 
 ## Các vùng chính
 
-| Đường dẫn                                                            | Vai trò hiện tại                                                    |
-| -------------------------------------------------------------------- | ------------------------------------------------------------------- |
-| `frontend/app/`                                                      | Route `/`, `/dashboard`, `/terms`, `/privacy`, layout toàn cục     |
-| `frontend/components/auth/`                                          | Trang login/register/OTP và dialog xác nhận guest                   |
-| `frontend/features/courts/`, `frontend/features/booking/`            | Luồng chọn sân, availability, giữ chỗ và booking của tôi            |
-| `frontend/features/payment/`                                         | Form khách vãng lai, dialog nhập OTP email, modal QR khóa giao diện |
-| `frontend/features/ai-assistant/`                                    | Nút nổi FAB tròn (icon message/robot), popup chat hỏi đáp AI        |
-| `frontend/features/cookie-consent/`                                  | Banner chấp thuận cookie và CookiePreferencesProvider               |
-| `frontend/features/legal/`                                           | Shell trang pháp lý, collection notice và footer pháp lý            |
-| `frontend/components/home/`                                          | Header, catalog sân và các khối trang chủ                           |
-| `frontend/context/auth-context.tsx`                                  | Session state, điều hướng đăng nhập, guest state và auth API        |
-| `frontend/services/auth.ts`, `frontend/services/courts.ts`           | Gọi HTTP, kiểm tra response và timeout/fallback cho các request đọc |
-| `frontend/hooks/use-auth-form.ts`, `frontend/lib/auth-validation.ts` | State form, validation/chuẩn hóa và khóa submit trùng               |
-| `frontend/types/`                                                    | Kiểu dữ liệu frontend                                               |
+| Đường dẫn                                                            | Vai trò hiện tại                                                               |
+| -------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| `frontend/app/`                                                      | Routes catalog/booking/bookings/account/auth/dashboard/legal/support và layout |
+| `frontend/components/auth/`                                          | Trang login/register/OTP và dialog xác nhận guest                              |
+| `frontend/features/courts/`, `frontend/features/booking/`            | Luồng chọn sân, availability, giữ chỗ và booking của tôi                       |
+| `frontend/features/payment/`                                         | Form khách vãng lai, dialog nhập OTP email, modal QR khóa giao diện            |
+| `frontend/features/ai-assistant/`                                    | Nút nổi FAB tròn (icon message/robot), popup chat hỏi đáp AI                   |
+| `frontend/features/cookie-consent/`                                  | Banner chấp thuận cookie và CookiePreferencesProvider                          |
+| `frontend/features/legal/`                                           | Shell trang pháp lý, collection notice và footer pháp lý                       |
+| `frontend/components/home/`                                          | Header, catalog sân và các khối trang chủ                                      |
+| `frontend/context/auth-context.tsx`                                  | Session state, điều hướng đăng nhập, guest state và auth API                   |
+| `frontend/services/auth.ts`, `frontend/services/courts.ts`           | Gọi HTTP, kiểm tra response và timeout/fallback cho các request đọc            |
+| `frontend/hooks/use-auth-form.ts`, `frontend/lib/auth-validation.ts` | State form, validation/chuẩn hóa và khóa submit trùng                          |
+| `frontend/types/`                                                    | Kiểu dữ liệu frontend                                                          |
 
 Feature có nhiều luồng độc lập ưu tiên cách tổ chức của Booking trong `frontend/features/<feature>/`: `components/`, `hooks/`, `api/`, `model/`. Panel/container ghép session, hook và view; view nhận props/callback; hook sở hữu state/interaction có cohesion; API service chỉ sở hữu HTTP và response contract. Không gom toàn bộ feature vào một service hoặc chuyển nguyên khối đó thành một hook tổng. Chỉ tách thêm component khi có trách nhiệm/dependency rõ, không tạo folder rỗng hoặc store toàn cục để đủ mẫu.
 
@@ -40,7 +40,7 @@ Chưa có thư viện state/API client riêng trong dependency. AuthContext ủy
 
 URL lấy từ `NEXT_PUBLIC_API_URL`; dev/test mặc định `http://localhost:4000`, production bắt buộc origin HTTPS hợp lệ và fail build nếu thiếu/sai. Auth request đặt `credentials: 'include'` để browser gửi/nhận cookie. Cookie do backend quản lý; frontend không đọc access token. Payload đăng ký có `confirmPassword`, chỉ dùng kiểm tra khớp tại backend. Form hiển thị message generic từ server cho đăng ký mới/trùng email/phone; username trùng vẫn là lỗi. Không suy ra account được tạo chỉ từ 201.
 
-Next config đặt nosniff/frame deny/no-referrer và CSP Report-Only với API origin tường minh. Chưa enforce CSP cho inline Next hydration/styles; cần browser evidence và nonce/hash trước rollout enforce. Không bật unsafe-eval production.
+Next config đặt nosniff, frame deny, referrer policy `strict-origin-when-cross-origin`, Permissions-Policy và CSP enforced. CSP hiện cho phép `unsafe-inline`, `unsafe-eval` cùng các nguồn HTTPS rộng; chưa có nonce/hash theo request. Siết policy cần browser verification và kiểm tra hydration/styles.
 
 Trang chính và luồng đặt sân dùng giao diện chuyển từ HTML thiết kế được cung cấp: nền tối #060911, card kính #0b1220, nút neon #10e760, font Plus Jakarta Sans và icon SVG nội bộ. `ArenaShell` ghép canvas sóng tần số, grid/radial, header ba mục Trang chủ/Đặt sân/Lịch của tôi và footer; CSS `arena*.css` giới hạn bằng class riêng, không đổi form login đã có. Hero có chữ shimmer, ping và bốn ô thông tin; số sân lấy từ API, không gắn số liệu USAPA/Lux hoặc khuyến mãi giả. Catalog hai cột desktop, một cột mobile vẫn gọi `GET /api/courts`, có bộ lọc và loading/error/empty, không nối fallback showcase.
 

@@ -1,39 +1,58 @@
 # Tài liệu hệ thống
 
-`docs/` chứa tài liệu ổn định, đã rà soát và hữu ích cho người duy trì repository. Chọn tài liệu theo miền bên dưới; đối chiếu source hiện hành khi tài liệu cũ chưa phản ánh hết thay đổi.
+Bắt đầu tại [README](../README.md). Tài liệu phân theo mục đích đọc theo [Diátaxis](https://diataxis.fr/start-here/): học qua quy trình đầu tiên, thực hiện công việc, tra cứu và hiểu kiến trúc. Quy ước biên tập tại [DOCUMENTATION-STANDARDS.md](DOCUMENTATION-STANDARDS.md).
 
-## Kiến trúc và dữ liệu
+## Khởi động lần đầu
 
-- [Backend architecture](BACKEND-ARCHITECTURE.md)
-- [Frontend architecture](FRONTEND-ARCHITECTURE.md)
-- [Database summary](DATABASE.md)
-- [Security, auth và permissions](SECURITY.md)
+| Tài liệu                              | Kết quả                                                |
+| ------------------------------------- | ------------------------------------------------------ |
+| [Getting started](GETTING-STARTED.md) | Chạy web/API và hạ tầng local với DB development riêng |
+| [Configuration](CONFIGURATION.md)     | Hiểu env, cổng và thứ tự nạp                           |
+| [Contributing](../CONTRIBUTING.md)    | Chuẩn bị thay đổi và chọn kiểm tra phù hợp             |
 
-## Nghiệp vụ và vận hành
+## Hướng dẫn công việc
 
-- [Workflows và state machines](WORKFLOWS.md) — thiết kế và các quyết định còn mở.
-- [Tiến độ & Phân chia Worktree](ROADMAP-WORKTREE-STREAMS.md) — tổng kết module hiện có, module còn thiếu và ranh giới chia Git worktree.
-- [Pipelines](PIPELINES.md) — build, test, lint, CI và migration.
-- [Legal và privacy](LEGAL-AND-PRIVACY.md) — routes, cookie consent, policy versioning và chính sách booking.
-- [Danh mục dữ liệu cá nhân](PRIVACY-DATA-INVENTORY.md) — mục đích, lưu trữ, bên nhận và giới hạn retention.
-- [Điều kiện phát hành](RELEASE-REQUIREMENTS.md) — quyết định còn mở và evidence trước vận hành thương mại.
+| Tài liệu                                    | Phạm vi                                                |
+| ------------------------------------------- | ------------------------------------------------------ |
+| [Operations](OPERATIONS.md)                 | Migration, seed, SMTP local, rollout và chẩn đoán      |
+| [Pipelines](PIPELINES.md)                   | Lint, unit, integration, build và side effect của test |
+| [CI troubleshooting](CI-TROUBLESHOOTING.md) | Điều tra CI và môi trường test                         |
+| [Booking MVP](BOOKING-MVP.md)               | Contract giữ chỗ, giá, expiry và seed                  |
 
-## Tài liệu tham chiếu
+## Tham chiếu
 
-- [Bối cảnh và điểm còn mở](PROJECT.md)
-- [Kiến trúc và ownership chi tiết](ARCHITECTURE.md)
-- [Data dictionary](DATABASE-DESIGN.md)
-- [Tech stack và version policy](TECH-STACK.md)
-- [Commands vận hành](OPERATIONS.md)
+| Tài liệu                                              | Phạm vi                                          |
+| ----------------------------------------------------- | ------------------------------------------------ |
+| [API](API.md)                                         | Nhóm endpoint, session, CSRF, guest token và lỗi |
+| [Database](DATABASE.md)                               | Model, quan hệ và invariant SQL                  |
+| [Data dictionary](DATABASE-DESIGN.md)                 | Thiết kế bảng gốc; đọc cùng schema/migration mới |
+| [Tech stack](TECH-STACK.md)                           | Version khai báo, lockfile và runtime            |
+| [Security](SECURITY.md)                               | Session, account, quyền và giới hạn bảo mật      |
+| [Guest recovery](GUEST-BOOKING-RECOVERY-CONTRACTS.md) | Hợp đồng khôi phục checkout khách vãng lai       |
+| [Frontend UI](FRONTEND-UI.md)                         | Route, dữ liệu UI và dependency chưa hoàn thiện  |
 
-Tài liệu học cá nhân, giáo trình và bản copy Sheet nằm ở guide/ và được Git ignore. Schema/migration thật thuộc backend/prisma và cần version control; generated client có quy tắc ignore riêng.
+## Giải thích hệ thống
 
-## Quy ước đóng góp tài liệu
+| Tài liệu                                           | Phạm vi                                             |
+| -------------------------------------------------- | --------------------------------------------------- |
+| [Project](PROJECT.md)                              | Phạm vi hiện tại, giới hạn và quyết định còn mở     |
+| [Architecture](ARCHITECTURE.md)                    | Topology, trách nhiệm và ranh giới transaction      |
+| [Backend architecture](BACKEND-ARCHITECTURE.md)    | Use case, port, adapter và module                   |
+| [Frontend architecture](FRONTEND-ARCHITECTURE.md)  | Route, state, feature và HTTP integration           |
+| [Workflows](WORKFLOWS.md)                          | Booking, thanh toán, hủy, check-in và state machine |
+| [Codebase map](CODEBASE-MAP.md)                    | Định vị source, test và cấu hình                    |
+| [Development streams](ROADMAP-WORKTREE-STREAMS.md) | Dependency và ownership của các vùng phát triển     |
 
-Public documentation nằm trong `docs/`: hướng dẫn developer, kiến trúc, API, bảo mật và vận hành có giá trị lâu dài. Chỉ liên kết tới file được publish cùng repository; không đưa thông tin cá nhân, secrets hoặc bằng chứng hợp đồng riêng tư vào docs.
+## Chính sách và điều kiện phát hành
 
-Agent mặc định lưu plan dùng tạm, handoff, scratchpad, corrective audit và progress report tại `.temp/ai-reports/` (compliance dùng `.temp/ai-reports/compliance/`). Các thư mục này được Git ignore. `coordination/` tiếp tục là dữ liệu điều phối local. Không tạo lại bộ báo cáo trong `docs/compliance/` hoặc `compliance/`.
+- [Legal và privacy](LEGAL-AND-PRIVACY.md): nội dung chính sách và tích hợp UI.
+- [Privacy data inventory](PRIVACY-DATA-INVENTORY.md): dữ liệu, mục đích và retention cần duyệt.
+- [Release requirements](RELEASE-REQUIREMENTS.md): điều kiện và evidence trước vận hành thương mại.
 
-Không tạo báo cáo public chỉ để tổng kết một implementation thành công. Khi hoàn tất task, chỉ cập nhật tài liệu bền vững liên quan nếu hành vi hoặc kiến trúc hệ thống thay đổi đáng kể. Giữ policy JSON, manifest, schema, migration, tests và CI cùng source dưới version control; chúng không phải báo cáo AI.
+Các trang pháp lý/release không phải chứng nhận tuân thủ hoặc quyền tự triển khai. Quyết định chưa duyệt giữ OPEN. Có source, schema hoặc test config chưa chứng minh runtime, DB đích hay provider hoạt động.
 
-Docs mô tả hệ thống; trạng thái DB thực tế cần đọc migration history của đúng môi trường.
+## Hiện hành và lịch sử
+
+Tài liệu cốt lõi phản ánh source, không thay log kiểm chứng của revision. Nội dung trong `completion/` là snapshot audit/decision/implementation theo thời điểm ghi trong file; không dùng nhãn PASS, số test hoặc blocker cũ làm trạng thái hiện tại. Tài liệu pilot, workflow AI và báo cáo cục bộ không phải hướng dẫn khởi động sản phẩm.
+
+Chỉ link file được publish cùng repo. Học liệu cá nhân và cấu hình/điều phối AI local không thuộc bộ tài liệu public; không đặt secrets, PII hoặc evidence hợp đồng riêng tư tại đây. Schema/migration, policy JSON, tests và CI là source phải version cùng tính năng.

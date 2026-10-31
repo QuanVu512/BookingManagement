@@ -1,68 +1,57 @@
 # Bản đồ codebase
 
-Tài liệu này định vị nhanh các vùng chính của repository. Dùng nó để chọn file cần đọc; cấu trúc và mức triển khai có thể đổi theo code thực tế.
+Dùng bản đồ này để định vị source và contract. [README](../README.md) giới thiệu sản phẩm; [Getting started](GETTING-STARTED.md) hướng dẫn chạy local. Cấu trúc không chứng minh mức nghiệm thu runtime.
 
-## Cây thư mục
+## Thư mục
 
 ```text
-booking-project/
-├── backend/
-│   ├── src/
-│   │   ├── modules/             # Auth, users, courts, bookings, payments, ai-assistant, privacy-requests, check-in, notifications
-│   │   ├── infrastructure/      # Prisma, Redis, BullMQ
-│   │   ├── app.module.ts        # Lắp module, rate limit, observability
-│   │   └── main.ts              # Bootstrap, CORS, Swagger, listen
-│   ├── prisma/
-│   │   ├── schema.prisma        # Nguồn model và enum
-│   │   └── migrations/          # SQL migration có version
-│   └── test/                    # E2E Jest
-├── frontend/
-│   ├── app/                     # Next.js App Router
-│   ├── components/              # UI components
-│   ├── features/                # UI theo feature (booking, courts, payment, ai-assistant, cookie-consent, legal)
-│   ├── context/                 # AuthContext & ThemeContext
-│   └── types/                   # Kiểu dùng ở frontend
-├── infra/docker-compose.yml     # PostgreSQL và Redis local
-├── tests/load/                  # Smoke/load script
-├── docs/                        # Tài liệu hệ thống public
-├── .github/workflows/           # CI
-├── package.json                 # Scripts và dependency chung
-└── package-lock.json            # Cây dependency đã khóa
+backend/
+  src/
+    modules/             Auth, users, courts, bookings, payments, check-in
+                         ai-assistant, legal-content, privacy-requests, support
+    infrastructure/      Prisma, Redis, BullMQ
+    app.module.ts        Module wiring và global guards/filter
+    main.ts              CORS, Swagger, security headers, listen
+  prisma/                Schema, SQL migrations, seed và audit scripts
+  test/                  HTTP/integration suites và helpers
+frontend/
+  app/                   Next.js routes và layouts
+  features/              Components/hooks/api/model theo feature
+  components/            Auth, home, arena và các UI dùng chung
+  context/               Auth/theme state
+  services/              HTTP services dùng chung
+  types/                 Frontend contracts
+infra/docker-compose.yml PostgreSQL, Redis, Mailpit và storage test riêng
+tests/load/              Smoke/load scripts
+tools/                   Công cụ kiểm tra repository
+.github/workflows/       CI
+package.json             Scripts/dependency chung
+package-lock.json        Dependency tree đã khóa
+docs/                    Tài liệu public
 ```
 
-`backend/src/generated/prisma/`, `backend/dist/`, `frontend/.next/`, `node_modules/` và `.temp/` là vùng sinh tự động, cache hoặc tạm; không dùng làm nguồn thiết kế. `guide/` là học liệu local. `coordination/` là lịch sử điều phối, không phải tài liệu sản phẩm.
+Generated client `backend/src/generated/prisma/`, `backend/dist/`, `frontend/.next/` và `node_modules/` là output/cache. Học liệu và cấu hình/điều phối AI local không phải nguồn contract sản phẩm.
 
-## Ownership
+## Định vị theo nhu cầu
 
-| Vùng                          | Trách nhiệm                                                  |
-| ----------------------------- | ------------------------------------------------------------ |
-| `frontend/app/`               | Route, layout và trang Next.js                               |
-| `frontend/components/`        | Thành phần giao diện theo feature                            |
-| `frontend/context/`           | State dùng chung phía client, hiện có auth và guest UI state |
-| `backend/src/modules/`        | Ranh giới module nghiệp vụ và HTTP                           |
-| `backend/src/infrastructure/` | Kết nối Prisma, Redis và BullMQ                              |
-| `backend/prisma/`             | Schema và lịch sử SQL migration                              |
-| `infra/`                      | Cấu hình dịch vụ local bằng Docker Compose                   |
-| `tests/load/`                 | Kiểm tra tải/smoke riêng, không phải unit test               |
-| `docs/`                       | Đặc tả, kiến trúc và hướng dẫn vận hành                      |
+| Nhu cầu                    | Điểm bắt đầu                                                                                   | Contract                                                             |
+| -------------------------- | ---------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| Login/OTP/recovery         | `backend/src/modules/auth/`, `frontend/components/auth/`                                       | [Security](SECURITY.md)                                              |
+| Hồ sơ                      | `backend/src/modules/users/presentation/`, `application/`                                      | [API](API.md)                                                        |
+| Catalog/giá                | `backend/src/modules/courts/`, `frontend/features/courts/`                                     | [Booking MVP](BOOKING-MVP.md)                                        |
+| Hold/expiry/cancel         | `backend/src/modules/bookings/`, `frontend/features/booking/`                                  | [Workflows](WORKFLOWS.md)                                            |
+| Guest/payment/refund       | `backend/src/modules/payments/`, `frontend/features/payment/`                                  | [API](API.md), [guest recovery](GUEST-BOOKING-RECOVERY-CONTRACTS.md) |
+| Check-in                   | `backend/src/modules/check-in/`                                                                | [Workflows](WORKFLOWS.md)                                            |
+| Assistant                  | `backend/src/modules/ai-assistant/`, `frontend/features/ai-assistant/`                         | [Backend architecture](BACKEND-ARCHITECTURE.md)                      |
+| Chính sách/privacy/support | Module tương ứng trong `backend/src/modules/`, các route legal/support/privacy phía web        | [Legal](LEGAL-AND-PRIVACY.md)                                        |
+| Model/constraint           | `backend/prisma/schema.prisma`, `migrations/`                                                  | [Database](DATABASE.md)                                              |
+| Env/startup                | `backend/src/main.ts`, `app.module.ts`, `backend/prisma.config.ts`, `frontend/next.config.mjs` | [Configuration](CONFIGURATION.md)                                    |
+| Test/build/CI              | `package.json`, Jest configs, `.github/workflows/ci.yml`                                       | [Pipelines](PIPELINES.md)                                            |
 
-## Quick jump
+## Ranh giới cần nhớ
 
-| Nhu cầu                     | Điểm bắt đầu                                                           | Tình trạng cần nhớ                                                                      |
-| --------------------------- | ---------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
-| Đăng nhập/JWT               | `backend/src/modules/auth/`                                            | Controller và service có luồng login/register/me/logout; xem [SECURITY.md](SECURITY.md) |
-| Hồ sơ người dùng            | `backend/src/modules/users/`                                           | Module còn scaffold; xem [BACKEND-ARCHITECTURE.md](BACKEND-ARCHITECTURE.md)             |
-| Danh sách sân               | `backend/src/modules/courts/`                                          | Có endpoint public; UI ở `frontend/app/page.tsx`                                        |
-| Đặt sân/giữ chỗ             | `backend/src/modules/bookings/`, schema `Booking` và `CourtOccupancy`  | HOLDING/expiry/cancel đã có; xem [BOOKING-MVP.md](BOOKING-MVP.md)                       |
-| Thanh toán/hoàn tiền        | `backend/src/modules/payments/`, schema `Payment*` và `Refund*`        | Module chưa có workflow                                                                 |
-| Check-in                    | `backend/src/modules/check-in/` và schema `BookingCheckin`             | Module chưa có workflow                                                                 |
-| Giao diện đăng nhập/đăng ký | `frontend/components/auth/`, `frontend/context/auth-context.tsx`       | Client gọi Nest API qua `NEXT_PUBLIC_API_URL`                                           |
-| Cơ sở dữ liệu               | `backend/prisma/schema.prisma`, `backend/prisma/migrations/`           | Xem [DATABASE.md](DATABASE.md); migration cần đối chiếu DB đích                         |
-| Pipeline và lệnh            | `package.json`, `.github/workflows/ci.yml`, `infra/docker-compose.yml` | Xem [PIPELINES.md](PIPELINES.md)                                                        |
+Backend module sở hữu use case và persistence contract; frontend không tự quyết tiền/quyền/trạng thái. Courts public export schedule/pricing contract; Booking dùng transaction để giữ snapshot và occupancy. Payment/provider và queue không atomic với PostgreSQL.
 
-## Tài liệu theo miền
+Notifications có Socket.IO scaffold chưa nạp vào AppModule. User module có profile use cases; payment/check-in đã có implementation. Không dùng mô tả scaffold từ snapshot cũ để suy trạng thái hiện tại.
 
-- [Backend](BACKEND-ARCHITECTURE.md) · [Frontend](FRONTEND-ARCHITECTURE.md)
-- [Cơ sở dữ liệu](DATABASE.md) · [Bảo mật](SECURITY.md)
-- [Workflow](WORKFLOWS.md) · [Pipeline](PIPELINES.md)
-- Tài liệu tham chiếu chi tiết: [ARCHITECTURE.md](ARCHITECTURE.md), [DATABASE-DESIGN.md](DATABASE-DESIGN.md), [PROJECT.md](PROJECT.md), [TECH-STACK.md](TECH-STACK.md), [OPERATIONS.md](OPERATIONS.md).
+Tham chiếu sâu: [Architecture](ARCHITECTURE.md), [Backend](BACKEND-ARCHITECTURE.md), [Frontend](FRONTEND-ARCHITECTURE.md). Chỉ mở rộng phạm vi đọc/sửa khi có dependency cụ thể với task.

@@ -2,16 +2,18 @@
 
 Tài liệu này định vị source cho developer. Nội dung JSON được gắn `PUBLISHED` không tự chứng minh owner đã duyệt pháp lý hoặc môi trường production đã sẵn sàng. Xem [điều kiện phát hành](RELEASE-REQUIREMENTS.md) cho phần còn mở.
 
+Tham chiếu sử dụng: [API](API.md), [Workflows](WORKFLOWS.md) và [Configuration](CONFIGURATION.md). Hành vi runtime và policy được duyệt phải được phân biệt, nhất là ranh giới T−12h ghi ở cuối phần chính sách.
+
 ## Trang và API hiện có
 
-| Frontend route | Source / chức năng |
-| --- | --- |
-| `/privacy` | [Privacy page](../frontend/app/privacy/page.tsx): thông báo xử lý dữ liệu |
-| `/terms` | [Terms page](../frontend/app/terms/page.tsx): điều khoản giao kết |
-| `/cookies` | [Cookie page](../frontend/app/cookies/page.tsx): cookie và browser storage |
-| `/refund-policy` | [Refund page](../frontend/app/refund-policy/page.tsx): hủy, cọc và hoàn tiền |
+| Frontend route                          | Source / chức năng                                                                                                                                       |
+| --------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/privacy`                              | [Privacy page](../frontend/app/privacy/page.tsx): thông báo xử lý dữ liệu                                                                                |
+| `/terms`                                | [Terms page](../frontend/app/terms/page.tsx): điều khoản giao kết                                                                                        |
+| `/cookies`                              | [Cookie page](../frontend/app/cookies/page.tsx): cookie và browser storage                                                                               |
+| `/refund-policy`                        | [Refund page](../frontend/app/refund-policy/page.tsx): hủy, cọc và hoàn tiền                                                                             |
 | `/privacy/requests`, `/account/privacy` | [Form](../frontend/app/privacy/requests/page.tsx) và [trang tài khoản](../frontend/app/account/privacy/page.tsx): tiếp nhận và xem yêu cầu quyền dữ liệu |
-| `/support` | [Support page](../frontend/app/support/page.tsx): gửi phản ánh, tra cứu trạng thái |
+| `/support`                              | [Support page](../frontend/app/support/page.tsx): gửi phản ánh, tra cứu trạng thái                                                                       |
 
 [LegalContentController](../backend/src/modules/legal-content/presentation/legal-content.controller.ts) khai báo `GET /legal/policies`, `/legal/booking-offer`, `/legal/business`. [Bootstrap](../backend/src/main.ts) hiện không đặt global `/api` prefix. Business manifest đang `DRAFT_PENDING_OWNER`; endpoint business trả `503 BUSINESS_INFO_NOT_PUBLISHED` đến khi đủ điều kiện công bố. Không dùng thông tin mẫu làm danh tính doanh nghiệp thật.
 
@@ -54,14 +56,14 @@ Store được inject là [InMemoryPrivacyRequestStore](../backend/src/modules/p
 - Các tỷ lệ cọc/phạt trên không tính dịch vụ bổ sung. Ví dụ giá sân 1.000.000 VNĐ: cọc 300.000; hủy đúng hạn giữ 100.000, hoàn 200.000; hủy muộn/no-show mất 300.000.
 - Không viết lại giao dịch lịch sử, số tiền, snapshot hoặc policy acceptance đã ghi. Xử lý hoàn tiền dựa trên tiền thực đã xác minh và nghĩa vụ đã giữ/hoàn; tạo refund request không đồng nghĩa đã chuyển tiền.
 
-| Nghiệp vụ | Source thực thi hiện tại |
-| --- | --- |
-| Member hold, cọc và snapshot | [CreateHoldUseCase](../backend/src/modules/bookings/application/create-hold.use-case.ts), [DTO](../backend/src/modules/bookings/presentation/dto/booking-request.dto.ts) |
-| Guest hold, cọc và token | [GuestCreateHoldUseCase](../backend/src/modules/payments/application/guest-create-hold.use-case.ts), [guest DTO/controller](../backend/src/modules/payments/presentation/guest-bookings.controller.ts) |
-| Giá và cấu trúc snapshot | [Prisma schema](../backend/prisma/schema.prisma): Booking/BookingPriceItem; các create-hold use case dùng quote từ court schedule |
-| Làm tròn VND, tạo yêu cầu thu | [Money domain](../backend/src/modules/payments/domain/money.ts), [CreatePaymentRequestUseCase](../backend/src/modules/payments/application/create-payment-request.use-case.ts) |
-| Quote/apply hủy thường | [Cancellation policy](../backend/src/modules/bookings/domain/cancellation-policy.ts), [request](../backend/src/modules/bookings/application/request-paid-cancellation.use-case.ts), [apply](../backend/src/modules/bookings/application/apply-paid-cancellation.use-case.ts) |
-| Hủy muộn/no-show | [Deposit forfeiture](../backend/src/modules/bookings/domain/deposit-forfeiture.ts), [staff late cancel](../backend/src/modules/bookings/application/staff-late-cancel.use-case.ts), [mark no-show](../backend/src/modules/bookings/application/mark-no-show.use-case.ts), [settle](../backend/src/modules/bookings/application/settle-eligible-bookings.use-case.ts) |
+| Nghiệp vụ                     | Source thực thi hiện tại                                                                                                                                                                                                                                                                                                                                             |
+| ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Member hold, cọc và snapshot  | [CreateHoldUseCase](../backend/src/modules/bookings/application/create-hold.use-case.ts), [DTO](../backend/src/modules/bookings/presentation/dto/booking-request.dto.ts)                                                                                                                                                                                             |
+| Guest hold, cọc và token      | [GuestCreateHoldUseCase](../backend/src/modules/payments/application/guest-create-hold.use-case.ts), [guest DTO/controller](../backend/src/modules/payments/presentation/guest-bookings.controller.ts)                                                                                                                                                               |
+| Giá và cấu trúc snapshot      | [Prisma schema](../backend/prisma/schema.prisma): Booking/BookingPriceItem; các create-hold use case dùng quote từ court schedule                                                                                                                                                                                                                                    |
+| Làm tròn VND, tạo yêu cầu thu | [Money domain](../backend/src/modules/payments/domain/money.ts), [CreatePaymentRequestUseCase](../backend/src/modules/payments/application/create-payment-request.use-case.ts)                                                                                                                                                                                       |
+| Quote/apply hủy thường        | [Cancellation policy](../backend/src/modules/bookings/domain/cancellation-policy.ts), [request](../backend/src/modules/bookings/application/request-paid-cancellation.use-case.ts), [apply](../backend/src/modules/bookings/application/apply-paid-cancellation.use-case.ts)                                                                                         |
+| Hủy muộn/no-show              | [Deposit forfeiture](../backend/src/modules/bookings/domain/deposit-forfeiture.ts), [staff late cancel](../backend/src/modules/bookings/application/staff-late-cancel.use-case.ts), [mark no-show](../backend/src/modules/bookings/application/mark-no-show.use-case.ts), [settle](../backend/src/modules/bookings/application/settle-eligible-bookings.use-case.ts) |
 
 Hai create-hold use case hiện chỉ cho 30%. Payment domain/DTO vẫn có kiểu 30/100 để tương thích và payment request đối chiếu snapshot; sự tồn tại của 100 trong cấu trúc không cấp lựa chọn 100% cho booking mới. Công thức hiện lấy `totalAmount` từ quote sân; khi bổ sung dịch vụ phải giữ riêng base giá sân để không phạt trên dịch vụ.
 

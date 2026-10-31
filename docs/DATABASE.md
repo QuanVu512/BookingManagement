@@ -4,7 +4,7 @@ Tóm tắt schema PostgreSQL để định vị nhanh. Nguồn model/enum là [`
 
 ## Phạm vi và nhóm model
 
-Schema hiện có 22 model trong một PostgreSQL database và schema `public`:
+Schema hiện có 27 model trong một PostgreSQL database và schema `public`:
 
 | Miền               | Model (Prisma)                                                                                                              | Bảng                                                                                                                                       |
 | ------------------ | --------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -14,7 +14,9 @@ Schema hiện có 22 model trong một PostgreSQL database và schema `public`:
 | Check-in           | `BookingCheckin`                                                                                                            | `booking_checkins`                                                                                                                         |
 | Thu và hoàn tiền   | `PaymentRequest`, `PaymentTransaction`, `PaymentWebhookEvent`, `RefundRequest`, `RefundAttempt`                             | `payment_requests`, `payment_transactions`, `payment_webhook_events`, `refund_requests`, `refund_attempts`                                 |
 | Thông báo          | `NotificationDelivery`                                                                                                      | `notification_deliveries`                                                                                                                  |
-| Tích hợp nền       | `OutboxEvent`                                                                                                               | `outbox_events`                                                                                                                            |
+| Tích hợp nền       | `OutboxEvent`, `OutboxMessage`                                                                                              | `outbox_events`, `outbox_messages`                                                                                                         |
+
+Các model bổ sung so với thiết kế v1: `PaymentAuditLog` (`payment_audit_logs`), `GuestOtpChallenge` (`guest_otp_challenges`), `GuestOtpProof` (`guest_otp_proofs`), `GuestCheckoutIntent` (`guest_checkout_intents`) và `OutboxMessage` (`outbox_messages`). Chúng lưu audit và lifecycle guest/outbox theo schema/migration hiện hành; không suy ra email đã gửi chỉ từ hàng outbox.
 
 ## Quan hệ chính
 
@@ -34,6 +36,7 @@ erDiagram
   Booking ||--o{ BookingCancellationRequest : cancellations
   Booking ||--o{ PaymentRequest : payment_requests
   PaymentRequest ||--o{ PaymentTransaction : receipts
+  GuestOtpProof ||--o| GuestCheckoutIntent : checkout
   PaymentTransaction ||--o{ RefundRequest : refunds
   RefundRequest ||--o{ RefundAttempt : attempts
   Booking ||--o{ NotificationDelivery : notifications

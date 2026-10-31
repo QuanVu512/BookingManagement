@@ -1,105 +1,86 @@
-# Build, test, migration và CI
+# Build, kiểm thử và CI
 
-Các lệnh chạy từ thư mục gốc repository. Script chuẩn là `package.json`; workflow CI hiện tại là `.github/workflows/ci.yml`.
+Chạy lệnh từ root repository. Nguồn chuẩn là [package.json](../package.json), cấu hình Jest và [CI workflow](../.github/workflows/ci.yml). Kiểm tra script cùng pre/post-hook trước khi chạy. Đây là hướng dẫn kiểm chứng, không phải log PASS cho revision hiện tại.
 
-## Lệnh thường dùng
+## Kiểm tra không cần storage ngoài
 
-| Mục tiêu                                      | Lệnh                                                                                           |
-| --------------------------------------------- | ---------------------------------------------------------------------------------------------- |
-| Cài dependency theo lockfile                  | `npm ci`                                                                                       |
-| Lint/type-aware lint                          | `npm run lint`                                                                                 |
-| Unit test backend + frontend Jest             | `npm test`                                                                                     |
-| E2E Jest                                      | `npm run test:e2e`                                                                             |
-| Build API (generate Prisma rồi Nest build)    | `npm run build`                                                                                |
-| Build frontend                                | `npm run build:web`                                                                            |
-| Sinh Prisma client/types                      | `npm run prisma:generate`                                                                      |
-| Xem trạng thái migration trên DB URL hiện tại | `npm run prisma:migrate:status`                                                                |
-| Tạo migration trong môi trường dev            | `npm run prisma:migrate:dev`                                                                   |
-| Apply migration đã tạo                        | `npm run prisma:migrate:deploy`                                                                |
-| Khởi động PostgreSQL, Redis và Mailpit local  | `npm run infra:up`                                                                             |
-| Khởi động riêng Mailpit, đợi healthcheck      | `npm run mailpit:up`                                                                           |
-| Chạy backend với SMTP Mailpit local           | `start:dev` với môi trường SMTP local; xem [OPERATIONS](OPERATIONS.md#smtp-local-bằng-mailpit) |
-| Dừng container local, giữ volume              | `npm run infra:down`                                                                           |
+| Lệnh                           | Phạm vi                                                      |
+| ------------------------------ | ------------------------------------------------------------ |
+| `npm run lint`                 | Oxlint type-aware cho backend/frontend                       |
+| `npm test`                     | `test:backend` rồi `test:frontend`                           |
+| `npm run test:backend`         | Unit config; loại integration suites                         |
+| `npm run test:frontend`        | Jest frontend; rendering JSDOM và HTTP mock                  |
+| `npm run test:auth:contract`   | Nest HTTP contract và frontend validation/network            |
+| `npm run test:auth:security`   | Auth HTTP với dependencies mô phỏng, không phải storage thật |
+| `npm run test:frontend:ui`     | Rendering specs trong JSDOM                                  |
+| `npm run test:auth:ui`         | Rendering auth                                               |
+| `npm run test:booking:ui`      | Rendering booking                                            |
+| `npm run test:backend:runtime` | Nest ESM/throttler HTTP runtime regression                   |
 
-Yêu cầu Node nằm trong `.nvmrc` và `engines` của package. Prisma config ở `backend/prisma.config.ts`; lệnh Prisma phụ thuộc `DATABASE_URL`. Không đọc/ghi credential thật để chạy lệnh và không chạy migration lên môi trường không được chỉ định.
+Unit config backend tại `backend/jest.unit.config.js`; frontend tại `frontend/jest.config.js`; integration/HTTP backend tại `backend/jest.config.js`. Không gọi rendering test là browser E2E.
 
-`npm run build` không apply migration. `migrate deploy` apply SQL hiện có nhưng không sinh client; `prisma:generate` không chứng minh schema đã được migrate. Xem [OPERATIONS.md](OPERATIONS.md) trước thao tác DB.
+## Storage integration riêng
 
-## Storage riêng cho E2E local
+| Lệnh                                       | Môi trường bắt buộc                                                                                   |
+| ------------------------------------------ | ----------------------------------------------------------------------------------------------------- |
+| `npm run test:auth:storage`                | `AUTH_SECURITY_DATABASE_TEST_URL`, `AUTH_SECURITY_REDIS_TEST_URL`                                     |
+| `npm run test:booking:integration`         | `BOOKING_DATABASE_TEST_URL`, `BOOKING_REDIS_TEST_URL`                                                 |
+| `npm run test:booking:deposit:integration` | `BOOKING_DEPOSIT_DATABASE_TEST_URL`, DB loopback rỗng `booking_deposit_test`                          |
+| `npm run test:auth:phones`                 | Có unit; phần migration/CLI opt-in bằng `AUTH_MIGRATION_TEST_URL`, DB loopback `auth_validation_test` |
+| `npm run test:payments:integration`        | Đọc guard/môi trường của suite `backend/test/payments-coordinator.integration.spec.ts` trước khi chạy |
 
-Dev dùng services `postgres` (cổng 5433 mặc định) và `redis` (6380). E2E dùng `test-database` (5435 mặc định) và `test-redis` (6381), với volumes `test_postgres_data` và `test_redis_data` riêng. Database có thể cùng tên ở hai PostgreSQL instance; dữ liệu vẫn độc lập.
+Các suite có guard/REQUIRE_STORAGE riêng; thiếu URL có thể SKIP hoặc FAIL theo chế độ. SKIP không phải PASS của storage. Không fallback sang DB ứng dụng. Suite phone tạo lại bảng users trong DB test riêng; deposit replay SQL lịch sử và từ chối target không rỗng. Không chạy hai bản suite cùng DB hoặc sử dụng lại DB ứng dụng.
 
-Tạo `backend/.env.test` local (được Git ignore) với `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB` và `DATABASE_URL` khớp nhau. Ví dụ chỉ dùng cho local:
+Xem [Booking MVP](BOOKING-MVP.md) cho booking integration và [Operations](OPERATIONS.md#tiền-kiểm-chuẩn-hóa-điện-thoại-auth) cho phone audit. Cấu hình seed/test không tự cấp quyền migrate hay xóa dữ liệu.
+
+## E2E local và pre-hook
+
+`npm run test:e2e` có `pretest:e2e` gọi `db:test:restart`. Chuỗi này dừng/xóa hai container test, tạo lại, đợi readiness rồi apply migrations. Nó giữ volumes; không tương đương DB sạch.
+
+Storage test dùng `test-database` cổng mặc định `5435`, `test-redis` cổng `6381` và volumes riêng. Tạo `backend/.env.test` với các giá trị local sau, không dùng URL dev/production:
 
 ```dotenv
 NODE_ENV=test
 POSTGRES_USER=pickleball
-POSTGRES_PASSWORD=local_dev_password
-POSTGRES_DB=pickleball
-DATABASE_URL=postgresql://pickleball:local_dev_password@localhost:5435/pickleball?schema=public
+POSTGRES_PASSWORD=local_test_password
+POSTGRES_DB=pickleball_test
+TEST_POSTGRES_PORT=5435
+DATABASE_URL=postgresql://pickleball:local_test_password@localhost:5435/pickleball_test?schema=public
 REDIS_URL=redis://localhost:6381
 REDIS_HOST=localhost
 REDIS_PORT=6381
 REDIS_PASSWORD=
 ```
 
-Chạy `npm run test:e2e`. Hook `pretest:e2e` dừng/xóa riêng hai container test, tạo lại và đợi healthcheck, rồi apply migrations hiện có vào DB test. Restart giữ volumes và dữ liệu, không reset database. Dev vẫn dùng `npm run infra:up` hoặc `npm run db:dev:restart`; không chạy `infra:down` nếu muốn giữ các container dev hoạt động.
+E2E/migration test nạp file bằng `dotenv run --override`; file test ưu tiên biến process. Cấu hình bắt buộc khác như JWT/SMTP phải đáp ứng bootstrap nếu suite dùng AppModule thật. Các dedicated integration suite ở bảng trên dùng URL riêng, không tự dùng `.env.test`.
 
-Migration test và lệnh E2E nạp `backend/.env.test` trực tiếp bằng `dotenv run --override -f backend/.env.test -- ...`, ưu tiên file này hơn biến môi trường đang có. CLI này có sẵn trong dependency `dotenv` của dự án. Khai báo cả `REDIS_URL` và `REDIS_HOST`/`REDIS_PORT` vì RedisService và BullMQ đọc các trường khác nhau. Các cấu hình ứng dụng khác vẫn theo ConfigModule hiện hành. Nếu đổi cổng PostgreSQL, cập nhật `TEST_POSTGRES_PORT` và `DATABASE_URL` trong file test cho khớp.
+## Build và migration
+
+| Lệnh                            | Tác động                                              |
+| ------------------------------- | ----------------------------------------------------- |
+| `npm run prisma:generate`       | Sinh client/types, không migrate                      |
+| `npm run prisma:migrate:status` | Đọc trạng thái DB đã chọn                             |
+| `npm run prisma:migrate:dev`    | Tạo/apply migration development; có yêu cầu shadow DB |
+| `npm run prisma:migrate:deploy` | Apply SQL có sẵn vào DB đã chọn, không sinh client    |
+| `npm run build`                 | Generate client rồi Nest build                        |
+| `npm run build:web`             | Next production build; API origin HTTPS hợp lệ        |
+
+Build cần Prisma config/DATABASE_URL nhưng không phải lệnh migrate. Không dùng reset để sửa DB có dữ liệu. Setup hạ tầng và env xem [Getting started](GETTING-STARTED.md) và [Configuration](CONFIGURATION.md). Alias `infra:*` có thể khác file env giữa các revision; hướng dẫn mới dùng Compose `--env-file infra/.env` tường minh.
 
 ## CI hiện tại
 
-Workflow chạy khi push hoặc pull request:
+Workflow chạy khi push/pull request, dùng Node theo `.nvmrc`, npm ci, PostgreSQL/Redis disposable. Các nhóm step gồm:
 
-1. Cài Node theo `.nvmrc` và `npm ci`.
-2. Generate Prisma client với `DATABASE_URL` placeholder.
-3. Tạo service PostgreSQL/Redis disposable, migrate DB riêng `auth_security_test`; `AUTH_SECURITY_REQUIRE_STORAGE=true` buộc storage suite không được bỏ qua vì thiếu URL. Chạy `npm audit --audit-level=high`, focused source security gate, lint, unit/storage và HTTP/frontend auth checks. Local không có URL test vẫn skip storage; phải báo riêng.
-4. Build API và frontend.
+1. Nest/throttler runtime regression và Prisma generate.
+2. Migration vào DB auth test, tạo/migrate booking test; kiểm upgrade deposit và phone migration riêng.
+3. Auth storage, booking integration và booking UI trên runner UTC.
+4. `npm audit --audit-level=high`, `node tools/security-source-check.mjs`, lint và unit tests.
+5. Auth contract/security/rendering/phone checks; build API và frontend.
 
-Workflow không deploy ứng dụng và không chứng minh DB ứng dụng/payment/provider hoạt động. URLs chỉ trỏ service containers CI; không fallback sang DATABASE_URL ứng dụng trong storage suite. Frontend build CI dùng HTTPS API placeholder, không chứng minh topology production. Actions checkout/setup-node được pin SHA; pin phải được xác minh với repository chính thức khi cập nhật. Scan errors/findings không được coi là clean. Dependency high chưa xử lý sẽ làm gate fail theo chủ đích.
+CI bật REQUIRE_STORAGE cho các suite tương ứng để thiếu môi trường phải fail. Workflow không tự deploy, không gọi merchant bank thật và chưa bao phủ mọi flow có trong source. Frontend build dùng HTTPS API placeholder; không chứng minh topology production. Xem log run đúng commit trước khi báo CI PASS.
 
-## Dependency overrides cho security gate
+## Dependency và báo cáo
 
-`package.json` giới hạn override theo package cha đang kéo dependency có advisory; `package-lock.json` giữ phiên bản cài đặt cụ thể. Bản vá không thay ngưỡng `npm audit --audit-level=high` của CI.
+Manifest có override bắc cầu theo package cha; lockfile giữ cây đã cài. Không ghi advisory đã hết chỉ từ ngày audit cũ hoặc threshold high. Khi thay override, kiểm tra diff và chạy đúng audit/generate/lint/tests/build liên quan; không dùng `npm audit fix --force` để đổi major ngoài scope.
 
-| Package cha      | Dependency được override | Phiên bản đã kiểm chứng |
-| ---------------- | ------------------------ | ----------------------- |
-| `@prisma/config` | `deepmerge-ts`           | `8.0.2`                 |
-| `prisma`         | `mysql2`                 | `3.24.6`                |
-| `@nestjs/mau`    | `undici`                 | `6.29.0`                |
-| `@nestjs/mau`    | `tmp`                    | `0.2.7`                 |
-
-Các override này xử lý advisory của dependency bắc cầu mà không nâng major Prisma hoặc Nest. Khi upstream đã cập nhật dependency, thử bỏ override rồi chạy lại `npm ci`, `npm audit --audit-level=high`, Prisma generate, lint, test và build API/frontend trước khi loại bỏ hẳn. Không dùng `npm audit fix --force` để tự động downgrade Jest hoặc thay major ngoài phạm vi bản vá.
-
-Audit ngày 2026-10-16 còn 20 cảnh báo moderate trong chuỗi Jest → `@istanbuljs/load-nyc-config` → `js-yaml` → `argparse` → `sprintf-js`; registry chưa có bản `sprintf-js` sửa [GHSA-hp3w-g68c-fv3c](https://github.com/advisories/GHSA-hp3w-g68c-fv3c). Không coi audit đạt ngưỡng high là không còn lỗ hổng; kiểm tra lại advisory khi cập nhật dependency.
-
-## Pre-flight cho thay đổi
-
-Booking MVP có suite `npm run test:booking:integration`. CI tạo DB `booking_mvp_test` riêng, migrate bằng `BOOKING_DATABASE_TEST_URL`, dùng `BOOKING_REDIS_TEST_URL` cho JWT/CSRF và BullMQ worker, và `BOOKING_REQUIRE_STORAGE=true` để không bỏ qua storage. Booking không dùng Redis lock; BullMQ chạy worker expiry, auth vẫn cần Redis cho session/CSRF. Seed: `npm run seed:courts` với DATABASE_URL tường minh. Cách chạy PostgreSQL test riêng và contract tại [BOOKING-MVP.md](BOOKING-MVP.md).
-
-- Chạy đúng lint/test/build cho vùng bị ảnh hưởng và báo riêng command, exit status, lỗi thuộc phạm vi nào.
-- Với schema, xem diff cả `schema.prisma` và migration SQL; bảo toàn constraint thủ công. Kiểm tra trạng thái DB đích trước khi kết luận migration đã apply.
-- Không sửa migration đã áp dụng; tạo migration mới theo môi trường dev phù hợp.
-- Không dùng reset để xử lý DB có dữ liệu. Không commit `.env`, secret, generated output hoặc dữ liệu người dùng.
-- Exit 0 của tool chỉ xác nhận command kết thúc thành công; không xác nhận nghiệp vụ, deployment hoặc dữ liệu production.
-
-## Phân vùng test và tiện ích
-
-`npm test` chạy `test:backend` (src unit và audit phone, loại integration) rồi `test:frontend` (`frontend/__tests__/`, config độc lập, rendering JSDOM và fetch mock), không cần service ngoài. `test:auth:contract` gọi riêng backend HTTP và frontend validation/network. Các alias UI theo feature vẫn được giữ.
-
-`npm run test:auth:security` chạy riêng `auth-security.http.integration.spec.ts` bằng `--runTestsByPath`; CI gọi lệnh này trong step `Auth HTTP, frontend and phone audit checks`. Suite dựng Nest HTTP server thật trên loopback với DB/Redis/mail mô phỏng, giữ real timers và deadline phản hồi production 3500 ms; timeout test riêng là 30 giây. `test:backend` và `test:watch` dùng unit config nên không thu nhận suite này. Auth và audit dùng regex chuẩn hóa đồng bộ với migration SQL; `libphonenumber-js` không còn là direct dependency mà chỉ có thể còn trong `node_modules` như transitive dependency của `class-validator`, không import trên luồng Auth.
-
-Storage auth chạy riêng bằng `npm run test:auth:storage`; booking dùng `test:booking:integration`. `test:auth:phones` dùng Jest; phần DB/CLI chỉ chạy khi có `AUTH_MIGRATION_TEST_URL`, buộc URL loopback và DB `auth_validation_test` riêng vì suite tạo lại bảng users. CI tạo DB này và đặt `AUTH_MIGRATION_REQUIRE_STORAGE=true`, thiếu URL phải fail. Không fallback sang DATABASE_URL ứng dụng.
-
-Seed ở `backend/prisma/seed.mjs`, khai báo `migrations.seed` trong Prisma config bằng file URL được encode; từ root chạy `npm run seed:courts`, từ backend chạy `npx prisma db seed --config prisma.config.ts`. Cả hai yêu cầu DATABASE_URL tường minh; seed không tự chạy cùng migrate. Audit chỉ đọc nằm ở `backend/prisma/audit-auth-phones.mjs`; `npm run auth:phones:audit` dùng URL từ môi trường (có thể nạp file đã chọn bằng Node --env-file), không tự chọn DB. Security gate cấp repo nằm ở `tools/security-source-check.mjs`.
-
-## PostgreSQL integration cho migration cọc Guest
-
-Lệnh `npm run test:booking:deposit:integration` chỉ dùng `BOOKING_DEPOSIT_DATABASE_TEST_URL`, không fallback sang `DATABASE_URL` hoặc đọc `.env`. Target phải là loopback và database tên `booking_deposit_test`, chưa có bảng public. Test từ chối DB không rỗng, không DROP/TRUNCATE bảng hiện hữu và không cần Redis. Chuẩn bị database test rỗng riêng; suite tự replay các SQL migration lịch sử, chèn snapshot 100% rồi apply SQL migration mới để kiểm upgrade. DB chỉ dành cho suite này; tạo lại DB disposable riêng cho lần chạy tiếp, không tái sử dụng DB ứng dụng.
-
-Đặt `BOOKING_DEPOSIT_REQUIRE_STORAGE=true` để thiếu URL phải FAIL thay vì SKIP. CI tạo database riêng trên PostgreSQL service disposable và bật flag này. Local thiếu URL thì suite SKIP, không phải PASS của migration. Không dùng pretest:e2e, migrate dev/deploy hoặc reset trên DB ứng dụng để chạy suite.
-
-
-## Điều tra CI và kiểm tra Nest runtime
-
-Xem [hướng dẫn đọc và xử lý lỗi CI](CI-TROUBLESHOOTING.md) để phân loại lỗi, tái hiện trên PowerShell, tra cứu dependency và hiểu giới hạn của rerun. `npm run test:backend:runtime` chạy HTTP regression Nest ESM/CommonJS + throttler thật (200/200/429), không cần storage; CI chạy trước các integration suite. Jest backend dùng `test/setup-nest-esm.mjs` qua `setupFiles` để common/core đã nạp xong trước graph test, tránh vòng lặp require(esm) từ plugin CommonJS.
+Mỗi kết quả cần command, revision, môi trường/mock/storage và observed result. Browser, storage, unit và provider là evidence khác nhau. Thay đổi chỉ tài liệu dùng kiểm tra link/command/contract/Markdown; không bắt buộc chạy app suite hoặc migrate để chứng minh prose đúng.

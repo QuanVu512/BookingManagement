@@ -13,6 +13,8 @@ Ba màn hình Trang chủ, Đặt sân và Lịch của tôi được chuyển s
 | `/auth/login`                                                       | Giữ card kính/neon/canvas riêng của login; không đưa popup đăng nhập giả của mẫu vào app                    |
 | Guest dialog                                                        | Bố cục gọn từ nguồn, focus trap/Escape, tiếp tục xem sân và giữ đích điều hướng hiện hành                   |
 
+Hướng dẫn chạy UI tại [Getting started](GETTING-STARTED.md); contract API tại [API](API.md). Mô tả layout/source không thay screenshot hoặc kiểm chứng browser của revision đang dùng.
+
 ## Animation
 
 Canvas theo công thức của mẫu, tâm sóng nằm giữa chiều cao viewport theo chỉ đạo mới nhất. Tương tác chuột tính lại theo vị trí canvas. Shimmer chữ, pulse/ping, hover ảnh/nút và chuyển cảnh được giữ; mặc định bật, không tự bỏ vì reduced-motion hoặc vì hero ra khỏi viewport. Có nút người dùng chủ động tạm dừng; canvas dừng khi tab ẩn và cleanup khi unmount. CSS mới giới hạn trong ArenaShell, không thay quy tắc reduced-motion của login hoặc component ngoài scope.

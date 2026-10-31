@@ -1,5 +1,7 @@
 # Đọc và xử lý CI thất bại
 
+Lệnh và phân vùng môi trường hiện hành tại [Pipelines](PIPELINES.md), cấu hình tại [Configuration](CONFIGURATION.md). Ví dụ run cụ thể bên dưới là lịch sử, không chứng minh CI của commit mới.
+
 ## Bắt đầu từ đúng run và đúng lỗi
 
 Vào **GitHub → Actions → workflow → run → job đỏ → step đỏ**. Ghi lại commit SHA, tên step, lệnh, phiên bản Node/npm, hệ điều hành và service test. Mở cả phần log ngay trước lỗi. `Process completed with exit code 1` chỉ cho biết lệnh thất bại; nguyên nhân thường nằm phía trên. Các step phía sau có thể bị bỏ qua, nên sửa một lỗi chưa chứng minh cả workflow xanh.

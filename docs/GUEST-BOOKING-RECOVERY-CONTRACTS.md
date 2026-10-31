@@ -1,12 +1,13 @@
-# Hợp Đồng Kỹ Thuật — Guest Booking Recovery (Bước 1, Plan v2.4)
+# Hợp đồng kỹ thuật Guest Booking Recovery
 
-Ngày 2026-10-29. Trạng thái: **CONTRACTS + SCHEMA IMPLEMENTED / LOCAL_VALIDATED**, Bước 2–5 **NOT_RUN**.
+Mốc thiết kế: 2026-10-29, contract v2.4. Trạng thái LOCAL_VALIDATED/NOT_RUN trong các bảng là snapshot tại mốc thiết kế, không phải kết quả kiểm chứng revision hiện tại. Endpoint và wiring hiện hành xem [API](API.md), [Backend architecture](BACKEND-ARCHITECTURE.md) và source; cần evidence mới để kết luận runtime.
 
 Đầu vào:
 
-- [Plan v2.4](../coordination/plans/guest-booking-redesign-plan.md) — SHA-256 `FA67FDBFBF56180137592ED0CE0EF0B84C3FF587FD74D3C7CEF541BE8577D1DA`.
-- [Concept v2.4](../coordination/plans/guest-booking-redesign-concept.md) — SHA-256 `87AF798437CCB50FC4870A3E85F1E3F61D2E06C283E83003FF1D3B4131DB04E2`.
-- [Review v2.4](../coordination/reports/guest-booking-redesign-plan-v2-4-review-codex-20261029.md).
+- Contract guest checkout v2.4 và các quyết định F1–F6 được ghi lại đầy đủ bên dưới.
+- Source hiện hành trong [Payments](../backend/src/modules/payments/) và [schema](../backend/prisma/schema.prisma).
+
+Hồ sơ plan/concept/review nội bộ không được publish; tài liệu public không phụ thuộc liên kết local.
 
 Tài liệu này chốt ba điểm còn mở của review v2.4 và các contract F1–F6 ở mức đủ để viết code Bước 2–5. Nó **không** thay phê duyệt của user và không chứng minh endpoint/worker đã chạy.
 
@@ -15,7 +16,7 @@ Tài liệu này chốt ba điểm còn mở của review v2.4 và các contract
 | Mã  | Vấn đề                          | Quyết định                                                                                                                                                                                                     |
 | --- | ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | D1  | Tuần tự hóa fingerprint         | Dùng canonical UTF-8 **có length-prefix cho mọi field**, version `v1`, hash SHA-256. Không dùng JSON tự do, không nối chuỗi thiếu ranh giới.                                                                   |
-| D2  | `canPay` khi payment `CREATING` | `canPay` = `canCreatePayment                                                                                                                                                                                   |     | canShowQr`. `CREATING` cho phép **khôi phục/gọi lại cùng idempotency key** (`canCreatePayment = true`) nhưng **không** cho hiển thị QR (`canShowQr = false`). `PENDING` thiếu payload cũng không được coi là trả được. |
+| D2  | `canPay` khi `CREATING`         | `canPay = canCreatePayment OR canShowQr`. CREATING cho phép khôi phục/replay cùng idempotency key nhưng không hiển thị QR. PENDING thiếu payload cũng không được coi là trả được.                              |
 | D3  | Email khi một SĐT gắn nhiều đơn | Chỉ gửi cho đơn `HOLDING` còn hạn; tối đa **5 recipient/lần**, **8 email/SĐT/15 phút**, **1 email/recipient/60 phút**; dedupe theo email chuẩn hóa; luôn trả thông báo generic. Không trả danh sách đơn/email. |
 
 ## 2. F1 — DB Generation Fencing & Reconcile
@@ -161,7 +162,7 @@ Migration:
 
 Test tương ứng: `guest-checkout-fingerprint.spec.ts`, `guest-lookup-fanout-policy.spec.ts` và integration test DB `backend/test/guest-checkout-recovery.integration.spec.ts` (hai connection cho AC-R3, purge/CHECK cho AC-R4).
 
-## 9. Đối chiếu acceptance (dự kiến)
+## 9. Snapshot acceptance tại mốc thiết kế
 
 | AC                                    | Bước triển khai | Trạng thái hiện tại              |
 | ------------------------------------- | --------------- | -------------------------------- |

@@ -1,26 +1,28 @@
 # Thiết kế CSDL đặt sân Pickleball
 
-Ngày thiết kế/tra cứu: 2026-10-09. Data dictionary cho modular monolith; Prisma schema và migration v1 đã tạo, chưa áp dụng DB. Chỉ thiết kế luồng đặt sân cho một chi nhánh; chưa thêm bảng thương mại điện tử.
+Data dictionary gốc được thiết kế ngày 2026-10-09 cho modular monolith. Tham chiếu hiện hành là [schema](../backend/prisma/schema.prisma), SQL migrations và [DATABASE.md](DATABASE.md): schema hiện có 27 model, gồm audit, guest OTP/checkout và outbox mới ngoài bộ bảng v1. Các bảng chi tiết bên dưới mô tả nền tảng v1, không thay đầy đủ migration sau đó. Trạng thái apply phải kiểm tra DB đích, không khẳng định từ tài liệu.
 
 ## Quy tắc nghiệp vụ
 
-| Nội dung               | Quy tắc áp dụng                                                                                                                                              |
-| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Khoảng chơi            | Giờ bắt đầu/kết thúc linh hoạt. Không tự suy diễn rằng giờ chọn phải nằm trên lưới 15 phút.                                                                  |
-| Vệ sinh                | Hai lượt cùng sân cách nhau ít nhất 15 phút. Booking 18:00–19:00 chiếm lịch 18:00–19:15; lượt tiếp theo sớm nhất 19:15.                                      |
-| Có tài khoản           | Chọn trả trước 30% hoặc thanh toán đủ 100%.                                                                                                                  |
-| Vãng lai               | Không tạo user giả; user_id NULL. Bắt buộc tên, email, điện thoại và thanh toán đủ 100% trước khi xác nhận booking.                                          |
-| Giữ chỗ                | HOLDING trong 5 phút để hoàn tất khoản trả trước bắt buộc.                                                                                                   |
-| Hủy                    | Trừ 10% tổng giá booking, hoàn phần tiền thực nhận còn lại. Tổng 1.000.000đ, đã trả 300.000đ: phí 100.000đ, hoàn 200.000đ. Đã trả 1.000.000đ: hoàn 900.000đ. |
-| Xác nhận hủy           | Hiển thị chính sách, phí và tiền hoàn; chỉ hủy sau khi khách đồng ý. Lưu bằng chứng điều khoản và thời điểm đồng ý.                                          |
-| Mốc được hủy           | Đang cần chốt: trước giờ chơi và chưa check-in, hoặc đến trước check-in kể cả quá giờ bắt đầu. Thiết kế hỗ trợ cả hai bằng cancellation_rule.                |
-| Sau hủy                | Giải phóng lịch khi hủy đã được áp dụng. Refund xử lý riêng; lỗi hoàn tiền không tự phục hồi lịch booking.                                                   |
-| Trả phần còn lại       | Nhân viên ghi nhận tiền mặt hoặc chuyển khoản thực nhận tại quầy. Đây là khoản BALANCE, khác với tiền đến sau khi HOLDING hết hạn.                           |
-| Tiền đến sau hết hạn   | Lưu receipt và đưa vào đối soát/hoàn tiền; không tự xác nhận lại một booking EXPIRED/CANCELLED.                                                              |
-| Lịch sử khách vãng lai | Booking vẫn được lưu trong hệ thống. Không có trang lịch sử gắn tài khoản; khách có thể truy cập một booking bằng link bí mật gửi qua email.                 |
-| Một chi nhánh          | Giữ branches với một bản ghi để tránh đổi cấu trúc sau này. Chưa cần branch_memberships; MANAGER/STAFF hiện có quyền trong chi nhánh duy nhất.               |
+| Nội dung               | Quy tắc áp dụng                                                                                                                                                                                                  |
+| ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Khoảng chơi            | Giờ bắt đầu/kết thúc linh hoạt. Không tự suy diễn rằng giờ chọn phải nằm trên lưới 15 phút.                                                                                                                      |
+| Vệ sinh                | Hai lượt cùng sân cách nhau ít nhất 15 phút. Booking 18:00–19:00 chiếm lịch 18:00–19:15; lượt tiếp theo sớm nhất 19:15.                                                                                          |
+| Có tài khoản           | Booking mới bắt buộc cọc 30%; snapshot 100% lịch sử vẫn hợp lệ, không backfill.                                                                                                                                  |
+| Vãng lai               | Không tạo user giả; user_id NULL. Có tên/email/điện thoại và proof OTP; booking mới cọc 30% theo policy hiện hành.                                                                                               |
+| Giữ chỗ                | HOLDING trong 5 phút để hoàn tất khoản trả trước bắt buộc.                                                                                                                                                       |
+| Hủy                    | Hủy paid thông thường: trừ 10% tổng giá, hoàn phần thực nhận còn lại; late-cancel/no-show áp deposit 30% riêng. Tổng 1.000.000đ, đã trả 300.000đ: phí 100.000đ, hoàn 200.000đ. Đã trả 1.000.000đ: hoàn 900.000đ. |
+| Xác nhận hủy           | Hiển thị chính sách, phí và tiền hoàn; chỉ hủy sau khi khách đồng ý. Lưu bằng chứng điều khoản và thời điểm đồng ý.                                                                                              |
+| Mốc được hủy           | Hủy paid thông thường phải quote/consent và còn deadline snapshot; từ T-12h đến trước endsAt chỉ staff late-cancel, giữ deposit 30%.                                                                             |
+| Sau hủy                | Giải phóng lịch khi hủy đã được áp dụng. Refund xử lý riêng; lỗi hoàn tiền không tự phục hồi lịch booking.                                                                                                       |
+| Trả phần còn lại       | Nhân viên ghi nhận tiền mặt hoặc chuyển khoản thực nhận tại quầy. Đây là khoản BALANCE, khác với tiền đến sau khi HOLDING hết hạn.                                                                               |
+| Tiền đến sau hết hạn   | Lưu receipt và đưa vào đối soát/hoàn tiền; không tự xác nhận lại một booking EXPIRED/CANCELLED.                                                                                                                  |
+| Lịch sử khách vãng lai | Booking vẫn được lưu trong hệ thống. Không có trang lịch sử gắn tài khoản; khách quản lý bằng token gắn booking; delivery email/recovery phụ thuộc adapter và hạ tầng, không tự suy thư đã gửi.                  |
+| Một chi nhánh          | Giữ branches với một bản ghi để tránh đổi cấu trúc sau này. Chưa cần branch_memberships; MANAGER/STAFF hiện có quyền trong chi nhánh duy nhất.                                                                   |
 
-Phí 10% là chính sách kinh doanh người dùng lựa chọn, không phải biểu phí payOS. Cần công bố rõ chính sách và lưu phiên bản khách đã chấp nhận. Hủy chưa được xác nhận thanh toán/HOLDING hết hạn không tự tạo phí phạt 10%. Chính sách hoàn phí khi sân chủ động hủy, no-show và hủy sau check-in chưa được chốt; không tự áp dụng phí khách hủy cho những trường hợp này.
+Phí 10% là policy hủy thông thường, không phải biểu phí payOS; cần quote/consent và policy version. HOLDING hết hạn không tự sinh phí này. Late-cancel/no-show giữ deposit 30%, tạo nghĩa vụ hoàn phần verified vượt deposit, không cộng thêm 10%. Ngoại lệ sân chủ động hủy/reschedule và payout cần owner xác nhận; xem [WORKFLOWS.md](WORKFLOWS.md).
+
+Tại đúng T−12h có điểm lệch giữa code và policy đã ghi nhận: xem [Workflows](WORKFLOWS.md#hủy-và-hoàn-tiền) và [Legal](LEGAL-AND-PRIVACY.md#chính-sách-booking-đã-duyệt). Các mô tả bảng v1 bên dưới không quyết định lại ranh giới hoặc override snapshot lịch sử.
 
 ## Kết quả tra cứu payOS
 
@@ -32,7 +34,7 @@ Phí 10% là chính sách kinh doanh người dùng lựa chọn, không phải 
 
 Nguồn: [payOS API](https://payos.vn/docs/api/), [Kích hoạt Kênh Chi](https://payos.vn/dang-ky-dich-vu-chi-ho/). Không xác minh tài khoản merchant cụ thể và không gọi API thanh toán thật.
 
-Với cọc 30%, tạo link thu đúng khoản 30%; trả đủ thì tạo link 100%. Không tạo link 100% rồi yêu cầu chuyển 30%: theo [FAQ payOS](https://payos.vn/docs/cau-hoi-thuong-gap/), một số liên kết VietQR Pro có thể từ chối hoặc ngân hàng hoàn lại khoản chuyển sai số tiền. Phải kiểm tra loại kênh thu merchant dùng; không áp dụng hành vi đó cho mọi phương thức chuyển khoản.
+Booking mới tạo khoản cọc 30%; khoản BALANCE thu phần còn thiếu theo receipts. Snapshot trả trước 100% thuộc dữ liệu lịch sử, không phải tùy chọn tạo hold mới. Không tạo link 100% rồi yêu cầu chuyển 30%: theo [FAQ payOS](https://payos.vn/docs/cau-hoi-thuong-gap/), một số liên kết VietQR Pro có thể từ chối hoặc ngân hàng hoàn lại khoản chuyển sai số tiền. Phải kiểm tra loại kênh thu merchant dùng; không áp dụng hành vi đó cho mọi phương thức chuyển khoản.
 
 ## Quy ước để điền sheet
 

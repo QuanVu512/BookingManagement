@@ -2,6 +2,8 @@
 
 Đây là danh sách việc còn mở, không phải chứng nhận tuân thủ hay phê duyệt deploy. Owner giữ quyền quyết định kinh doanh; legal/finance xác nhận nghĩa vụ áp dụng. Source và test xanh không thay hồ sơ ký duyệt. Các mục bị hoãn tiếp tục hoãn cho đến khi có quyết định rõ ràng.
 
+Setup và checklist kỹ thuật tham chiếu [Getting started](GETTING-STARTED.md), [Operations](OPERATIONS.md) và [Pipelines](PIPELINES.md). Hoàn tất tài liệu không đóng các release gate bên dưới.
+
 ## Hồ sơ và quyết định
 
 - [ ] **Danh tính kinh doanh (O01):** owner xác minh chủ thể ký hợp đồng, tên pháp lý/thương mại, địa chỉ, đăng ký/mã thuế và giấy phép cơ sở nếu áp dụng. Cung cấp evidence riêng tư; chỉ công bố projection đã duyệt. [Business manifest](../backend/src/modules/legal-content/content/policy-manifest.json) tiếp tục `DRAFT_PENDING_OWNER` đến khi có dữ liệu thật.

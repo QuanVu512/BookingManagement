@@ -1,48 +1,65 @@
-# Quy trình nghiệp vụ và state machine
+# Quy trình nghiệp vụ và trạng thái
 
-Booking MVP đã triển khai HOLDING 5 phút, expiry qua BullMQ worker kèm self-heal ở write path và hủy giữ chỗ chưa thanh toán theo owner, trước giờ bắt đầu và chưa check-in. Giá làm tròn từng dòng đến 1 VND rồi cộng tổng. Chi tiết tại [BOOKING-MVP.md](BOOKING-MVP.md). Payment/refund/check-in/guest và CONFIRMED vẫn là thiết kế; sơ đồ dưới đây không chứng minh các luồng đó đã được thực thi.
+Trang này mô tả hành vi có trong source hiện hành; không chứng minh provider/DB production đã được nghiệm thu. Contract HTTP tại [API.md](API.md), lõi giữ chỗ tại [BOOKING-MVP.md](BOOKING-MVP.md).
 
 ## Đặt sân và giữ lịch
 
-Thiết kế hiện ghi nhận:
+1. Client chọn sân ACTIVE, khoảng chơi và lấy availability/giá từ server.
+2. Member có phiên hoặc guest xác minh email OTP gửi yêu cầu hold với idempotency key.
+3. Server chốt giá, policy và cleanup snapshot; tạo booking HOLDING, occupancy và history trong transaction.
+4. Hạn giữ 5 phút theo giờ server. Booking mới cọc 30% cho cả member/guest; không sửa snapshot 100% của lịch sử.
+5. Receipt được xác minh và phân bổ hợp lệ mới có thể làm booking CONFIRMED. UI hoặc việc tạo QR/payment link không đủ để xác nhận tiền.
 
-1. Booking lưu sân, thời gian bắt đầu/kết thúc, giá và thông tin khách dạng snapshot.
-2. Cả hội viên và khách vãng lai đều áp dụng mức cọc bắt buộc 30% tiền thuê sân (`prepaymentPercent = 30`). Khách vãng lai không tạo user giả, xác thực qua email OTP 6 số và nhận token `MANAGE_BOOKING`.
-3. Booking mới ở `HOLDING` với hạn hoàn tất khoản trả trước 5 phút (300 giây). Khi đạt điều kiện thanh toán, luồng chuyển trạng thái booking sang `CONFIRMED`.
-4. `CourtOccupancy` đại diện khoảng chiếm lịch; snapshot `cleanupMinutes` mặc định 15 phút được cộng vào cuối giờ chơi. SQL exclusion constraint bảo vệ overlap của occupancy `ACTIVE`.
+Khoảng chơi linh hoạt theo phút, có timezone. Cleanup tối thiểu 15 phút cộng sau giờ kết thúc, không tính tiền. PostgreSQL exclusion constraint bảo vệ occupancy ACTIVE; Redis lock không thay invariant DB.
 
 ```mermaid
 stateDiagram-v2
-  [*] --> HOLDING
-  HOLDING --> CONFIRMED: đạt khoản trả trước 30%
-  HOLDING --> EXPIRED: hết hạn 5 phút
-  CONFIRMED --> CHECKED_IN: check-in hợp lệ
-  CHECKED_IN --> COMPLETED: kết thúc
-  CONFIRMED --> CANCELLED: hủy hợp lệ
-  CONFIRMED --> NO_SHOW: vắng mặt không đến
+    [*] --> HOLDING
+    HOLDING --> CONFIRMED: khoản trả trước được xác minh
+    HOLDING --> EXPIRED: hết hạn giữ chỗ
+    HOLDING --> CANCELLED: hủy hold hợp lệ
+    CONFIRMED --> CANCELLED: quote và consent / staff policy
+    CONFIRMED --> CHECKED_IN: đủ tiền và check-in hợp lệ
+    CONFIRMED --> NO_SHOW: hết giờ không check-in
+    CHECKED_IN --> COMPLETED: kết thúc lượt chơi
 ```
 
-Khi hủy hoặc hết hạn, thiết kế yêu cầu occupancy được giải phóng; khoản đến muộn phải vào đối soát, không tự khôi phục booking đã `EXPIRED`/`CANCELLED`.
+Sơ đồ là mô hình chuyển trạng thái; từng transition còn có guard, transaction và điều kiện theo use case. Sự tồn tại của transition không đồng nghĩa browser/provider flow đã được test.
+
+**Ranh giới policy còn lệch:** bảng/transition phía trên mô tả source hiện tại. Tại đúng T−12h, `isInLateCancelWindow` đang dùng `>=` và xếp hủy muộn; [policy đã ghi nhận](LEGAL-AND-PRIVACY.md#chính-sách-booking-đã-duyệt) cho phép hủy thường tại mốc này. Cần sửa và kiểm chứng trong task nghiệp vụ trước release; tài liệu không tự thay policy bằng hành vi code.
+
+## Expiry và tiền đến muộn
+
+Availability chỉ đọc, coi hold quá hạn là không chặn lịch. Worker và write path đối soát expiry để cập nhật trạng thái/release/history. Không tự khôi phục EXPIRED/CANCELLED khi tiền đến muộn; lưu receipt/evidence và xử lý đối soát/nghĩa vụ hoàn theo trạng thái tiền thực tế.
+
+DB commit không atomic với provider hoặc queue. Inbox, idempotency, outbox và job recovery giảm rủi ro lặp/mất bước; không suy an toàn tuyệt đối từ tên worker. Timeout/UNKNOWN không phải căn cứ gửi tiền lại.
 
 ## Hủy và hoàn tiền
 
-Chính sách hoàn hủy chính thức chốt ngày 26/10/2026:
-- **Hủy trước 12 giờ so với giờ chơi (`T - 12h`)**: Khách hàng chịu phí hủy 10% tổng giá thuê sân, hệ thống hoàn lại 20% (trong khoản cọc 30% đã thu).
-- **Hủy trong vòng 12 giờ hoặc vắng mặt (No-show)**: Không hoàn tiền, khách mất toàn bộ khoản đặt cọc 30%.
-- `BookingCancellationRequest` theo dõi quote/consent, còn `RefundRequest` và `RefundAttempt` theo dõi nghĩa vụ và từng lần hoàn. Booking `CANCELLED` không đồng nghĩa tiền đã hoàn.
+| Trường hợp                                | Hành vi                                                                                     |
+| ----------------------------------------- | ------------------------------------------------------------------------------------------- |
+| Hold chưa thanh toán                      | Endpoint cancel-hold riêng, kiểm owner/thời gian/trạng thái; không áp phí paid cancellation |
+| CONFIRMED trước cửa sổ hủy muộn           | Báo phí 10% tổng giá, quote có hạn và explicit consent trước apply                          |
+| Từ 12 giờ trước startsAt đến trước endsAt | Chỉ staff hủy theo late-cancel; giữ deposit 30%, không cộng phí 10%                         |
+| NO_SHOW                                   | Giữ deposit 30%; tiền verified vượt deposit tạo nghĩa vụ hoàn                               |
+| Đã có refund request                      | REQUESTED/APPROVED không đồng nghĩa tiền đã trả; cần settlement/evidence phù hợp            |
 
-MVP chỉ hủy HOLDING trước giờ bắt đầu, chưa check-in và không thu phí vì chưa thu tiền. Luồng hoàn tiền tự động qua cổng thanh toán thuộc stream thanh toán tiếp theo.
+Ví dụ tổng 1.000.000 VND, đã trả 300.000: hủy thường hợp lệ giữ phí 100.000, tạo nghĩa vụ hoàn 200.000. Hủy muộn/no-show giữ 300.000; nếu lịch sử đã trả 1.000.000, phần vượt deposit là 700.000. Số tiền thực hoàn không vượt tiền verified sau phân bổ/đã hoàn, theo snapshot và transaction.
 
-## Thanh toán và check-in
+Không diễn giải câu “mất cọc” thành mất toàn bộ tiền với booking lịch sử trả 100%. Đích hoàn, payout mode, SLA/phí và ngoại lệ merchant/reschedule cần quyết định vận hành riêng; tài liệu không tự duyệt các policy còn mở.
 
-Schema hỗ trợ nhiều `PaymentRequest` cho booking, receipt `PaymentTransaction`, sự kiện webhook và các refund attempt có idempotency. Luồng provider/webhook/đối soát chưa được implement. Check-in có thể qua QR hoặc thao tác thủ công trong enum; module chưa có endpoint/workflow. Điều kiện trả đủ trước check-in được ghi là đề xuất cần chốt trong [DATABASE-DESIGN.md](DATABASE-DESIGN.md), không phải contract đã hoàn tất.
+## Check-in và kết thúc
 
-## Ranh giới an toàn khi implement
+Owner/member hoặc guest đủ quyền xin token CHECKIN. Nhân viên STAFF/MANAGER/ADMIN xác minh QR hoặc check-in thủ công có note theo API. Token gắn booking/purpose/expiry; DB giữ hash, consume/check-in/history/outbox điều phối trong transaction.
 
-- Server xác định giá, thời gian, trạng thái, quyền và kết quả thanh toán.
-- Transaction phải bảo vệ invariant DB; Redis chỉ là lớp bổ sung.
-- Webhook phải xác minh signature/amount, chống duplicate và xử lý late payment; refund cần idempotency và đối soát trạng thái UNKNOWN.
-- Token check-in/manage booking phải gắn đúng booking, có mục đích/expiry và không được dùng lại sau consume nếu contract yêu cầu một lần.
-- Ghi lịch sử/outbox cùng transaction nguồn khi nghiệp vụ được triển khai.
+Server từ chối booking không CONFIRMED hoặc còn balanceDue theo receipts verified. Cửa sổ mặc định từ startsAt đến trước endsAt; config không hợp lệ phải fail closed. Replay được nhận diện, không tạo thêm check-in. Settlement có use case COMPLETED/NO_SHOW và scheduler; cần kiểm chứng worker trong môi trường đích.
 
-Schema và constraint: [DATABASE.md](DATABASE.md). Quyền và token: [SECURITY.md](SECURITY.md). Điểm còn mở có danh sách chuẩn tại [PROJECT.md](PROJECT.md) và [DATABASE-DESIGN.md](DATABASE-DESIGN.md).
+## Guest và thông báo
+
+Guest không có tài khoản giả, dùng contact + email OTP/proof, checkout intent và token gắn booking. Manage token không phải token check-in; không đặt vào query URL hoặc log. Recovery phải dùng proof/token đúng contract, không chỉ mã booking hay số điện thoại.
+
+Auth SMTP có luồng gửi OTP/reset. Worker payment/outbox có retry/quarantine; delivery sink email booking chưa hoàn thiện. Socket.IO chưa được AppModule nạp, availability hiện polling HTTP. Không công bố email booking/realtime là đã hoạt động chỉ vì có model hoặc dependency.
+
+## Nguồn đối chiếu
+
+[Booking use cases](../backend/src/modules/bookings/application/), [payment use cases](../backend/src/modules/payments/application/), [check-in use cases](../backend/src/modules/check-in/application/), [schema](../backend/prisma/schema.prisma), [phạm vi sản phẩm](PROJECT.md), [bảo mật](SECURITY.md). Thiết kế v1 trong data dictionary phải được đọc cùng policy/migration sau này.

@@ -8,7 +8,7 @@ Backend là một NestJS modular monolith trong `backend/src/`, kết nối mộ
 HTTP Controller → Application use case → Port ← Infrastructure adapter
                                                      ├→ PostgreSQL/Prisma
                                                      ├→ Redis
-                                                     └→ BullMQ (booking expiry worker)
+                                                     └→ BullMQ (expiry, payment/recovery/outbox jobs)
 ```
 
 - **Controller / presenter** nhận HTTP/DTO, gọi use case tương ứng và map response/error. Contract HTTP cần được giữ ổn định với frontend.
@@ -24,17 +24,17 @@ Booking là mẫu tổ chức module theo `application/`, `ports/`, `infrastruct
 
 ## Module
 
-| Module             | Trạng thái trong source                                                                                                                              |
-| ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `auth`             | Controller/service login, register, session lookup, logout; JWT strategy và guards; chuẩn hóa số điện thoại VN bằng Pure Regex                      |
-| `users`            | Scaffold controller/service; chức năng còn hạn chế                                                                                                   |
-| `courts`           | Danh sách/chi tiết ACTIVE, domain pricing tính giá theo phút (BigInt HALF_UP), availability theo khoảng có buffer                                     |
-| `bookings`         | HOLDING 5 phút, expiry qua BullMQ worker + self-heal write path, idempotency, cọc 30%, list/cancel theo owner; transaction PostgreSQL                |
-| `payments`         | `GuestBookingsController` cho khách vãng lai, xác thực OTP email (`/send-otp`, `/verify-otp`), cọc 30%; cổng thanh toán PayOS/webhook ở phase sau    |
-| `ai-assistant`     | Q&A Assistant (`/api/ai-assistant/chat`), quản lý hạn mức token qua Redis (`RedisAiBudgetAdapter`), knowledge policies và static provider          |
-| `privacy-requests` | Tiếp nhận và xử lý yêu cầu quyền riêng tư DSR (quyền truy xuất/xóa dữ liệu người dùng) tuân thủ bảo vệ dữ liệu cá nhân                              |
-| `check-in`         | Module boundary; chưa có check-in workflow                                                                                                           |
-| `notifications`    | Realtime gateway/module; chưa có pipeline gửi email hoàn chỉnh                                                                                       |
+| Module             | Trạng thái trong source                                                                                                                            |
+| ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `auth`             | Controller/service login, register, session lookup, logout; JWT strategy và guards; chuẩn hóa số điện thoại VN bằng Pure Regex                     |
+| `users`            | Profile controller, get/update use case; scaffold legacy không đại diện toàn module                                                                |
+| `courts`           | Danh sách/chi tiết ACTIVE, domain pricing tính giá theo phút (BigInt HALF_UP), availability theo khoảng có buffer                                  |
+| `bookings`         | HOLDING 5 phút, expiry qua BullMQ worker + self-heal write path, idempotency, cọc 30%, list/cancel theo owner; transaction PostgreSQL              |
+| `payments`         | Guest OTP/checkout/recovery, payOS request/webhook inbox, receipt/coordinator, staff reconcile/refund và audit; provider thực cần nghiệm thu riêng |
+| `ai-assistant`     | Q&A Assistant (`/api/ai/chat`), quản lý hạn mức token qua Redis (`RedisAiBudgetAdapter`), knowledge policies và static provider                    |
+| `privacy-requests` | Tiếp nhận/theo dõi DSR qua adapter hiện có; store memory không chứng minh retention hoặc fulfilment/xóa dữ liệu đã hoàn tất                        |
+| `check-in`         | Cấp token CHECKIN, verify QR/manual và complete; guard quyền, thời gian và đủ tiền verified                                                        |
+| `notifications`    | Socket.IO scaffold chưa nạp; email booking qua outbox còn thiếu delivery sink                                                                      |
 
 ## Hạ tầng
 
@@ -44,10 +44,10 @@ Booking là mẫu tổ chức module theo `application/`, `ports/`, `infrastruct
 - `modules/bookings/booking-expiry.module.ts`: đăng ký queue `booking-expiry`, processor và scheduler định kỳ; processor đóng worker/queue khi shutdown. `BookingsModule` không import BullMQ.
 - `modules/notifications/`: Socket.IO realtime scaffold chưa được nạp bởi AppModule. Chỉ bật lại sau khi có handshake auth/Origin/room ownership và test tương ứng.
 
-BullMQ hiện có worker expiry cho booking; các worker email/retry/outbox khác và distributed lock vẫn chưa chạy. Socket.IO vẫn là scaffold. Booking có persistence port `BookingStore` và adapter `PrismaBookingStore`; không suy từ đó rằng mọi module đã có repository hoặc worker xử lý outbox.
+BullMQ có booking expiry và payment jobs cho webhook retry, recovery, terminal watch, cancel retry, outbox dispatch và guest reconcile. Outbox chưa có delivery sink hoàn chỉnh: bounded retry/quarantine không chứng minh thư đã gửi. Socket.IO chưa được AppModule nạp. Core booking không dùng Redis lock. Booking có persistence port `BookingStore` và adapter `PrismaBookingStore`; không suy từ đó rằng mọi module đã có repository hoặc worker xử lý outbox.
 
 ## Transaction và dữ liệu
 
 Giữ thao tác booking, occupancy và các dòng lịch sử liên quan nhất quán bằng transaction DB; constraint SQL là lớp bảo vệ concurrency bổ sung. Redis lock không thay thế exclusion constraint/transaction. DB transaction không thể atomic với ngân hàng hay Redis; thiết kế tích hợp cần idempotency, outbox và đối soát.
 
-Contract model và SQL constraint được tóm tắt trong [DATABASE.md](DATABASE.md). [BOOKING-MVP.md](BOOKING-MVP.md) mô tả API giữ chỗ đã triển khai; [WORKFLOWS.md](WORKFLOWS.md) phân biệt phần này với thiết kế payment/check-in còn thiếu.
+Contract model và SQL constraint được tóm tắt trong [DATABASE.md](DATABASE.md). [BOOKING-MVP.md](BOOKING-MVP.md) mô tả API giữ chỗ đã triển khai; [WORKFLOWS.md](WORKFLOWS.md) mô tả payment/check-in hiện có và giới hạn nghiệm thu. Tham chiếu thêm [API](API.md) và [Configuration](CONFIGURATION.md).
