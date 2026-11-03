@@ -1,129 +1,84 @@
 # Pickleball Booking
 
-Ứng dụng đặt sân Pickleball với danh mục sân, lịch trống, giữ chỗ, đặt cọc và quản lý lượt chơi. Frontend dùng Next.js; API NestJS là modular monolith, với PostgreSQL/Prisma bảo vệ lịch sân và Redis/BullMQ xử lý phiên cùng tác vụ nền.
+Hệ thống đặt sân Pickleball, kết nối trải nghiệm tìm sân và đặt chỗ với quy trình thanh toán, quản lý booking và check-in. Hệ thống phục vụ hội viên, khách vãng lai và nhân viên vận hành.
 
-Dự án đang phát triển. Các luồng thanh toán, hoàn tiền và check-in có implementation trong repository; source hiện có chưa đồng nghĩa đã nghiệm thu ngân hàng hoặc vận hành production.
+Frontend sử dụng **Next.js**, backend tổ chức theo **NestJS modular monolith**, với **PostgreSQL** bảo vệ tính nhất quán dữ liệu và **Redis/BullMQ** hỗ trợ phiên cùng tác vụ nền.
 
-## Mục lục
+## Chức năng chính
 
-- [Chức năng](#chức-năng)
-- [Bắt đầu](#bắt-đầu)
-- [Kiến trúc](#kiến-trúc)
-- [Lệnh thường dùng](#lệnh-thường-dùng)
-- [Tài liệu](#tài-liệu)
-- [Đóng góp và bảo mật](#đóng-góp-và-bảo-mật)
-- [Giấy phép](#giấy-phép)
+- **Tìm và đặt sân:** xem danh mục, giá và lịch trống; giữ chỗ có thời hạn, theo dõi và hủy booking.
+- **Tài khoản và khách vãng lai:** đăng nhập, xác minh email OTP, khôi phục tài khoản và quản lý booking theo quyền.
+- **Thanh toán:** đặt cọc, tiếp nhận webhook payOS, ghi nhận giao dịch, đối soát và xử lý yêu cầu hoàn tiền.
+- **Vận hành lượt chơi:** quản lý booking, cấp và xác minh token check-in QR hoặc check-in thủ công theo điều kiện phía server.
 
-## Chức năng
+Chi tiết luồng và chính sách tại [Quy trình nghiệp vụ](docs/WORKFLOWS.md).
 
-| Khu vực          | Phạm vi hiện có trong source                                             |
-| ---------------- | ------------------------------------------------------------------------ |
-| Tài khoản        | Đăng ký, đăng nhập, email OTP, recovery, hồ sơ và thu hồi phiên          |
-| Danh mục sân     | Sân hoạt động, giá theo phút và lịch chiếm sân                           |
-| Đặt sân          | Giữ chỗ HOLDING 5 phút, idempotency, snapshot giá, expiry và hủy hold    |
-| Khách vãng lai   | Email OTP, tạo hold và token quản lý giới hạn theo booking               |
-| Thanh toán       | Payment request, adapter payOS, webhook inbox, receipt và đối soát       |
-| Hủy và hoàn tiền | Báo phí, consent, yêu cầu hoàn và thao tác của nhân viên                 |
-| Check-in         | Token, xác minh QR hoặc thủ công; kiểm tra tiền còn thiếu ở server       |
-| Hỗ trợ           | Trợ lý theo knowledge/provider, chính sách và tiếp nhận yêu cầu riêng tư |
-
-Booking mới đặt cọc **30%** cho hội viên và khách vãng lai. Vệ sinh tối thiểu **15 phút** không tính tiền. Xem [quy trình nghiệp vụ](docs/WORKFLOWS.md).
-
-Dashboard còn dữ liệu DEMO; quản trị sân/bảng giá/block bảo trì chưa đầy đủ; dịch vụ bổ sung và coupon chưa hoàn thiện. Availability dùng HTTP polling; Socket.IO chưa nối vào booking. Email booking qua outbox và hoàn tiền tự động cần provider, hạ tầng và kiểm chứng riêng. Xem [phạm vi và khoảng trống](docs/PROJECT.md).
-
-## Bắt đầu
-
-Cần Node.js theo [.nvmrc](.nvmrc), npm, PostgreSQL, Redis và Docker Compose v2 nếu dùng hạ tầng local. Dependency dùng chung [package.json](package.json) và [lockfile](package-lock.json) tại root.
-
-```powershell
-git clone https://github.com/QuanVu512/BookingManagement.git
-cd BookingManagement
-npm ci
-```
-
-Làm theo [khởi động local](docs/GETTING-STARTED.md) để tạo env, chạy hạ tầng và apply migration vào DB development mới. Sau đó mở hai terminal riêng:
-
-```powershell
-# Terminal API, sau cấu hình và migration
-npm run start:dev
-```
-
-```powershell
-# Terminal frontend
-npm run web:dev
-```
-
-| Dịch vụ                   | Địa chỉ theo cấu hình local        |
-| ------------------------- | ---------------------------------- |
-| Website                   | <http://localhost:4001>            |
-| API danh mục sân          | <http://localhost:4000/api/courts> |
-| Swagger, ngoài production | <http://localhost:4000/api/docs>   |
-| Mailpit local             | <http://127.0.0.1:8025>            |
-
-API cần `PORT=4000`; thiếu biến này, bootstrap mặc định dùng `3000`. Website trả HTML thành công chưa chứng minh API hoặc DB sẵn sàng.
-
-## Kiến trúc
+## Kiến trúc hệ thống
 
 ```mermaid
 flowchart LR
     Browser[Trình duyệt] --> Web[Next.js frontend]
-    Browser --> API[NestJS HTTP API]
-    API --> DB[(PostgreSQL / Prisma)]
-    API --> Redis[(Redis)]
-    Worker[BullMQ workers trong backend] --> Redis
-    Worker --> DB
-    API --> SMTP[SMTP / Mailpit local]
-    API --> PayOS[payOS khi được cấu hình]
+    Browser --> API[NestJS API]
+    subgraph Backend[Backend modular monolith]
+        API --> Modules[Module nghiệp vụ / Use cases]
+        Workers[BullMQ workers]
+    end
+    Modules --> DB[(PostgreSQL / Prisma)]
+    Modules --> Redis[(Redis)]
+    Workers --> Redis
+    Workers --> DB
+    Modules --> PayOS[payOS adapter]
+    Modules --> Mail[SMTP adapter]
 ```
 
-PostgreSQL transaction và exclusion constraint bảo vệ việc đặt trùng sân, gồm buffer vệ sinh. Server quyết định giá, thời gian, quyền và trạng thái thanh toán. Xem [kiến trúc hệ thống](docs/ARCHITECTURE.md).
+Backend chia theo miền **Auth/Users, Courts, Bookings, Payments và Check-in**. Controller tiếp nhận HTTP, use case điều phối nghiệp vụ, còn port và adapter phân định ranh giới truy cập dữ liệu, hàng đợi và dịch vụ ngoài. Cách tổ chức này giữ trách nhiệm từng miền rõ ràng trong một đơn vị triển khai backend.
 
-```text
-backend/src/modules/       Module nghiệp vụ và HTTP API
-backend/prisma/            Schema, migration và seed
-frontend/app/              Next.js routes
-frontend/features/         Component, hook, API và model theo feature
-infra/                     Docker Compose cho dịch vụ local
-tests/load/                Kịch bản smoke/load
-docs/                      Hướng dẫn và tham chiếu hệ thống
-```
+Frontend tổ chức theo feature, tách giao diện, hook, API và model. PostgreSQL là nguồn dữ liệu chính; Redis hỗ trợ phiên, CSRF, rate limit và hàng đợi. API và worker được lắp ghép trong cùng backend; lịch sân hiện cập nhật qua HTTP polling.
 
-## Lệnh thường dùng
+Đọc sâu tại [Kiến trúc hệ thống](docs/ARCHITECTURE.md), [Backend](docs/BACKEND-ARCHITECTURE.md) và [Frontend](docs/FRONTEND-ARCHITECTURE.md).
 
-Chạy từ root; đọc [pipeline](docs/PIPELINES.md) để chọn môi trường và hiểu side effect.
+## Điểm nổi bật về kỹ thuật
 
-| Lệnh                               | Mục đích                                          |
-| ---------------------------------- | ------------------------------------------------- |
-| `npm run lint`                     | Type-aware lint backend/frontend                  |
-| `npm test`                         | Backend unit và frontend Jest/JSDOM               |
-| `npm run test:auth:contract`       | HTTP auth contract và frontend validation/network |
-| `npm run test:booking:ui`          | Rendering regression booking trong JSDOM          |
-| `npm run test:booking:integration` | Booking với DB/Redis test riêng                   |
-| `npm run build`                    | Sinh Prisma client và build API, không migrate    |
-| `npm run build:web`                | Build frontend; production cần API origin HTTPS   |
-| `npm run prisma:migrate:status`    | Trạng thái migration DB đã chọn                   |
+- **Bảo vệ lịch sân tại database:** PostgreSQL exclusion constraint ngăn khoảng chiếm sân chồng lấn, bao gồm thời gian vệ sinh. Transaction giữ booking, snapshot giá, occupancy và lịch sử nhất quán.
+- **Xử lý yêu cầu lặp và thanh toán bất đồng bộ:** idempotency, webhook inbox và receipt identity hỗ trợ chống ghi nhận trùng; coordinator điều phối xác nhận booking, outbox lưu sự kiện để xử lý tiếp.
+- **Server kiểm soát nghiệp vụ:** giá, thời hạn giữ chỗ, số tiền đã xác minh và trạng thái booking được quyết định phía backend. UI cập nhật theo kết quả server.
+- **Phân quyền theo ngữ cảnh:** phiên người dùng, CSRF và token giới hạn theo booking bảo vệ các luồng hội viên, khách vãng lai và nhân viên; check-in kiểm tra cả điều kiện tiền và thời gian.
+- **Kiểm thử theo ranh giới:** unit, HTTP contract, integration với storage riêng và frontend rendering regression được phân nhóm để kiểm tra từng tầng.
 
-`test:e2e` có pre-hook khởi động lại container test và apply migration. Không dùng DB ứng dụng làm DB test. Số lượng test hoặc CI result cũ không chứng minh revision hiện tại.
+Các invariant dữ liệu, cơ chế bảo mật và cách kiểm chứng được mô tả tại [Database](docs/DATABASE.md), [Security](docs/SECURITY.md) và [Pipelines](docs/PIPELINES.md).
 
-## Tài liệu
+## Tech stack
 
-| Nhu cầu              | Tài liệu                                                                           |
-| -------------------- | ---------------------------------------------------------------------------------- |
-| Khởi động lần đầu    | [Getting started](docs/GETTING-STARTED.md)                                         |
-| Biến môi trường      | [Configuration](docs/CONFIGURATION.md)                                             |
-| HTTP API và auth     | [API reference](docs/API.md)                                                       |
-| Nghiệp vụ            | [Workflows](docs/WORKFLOWS.md)                                                     |
-| Kiến trúc thành phần | [Backend](docs/BACKEND-ARCHITECTURE.md), [Frontend](docs/FRONTEND-ARCHITECTURE.md) |
-| Dữ liệu              | [Database](docs/DATABASE.md), [data dictionary](docs/DATABASE-DESIGN.md)           |
-| Vận hành             | [Operations](docs/OPERATIONS.md), [CI troubleshooting](docs/CI-TROUBLESHOOTING.md) |
-| Toàn bộ danh mục     | [Documentation index](docs/README.md)                                              |
+| Thành phần          | Công nghệ                                              |
+| ------------------- | ------------------------------------------------------ |
+| Frontend            | Next.js App Router, React, TypeScript, CSS/CSS Modules |
+| Backend             | NestJS, Node.js, TypeScript                            |
+| Dữ liệu             | PostgreSQL, Prisma                                     |
+| Phiên và tác vụ nền | Redis, BullMQ                                          |
+| Tích hợp            | payOS, SMTP; Mailpit cho email local                   |
+| Kiểm thử            | Jest, ts-jest, JSDOM                                   |
+| Công cụ phát triển  | Docker Compose, GitHub Actions, Oxlint, Prettier       |
 
-## Đóng góp và bảo mật
+Phiên bản và vai trò từng công nghệ tại [Tech stack](docs/TECH-STACK.md).
 
-Đọc [CONTRIBUTING.md](CONTRIBUTING.md) trước khi gửi thay đổi. Cập nhật tài liệu cùng hành vi và ghi rõ kiểm tra thực sự đã chạy.
+## Trạng thái phát triển
 
-Session, CSRF và phân quyền xem [SECURITY.md](docs/SECURITY.md). Không đưa mật khẩu, cookie, guest token, URL DB thật hoặc dữ liệu khách hàng vào issue, log hay screenshot. Báo lỗ hổng qua kênh riêng của chủ repository.
+Dự án đang phát triển. Dashboard còn dữ liệu demo; quản trị sân, bảng giá và lịch bảo trì chưa đầy đủ. Delivery email booking và realtime còn phần chưa hoàn thiện. Tích hợp thanh toán và điều kiện vận hành production cần được nghiệm thu riêng.
+
+Phạm vi hiện tại tại [Project](docs/PROJECT.md); điều kiện phát hành tại [Release requirements](docs/RELEASE-REQUIREMENTS.md).
+
+## Tài liệu chi tiết
+
+| Nội dung              | Tài liệu                                                                 |
+| --------------------- | ------------------------------------------------------------------------ |
+| Cài đặt và chạy local | [Getting started](docs/GETTING-STARTED.md)                               |
+| Cấu hình môi trường   | [Configuration](docs/CONFIGURATION.md)                                   |
+| HTTP API              | [API reference](docs/API.md)                                             |
+| Thiết kế dữ liệu      | [Database](docs/DATABASE.md), [Data dictionary](docs/DATABASE-DESIGN.md) |
+| Vận hành và kiểm thử  | [Operations](docs/OPERATIONS.md), [Pipelines](docs/PIPELINES.md)         |
+| Đóng góp              | [Contributing](CONTRIBUTING.md)                                          |
+| Toàn bộ tài liệu      | [Documentation index](docs/README.md)                                    |
 
 ## Giấy phép
 
-[package.json](package.json) khai báo `private: true` và `license: UNLICENSED`. Repository chưa cấp giấy phép mã nguồn mở; cần được chủ sở hữu cho phép trước khi phân phối hoặc sử dụng lại ngoài phạm vi được cấp quyền.
+Chưa có giấy phép được công bố.
