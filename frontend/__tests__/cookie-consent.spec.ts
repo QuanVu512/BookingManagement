@@ -20,17 +20,17 @@ Object.defineProperty(globalThis, 'localStorage', {
   configurable: true,
 });
 
-describe('Cookie Preferences Storage & Gating (Phase 3)', () => {
+describe('Lưu trữ và áp dụng tùy chọn Cookie (Cookie Preferences Storage & Gating - Phase 3)', () => {
   beforeEach(() => {
     window.localStorage.clear();
   });
 
-  it('T02-1: trả về null khi chưa có lựa chọn lưu trữ', () => {
+  it('T02-1 (Chưa có tùy chọn): trả về null khi người dùng chưa từng lưu lựa chọn cookie', () => {
     const prefs = readStoredPreferences();
     expect(prefs).toBeNull();
   });
 
-  it('T02-2: lưu lựa chọn chấp nhận cookie hợp lệ với thời hạn 180 ngày', () => {
+  it('T02-2 (Chấp nhận cookie): lưu lựa chọn hợp lệ của người dùng với thời hạn 180 ngày', () => {
     const saved = writeStoredPreferences({
       preferences: true,
       analytics: true,
@@ -50,7 +50,7 @@ describe('Cookie Preferences Storage & Gating (Phase 3)', () => {
     expect(read?.marketing).toBe(false);
   });
 
-  it('T02-3: từ chối cookie tùy chọn (Reject) ghi nhận tất cả optional=false', () => {
+  it('T02-3 (Từ chối cookie tùy chọn): ghi nhận tất cả các cookie không bắt buộc là false', () => {
     const saved = writeStoredPreferences({
       preferences: false,
       analytics: false,
@@ -68,7 +68,7 @@ describe('Cookie Preferences Storage & Gating (Phase 3)', () => {
     expect(read?.marketing).toBe(false);
   });
 
-  it('T02-4: từ chối tải dữ liệu lưu trữ đã hết hạn hoặc sai schemaVersion', () => {
+  it('T02-4 (Dữ liệu cũ hoặc không hợp lệ): từ chối sử dụng dữ liệu cookie đã quá hạn hoặc sai phiên bản cấu trúc', () => {
     const expiredData = {
       schemaVersion: 1,
       policyVersion: CURRENT_COOKIE_POLICY_VERSION,
@@ -91,7 +91,7 @@ describe('Cookie Preferences Storage & Gating (Phase 3)', () => {
     expect(readStoredPreferences()).toBeNull();
   });
 
-  it('T02-5: dọn dẹp storage khi rút lại consent (revoke)', () => {
+  it('T02-5 (Rút lại đồng ý): xóa sạch dữ liệu phân tích và tiếp thị trong bộ nhớ, chỉ giữ lại mã phiên bắt buộc', () => {
     window.localStorage.setItem('booking:analytics:session', 'sample-session');
     window.localStorage.setItem('booking:marketing:campaign', 'sample-campaign');
     window.localStorage.setItem('booking:auth:token', 'keep-essential-token');

@@ -72,8 +72,8 @@ afterEach(async () => {
   await act(async () => root.unmount());
 });
 
-describe('RF-06A account navigation and read-only views', () => {
-  it('renders the disclosure menu with native targets', async () => {
+describe('Điều hướng và giao diện tài khoản người dùng (RF-06A: thông tin cá nhân và bảo mật)', () => {
+  it('RF-06A (Menu điều hướng): hiển thị menu tài khoản người dùng với các liên kết điều hướng chuẩn', async () => {
     await act(async () => root.render(<AccountMenu user={user} onLogout={logout} />));
     const trigger = document.querySelector('button[aria-haspopup="menu"]');
     expect(trigger?.getAttribute('aria-expanded')).toBe('false');
@@ -95,7 +95,7 @@ describe('RF-06A account navigation and read-only views', () => {
     );
   });
 
-  it('closes on Escape, restores focus and invokes logout', async () => {
+  it('RF-06A (Thao tác bàn phím): đóng menu khi nhấn phím Escape, trả lại tiêu điểm và kích hoạt đăng xuất đúng', async () => {
     await act(async () => root.render(<AccountMenu user={user} onLogout={logout} />));
     const trigger = document.querySelector(
       'button[aria-haspopup="menu"]',
@@ -117,7 +117,7 @@ describe('RF-06A account navigation and read-only views', () => {
     expect(trigger.getAttribute('aria-expanded')).toBe('false');
   });
 
-  it('renders real profile fields without non-functional account CTAs or role/notice', async () => {
+  it('RF-06A (Hồ sơ cá nhân): hiển thị các trường thông tin cá nhân thật, loại bỏ các nút hành động thừa hoặc thông báo ảo', async () => {
     await act(async () => root.render(<AccountProfileView user={user} />));
     const text = document.body.textContent ?? '';
     expect(text).toContain('customer01');
@@ -136,7 +136,7 @@ describe('RF-06A account navigation and read-only views', () => {
     expect(document.querySelectorAll('button')).toHaveLength(0);
   });
 
-  it('keeps security read-only and links only the existing recovery flow', async () => {
+  it('RF-06A (Bảo mật tài khoản): trang bảo mật chỉ hiển thị thông tin và liên kết đến luồng khôi phục tài khoản hiện có', async () => {
     await act(async () => root.render(<AccountSecurityView />));
     const links = [...document.querySelectorAll('a')].map((link) =>
       link.getAttribute('href'),
@@ -147,13 +147,13 @@ describe('RF-06A account navigation and read-only views', () => {
       expect(text).not.toContain(dead);
   });
 
-  it('redirects /account/payments to the bounded payments tab', () => {
+  it('RF-06A (Chuyển hướng đường dẫn): chuyển hướng đường dẫn /account/payments sang đúng tab lịch sử thanh toán', () => {
     redirected.length = 0;
     expect(() => AccountPaymentsPage()).toThrow('REDIRECT:/bookings?tab=payments');
     expect(redirected).toEqual(['/bookings?tab=payments']);
   });
 
-  it('removes the duplicate home booking link and stale bookings copy', () => {
+  it('RF-06A (Dọn dẹp liên kết): loại bỏ liên kết đặt sân trùng lặp ở trang chủ và văn bản cũ không còn áp dụng', () => {
     const home = readFileSync(join(frontendRoot, 'app/page.tsx'), 'utf8');
     expect(home).not.toContain('href="/bookings"');
     expect(home).not.toContain('Booking của tôi');

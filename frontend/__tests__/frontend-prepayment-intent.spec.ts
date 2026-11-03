@@ -6,8 +6,8 @@ import {
 
 const window = { start: '2035-01-08T08:00', end: '2035-01-08T09:00' };
 
-describe('prepayment percent intent (C06)', () => {
-  it('defaults to 30% and binds percent into the idempotency fingerprint', () => {
+describe('Tỷ lệ phần trăm đặt cọc thanh toán (C06: mặc định 30% và khóa chống trùng lặp)', () => {
+  it('C06 (Mặc định 30%): mặc định đặt cọc 30% và gắn tỷ lệ phần trăm vào dấu vân tay khóa chống trùng lặp', () => {
     const key = { fingerprint: '', key: '' };
     const input = bookingRequestInput(
       { courtId: 'court-1', timezone: 'Asia/Ho_Chi_Minh', window },
@@ -23,7 +23,7 @@ describe('prepayment percent intent (C06)', () => {
     );
   });
 
-  it('passes explicit 30% through and rotates the key on percent change', () => {
+  it('C06 (Đổi tỷ lệ cọc): chấp nhận giá trị 30% rõ ràng và thay đổi khóa idempotency khi tỷ lệ cọc thay đổi', () => {
     const key = { fingerprint: '', key: '' };
     const first = bookingRequestInput(
       {

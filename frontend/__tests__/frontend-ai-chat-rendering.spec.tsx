@@ -42,13 +42,13 @@ function mockFetchOnce() {
   return fetchMock;
 }
 
-describe('ai chat widget', () => {
+describe('Trợ lý AI hỗ trợ đặt sân và giải đáp chính sách (ChatWidget)', () => {
   afterEach(() => {
     document.getElementById('app')!.innerHTML = '';
     jest.restoreAllMocks();
   });
 
-  it('hiện FAB, mở khung chat khi bấm và đóng bằng Escape', async () => {
+  it('Hiển thị nút nổi FAB, mở khung chat khi nhấn và đóng lại khi bấm phím Escape', async () => {
     const root = createRoot(document.getElementById('app')!);
     await act(async () => {
       root.render(<ChatWidget />);
@@ -76,7 +76,7 @@ describe('ai chat widget', () => {
     });
   });
 
-  it('gửi câu hỏi và hiển thị câu trả lời tĩnh', async () => {
+  it('Gửi câu hỏi chính sách và hiển thị câu trả lời tĩnh từ hệ thống tri thức', async () => {
     const fetchMock = mockFetchOnce();
     const root = createRoot(document.getElementById('app')!);
     await act(async () => {
@@ -115,7 +115,7 @@ describe('ai chat widget', () => {
     });
   });
 
-  it('hiển thị card gợi ý sân và điều hướng khi bấm đặt', async () => {
+  it('Hiển thị thẻ gợi ý sân còn trống và chuyển hướng đến trang đặt khi người dùng nhấn chọn', async () => {
     const deepLink =
       '/courts/court-1?startsAt=2026-10-29T19%3A00%3A00%2B07%3A00&endsAt=x';
     const fetchMock = jest.fn<() => Promise<unknown>>(async () => ({

@@ -90,8 +90,8 @@ afterEach(() => {
   dom.window.document.body.innerHTML = '';
 });
 
-describe('Guest checkout OTP contract', () => {
-  it('keeps the one-time otpProof returned by verify-otp', async () => {
+describe('Quy trình xác thực OTP đặt sân cho khách vãng lai Guest checkout OTP contract', () => {
+  it('Lưu giữ bằng chứng otpProof dùng một lần do máy chủ trả về sau khi xác thực OTP thành công', async () => {
     const fetch = jest.spyOn(globalThis, 'fetch').mockResolvedValue(
       jsonResponse({
         success: true,
@@ -112,7 +112,7 @@ describe('Guest checkout OTP contract', () => {
     });
   });
 
-  it('rejects a verify-otp response without otpProof instead of calling create', async () => {
+  it('Từ chối phản hồi xác thực OTP khi thiếu mã otpProof, không tự ý gọi tạo đơn đặt sân', async () => {
     jest
       .spyOn(globalThis, 'fetch')
       .mockResolvedValue(
@@ -124,7 +124,7 @@ describe('Guest checkout OTP contract', () => {
     ).rejects.toThrow('Máy chủ không trả mã xác thực email hợp lệ');
   });
 
-  it('sends otpProof, checkoutIntentId and recoverySecret to create guest booking', async () => {
+  it('Gửi kèm đầy đủ otpProof, mã ý định checkoutIntentId và khóa khôi phục recoverySecret khi tạo đơn khách vãng lai', async () => {
     const fetch = jest
       .spyOn(globalThis, 'fetch')
       .mockResolvedValue(
@@ -153,7 +153,7 @@ describe('Guest checkout OTP contract', () => {
     expect(result.checkoutToken).toBe('checkout-token');
   });
 
-  it('creates UUID intent ids and persists identity by booking for recovery', () => {
+  it('Tạo mã định danh UUID chuẩn và lưu trữ thông tin khôi phục phiên đặt sân của khách', () => {
     const identity = createGuestCheckoutIdentity();
 
     expect(identity.checkoutIntentId).toMatch(
@@ -169,7 +169,7 @@ describe('Guest checkout OTP contract', () => {
     });
   });
 
-  it('wires the verify-otp proof and persisted identity into the guest modal', async () => {
+  it('Tích hợp thông suốt quy trình xác thực OTP và định danh khách vào hộp thoại GuestBookingModal', async () => {
     const fetch = jest
       .spyOn(globalThis, 'fetch')
       .mockImplementation(async (input) => {
@@ -284,8 +284,8 @@ describe('Guest checkout OTP contract', () => {
   });
 });
 
-describe('Guest checkout token persistence (P2-3)', () => {
-  it('không ghi đè token đã lưu khi replay trả accessToken rỗng', () => {
+describe('Lưu trữ và bảo vệ mã truy cập của khách vãng lai Guest checkout token persistence (P2-3)', () => {
+  it('P2-3 (Bảo vệ mã phiên): không ghi đè token đã lưu khi gửi lại yêu cầu mà máy chủ trả accessToken rỗng', () => {
     dom.window.sessionStorage.setItem(
       'guest-manage-token:booking-1',
       'old-token',
@@ -302,7 +302,7 @@ describe('Guest checkout token persistence (P2-3)', () => {
     ).toBe('new-token');
   });
 
-  it('giữ accessToken pending cũ khi replay cùng booking trả rỗng', () => {
+  it('P2-3 (Bảo toàn phiên): giữ accessToken pending cũ khi gửi lại cùng đơn mà máy chủ trả rỗng', () => {
     expect(
       resolvePendingGuestAccessToken(
         { bookingId: 'booking-1', accessToken: 'old-token' },

@@ -44,8 +44,8 @@ for (const [name, value] of Object.entries({
 
 const { createRoot } = await import('react-dom/client');
 
-describe('Guest Booking Redesign & OTP Flow', () => {
-  it('GuestBookingForm renders with redesigned structure and validates inputs', () => {
+describe('Quy trình đặt sân và xác thực OTP khách vãng lai (Guest Booking Redesign & OTP Flow)', () => {
+  it('GuestBookingForm hiển thị đúng cấu trúc biểu mẫu mới và kiểm tra tính hợp lệ của dữ liệu nhập', () => {
     const container = dom.window.document.createElement('div');
     dom.window.document.body.appendChild(container);
     const root = createRoot(container);
@@ -76,7 +76,7 @@ describe('Guest Booking Redesign & OTP Flow', () => {
     container.remove();
   });
 
-  it('GuestOtpDialog renders 6 digit input boxes and buttons', () => {
+  it('GuestOtpDialog hiển thị hộp thoại nhập 6 số OTP và các nút điều hướng', () => {
     const container = dom.window.document.createElement('div');
     dom.window.document.body.appendChild(container);
     const root = createRoot(container);
@@ -106,7 +106,7 @@ describe('Guest Booking Redesign & OTP Flow', () => {
     container.remove();
   });
 
-  it('BookingQrModal renders popup modal with VietQR/PayOS details and backdrop', () => {
+  it('BookingQrModal hiển thị hộp thoại mã VietQR/PayOS và lớp phủ nền backdrop', () => {
     const container = dom.window.document.createElement('div');
     dom.window.document.body.appendChild(container);
     const root = createRoot(container);
@@ -141,7 +141,7 @@ describe('Guest Booking Redesign & OTP Flow', () => {
     container.remove();
   });
 
-  it('PendingBookingAlert renders banner with pending order details and actions', () => {
+  it('PendingBookingAlert hiển thị thanh thông báo đơn đặt sân đang chờ xử lý và các nút hành động', () => {
     const container = dom.window.document.createElement('div');
     dom.window.document.body.appendChild(container);
     const root = createRoot(container);
@@ -181,7 +181,7 @@ describe('Guest Booking Redesign & OTP Flow', () => {
     container.remove();
   });
 
-  it('GuestBookingModal renders dialog with court info, 30% deposit calculation, and validates inputs', () => {
+  it('GuestBookingModal hiển thị thông tin sân, tự tính tiền đặt cọc 30% và kiểm tra trường bắt buộc', () => {
     const container = dom.window.document.createElement('div');
     dom.window.document.body.appendChild(container);
     const root = createRoot(container);
@@ -247,7 +247,7 @@ describe('Guest Booking Redesign & OTP Flow', () => {
     container.remove();
   });
 
-  it('correctly disables past slots for today and keeps future slots active', () => {
+  it('Vô hiệu hóa các khung giờ đã qua trong ngày và giữ hoạt động cho các khung giờ tương lai', () => {
     // Giả lập mốc thời gian: 29/10/2026 lúc 14:19 chiều (Asia/Ho_Chi_Minh = UTC 07:19)
     const fixedNow = new Date('2026-10-29T07:19:00Z');
 
@@ -326,7 +326,7 @@ describe('Guest Booking Redesign & OTP Flow', () => {
     container.remove();
   });
 
-  it('selectPreset supports click to toggle unselect, range shrinking, and jumping slots', () => {
+  it('Hỗ trợ bấm để chọn/bỏ chọn, thu hẹp khoảng giờ hoặc nhảy chọn khung giờ linh hoạt', () => {
     const baseWindow = { start: '2026-10-29T', end: '2026-10-29T' };
 
     // 1. Chọn slot 19
@@ -354,7 +354,7 @@ describe('Guest Booking Redesign & OTP Flow', () => {
     expect(jumpSlot).toEqual({ start: '2026-10-29T08:00', end: '2026-10-29T09:00' });
   });
 
-  it('assertBookableWindow strictly rejects past time slots and invalid ranges', () => {
+  it('Kiểm tra khung giờ đặt sân chặn chặt chẽ các giờ trong quá khứ hoặc khoảng thời gian không hợp lệ', () => {
     // 29/10/2026 lúc 14:19 chiều (Asia/Ho_Chi_Minh)
     const fixedNow = new Date('2026-10-29T07:19:00Z');
 
@@ -386,7 +386,7 @@ describe('Guest Booking Redesign & OTP Flow', () => {
     ).not.toThrow();
   });
 
-  it('calculateEstimatedPrices calculates instantaneous pricing on rapid slot clicks', () => {
+  it('Tự động tính toán giá tiền tức thì khi người dùng bấm chọn các khung giờ nhanh', () => {
     // Giá sân 84.000 đ/giờ, chọn 1 tiếng: 22:00 - 23:00
     const oneHour = calculateEstimatedPrices({
       start: '2026-10-29T22:00',

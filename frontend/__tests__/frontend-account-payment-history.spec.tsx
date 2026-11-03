@@ -167,8 +167,8 @@ afterAll(() => {
   globalThis.fetch = originalFetch;
 });
 
-describe('RF-06B bounded on-demand payment history', () => {
-  it('loads zero payment resources until one booking is expanded', async () => {
+describe('Lịch sử thanh toán tải theo nhu cầu có giới hạn (RF-06B: chỉ tải khi người dùng mở rộng đơn)', () => {
+  it('RF-06B (Tải theo nhu cầu): không gửi yêu cầu tải dữ liệu thanh toán cho đến khi người dùng bấm mở chi tiết đơn đặt sân', async () => {
     await mount('A', bookings('A', 50));
     expect(document.querySelectorAll('article.booking-panel')).toHaveLength(50);
     expect(calls).toEqual([]);
@@ -198,7 +198,7 @@ describe('RF-06B bounded on-demand payment history', () => {
     expect(text).toContain('Chưa có yêu cầu hoàn tiền.');
   });
 
-  it('keeps resource failures independent and retries only the failed resource', async () => {
+  it('RF-06B (Cô lập lỗi): tách biệt trạng thái lỗi của từng tài nguyên và chỉ tải lại đúng mục bị lỗi', async () => {
     await mount('A');
     await click(button('Xem yêu cầu thanh toán'));
     await act(async () => {
@@ -236,7 +236,7 @@ describe('RF-06B bounded on-demand payment history', () => {
     ).toBeNull();
   });
 
-  it('honours Retry-After on throttled resource retries', async () => {
+  it('RF-06B (Giới hạn tần suất): tuân thủ thời gian chờ Retry-After từ máy chủ khi bị giới hạn tần suất yêu cầu', async () => {
     await mount('A');
     await click(button('Xem yêu cầu thanh toán'));
     await act(async () => {
@@ -252,7 +252,7 @@ describe('RF-06B bounded on-demand payment history', () => {
     expect(prepayment.textContent).toContain('Có thể thử lại sau 7 giây.');
   });
 
-  it('discards queued owner responses after the account changes', async () => {
+  it('RF-06B (Đổi tài khoản): hủy bỏ phản hồi đang chờ khi người dùng đổi tài khoản khác, tránh hiển thị sai dữ liệu', async () => {
     await mount('A');
     await click(button('Xem yêu cầu thanh toán'));
     expect(calls).toHaveLength(2);
@@ -267,7 +267,7 @@ describe('RF-06B bounded on-demand payment history', () => {
     );
   });
 
-  it('refreshes the expanded booking with three reads then cools down', async () => {
+  it('RF-06B (Làm mát yêu cầu): đọc lại trạng thái tối đa 3 lần rồi chuyển sang thời gian chờ làm mát (cooldown)', async () => {
     await mount('A');
     await click(button('Xem yêu cầu thanh toán'));
     await act(async () => {
@@ -297,7 +297,7 @@ describe('RF-06B bounded on-demand payment history', () => {
     expect(HISTORY_REFRESH_COOLDOWN_MS).toBe(10_000);
   });
 
-  it('collapses the expanded booking without rendering stale data', async () => {
+  it('RF-06B (Thu gọn đơn): thu gọn đơn đặt sân đóng lại và không hiển thị dữ liệu cũ khi mở lại', async () => {
     await mount('A');
     await click(button('Xem yêu cầu thanh toán'));
     await click(button('Ẩn yêu cầu thanh toán'));

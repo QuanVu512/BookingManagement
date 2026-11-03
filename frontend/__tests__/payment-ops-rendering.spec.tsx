@@ -27,8 +27,8 @@ function render(element: React.ReactElement) {
   return { container, root };
 }
 
-describe('GuestBookingForm (FE-PAY-04, MIG-11/MIG-17)', () => {
-  it('renders 30% deposit guest copy and validates required fields', () => {
+describe('Biểu mẫu đặt sân cho khách vãng lai GuestBookingForm (FE-PAY-04: đặt cọc 30%, MIG-11/17: kiểm tra thông tin)', () => {
+  it('FE-PAY-04 (Đặt cọc khách vãng lai): hiển thị thông tin đặt cọc 30% và chặn gửi đơn khi chưa nhập đủ các trường bắt buộc', () => {
     const onCreated = jest.fn();
     const { container, root } = render(
       <GuestBookingForm courtId="court-1" onCreated={onCreated} />,
@@ -50,8 +50,8 @@ describe('GuestBookingForm (FE-PAY-04, MIG-11/MIG-17)', () => {
   });
 });
 
-describe('StaffOpsPanel (FE-PAY-08, MIG-16)', () => {
-  it('exposes E12/E14/E15/E16/E17–E22 actions without fake data', () => {
+describe('Bảng điều khiển vận hành thanh toán cho nhân viên StaffOpsPanel (FE-PAY-08/MIG-16)', () => {
+  it('FE-PAY-08 (Nghiệp vụ nhân viên): hiển thị đầy đủ các tác vụ nghiệp vụ thật (Tra cứu E12, Thu số dư E14, Đối soát E15, Phân bổ receipt E16, Hoàn tiền E17–E22, Duyệt four-eyes)', () => {
     const { container, root } = render(<StaffOpsPanel />);
     const text = container.textContent ?? '';
     for (const label of [

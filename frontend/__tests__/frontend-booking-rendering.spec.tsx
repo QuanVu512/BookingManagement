@@ -75,7 +75,7 @@ function mount(account = 'A') {
   root.render(<Probe account={account} />);
 }
 
-describe('Booking client reconciliation and session boundaries', () => {
+describe('Quản lý phiên đặt sân trực tiếp và tính toàn vẹn dữ liệu (Booking client reconciliation and session boundaries)', () => {
   beforeEach(async () => {
     const element = document.getElementById('app');
     if (!element) throw new Error('Missing fixture root');
@@ -88,7 +88,7 @@ describe('Booking client reconciliation and session boundaries', () => {
   });
 
   it.each(['2000-01-01', '2099-01-01'])(
-    'blocks checking or booking invalid day %s before any HTTP request',
+    'Chặn kiểm tra hoặc đặt sân ngày không hợp lệ %s trước khi gửi yêu cầu mạng',
     async (date) => {
       const fetch = jest.spyOn(globalThis, 'fetch');
       await act(async () =>
@@ -102,7 +102,7 @@ describe('Booking client reconciliation and session boundaries', () => {
     },
   );
 
-  it('reuses the original key after a lost response even when availability is now occupied', async () => {
+  it('Tái sử dụng khóa thanh toán ban đầu khi mạng bị ngắt giữa chừng dù vị trí sân đã bị chiếm', async () => {
     const keys: string[] = [];
     let posted = false;
     jest.spyOn(globalThis, 'fetch').mockImplementation(async (url, options) => {
@@ -138,7 +138,7 @@ describe('Booking client reconciliation and session boundaries', () => {
     expect(controls.booking?.status).toBe('HOLDING');
     expect(controls.canRetry).toBe(false);
   });
-  it('ignores double submit and hides an old account response after a session switch', async () => {
+  it('Bỏ qua nhấn đúp nút đặt sân và ẩn kết quả của tài khoản cũ khi chuyển đổi phiên làm việc', async () => {
     let finish: (response: Response) => void = () => {
       throw new Error('No request');
     };
@@ -165,7 +165,7 @@ describe('Booking client reconciliation and session boundaries', () => {
     expect(controls.booking).toBeUndefined();
     expect(document.body.textContent).not.toContain('BK-test');
   });
-  it('rejects malformed success instead of presenting a confirmed hold', async () => {
+  it('Từ chối dữ liệu thành công không đúng cấu trúc thay vì hiển thị đơn giữ chỗ giả mạo', async () => {
     jest
       .spyOn(globalThis, 'fetch')
       .mockImplementation(async (url) =>
@@ -177,14 +177,14 @@ describe('Booking client reconciliation and session boundaries', () => {
     expect(controls.booking).toBeUndefined();
     expect(controls.canRetry).toBe(true);
   });
-  it('converts branch-local minute inputs independently of the host timezone', () => {
+  it('Chuyển đổi giờ phút địa phương sang chuẩn UTC độc lập với múi giờ máy người dùng', () => {
     expect(localInputToIso('2035-01-08T06:11', 'Asia/Ho_Chi_Minh')).toBe(
       '2035-01-07T23:11:00.000Z',
     );
     expect(() => localInputToIso('invalid', 'Asia/Ho_Chi_Minh')).toThrow();
   });
 
-  it('invalidates quotes on quantity changes and binds hold retries to the selected services', async () => {
+  it('Hủy báo giá cũ khi thay đổi số lượng dịch vụ và gắn yêu cầu thử lại với dịch vụ đã chọn', async () => {
     const keys: string[] = [];
     const line = {
       productId: 'paddle',

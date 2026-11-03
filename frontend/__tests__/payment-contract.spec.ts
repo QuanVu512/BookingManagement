@@ -22,13 +22,13 @@ const request = {
   reviewReasonCode: null,
 };
 
-describe('Payment contract boundary (FE-PAY-02, MIG-10)', () => {
-  it('accepts a canonical payment request', () => {
+describe('Ranh giới dữ liệu thanh toán chuẩn (FE-PAY-02: chuẩn hóa dữ liệu thanh toán, MIG-10)', () => {
+  it('FE-PAY-02 (Cấu trúc thanh toán chuẩn): chấp nhận yêu cầu thanh toán hợp lệ theo chuẩn hệ thống', () => {
     expect(isPaymentRequest(request)).toBe(true);
     expect(parsePaymentRequest(request)).toEqual(request);
   });
 
-  it('rejects fixed-fixture money and unknown statuses', () => {
+  it('FE-PAY-02 (Kiểm tra dữ liệu): từ chối số tiền sai định dạng chuỗi và trạng thái không xác định', () => {
     expect(isPaymentRequest({ ...request, amount: '45000' })).toBe(false);
     expect(isPaymentRequest({ ...request, status: 'SUCCESS' })).toBe(false);
     expect(() => parsePaymentRequest({ id: 'incomplete' })).toThrow(
@@ -36,7 +36,7 @@ describe('Payment contract boundary (FE-PAY-02, MIG-10)', () => {
     );
   });
 
-  it('success requires server SCR04 + CONFIRMED (MIG-14)', () => {
+  it('MIG-14 (Xác nhận thành công): bắt buộc máy chủ trả màn hình SCR04_SUCCESS và đơn CONFIRMED', () => {
     expect(
       isPaymentSuccess(
         parsePaymentOutcome({
@@ -73,7 +73,7 @@ describe('Payment contract boundary (FE-PAY-02, MIG-10)', () => {
     ).toBe(false);
   });
 
-  it('distinguishes CSRF retry from RBAC block (MIG-12)', () => {
+  it('MIG-12 (Phân quyền và bảo mật): phân biệt rõ lỗi CSRF (được thử lại) với lỗi phân quyền RBAC (chặn thử lại)', () => {
     const csrf = new ApiRequestError({
       message: 'csrf',
       status: 403,

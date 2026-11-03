@@ -53,8 +53,8 @@ const serviceLine = {
   amount: 30000,
 };
 
-describe('Booking response contract boundary', () => {
-  it('accepts a complete booking page', () => {
+describe('Ranh giới dữ liệu phản hồi đặt sân (Booking response contract boundary)', () => {
+  it('Chấp nhận trang danh sách đơn đặt sân có cấu trúc hoàn chỉnh', () => {
     expect(isBooking(booking)).toBe(true);
     expect(parseBookingPage({ data: [booking], nextCursor: null })).toEqual({
       data: [booking],
@@ -62,14 +62,14 @@ describe('Booking response contract boundary', () => {
     });
   });
 
-  it('rejects incomplete success payloads instead of presenting them', () => {
+  it('Từ chối dữ liệu thiếu trường bắt buộc thay vì hiển thị lên giao diện', () => {
     expect(isBooking({ id: 'incomplete' })).toBe(false);
     expect(() =>
       parseBookingPage({ data: [{ id: 'incomplete' }], nextCursor: null }),
     ).toThrow('Danh sách booking không hợp lệ.');
   });
 
-  it('rejects unknown statuses and non-finite money', () => {
+  it('Từ chối trạng thái không hợp lệ hoặc số tiền không phải số hữu hạn', () => {
     expect(isBooking({ ...booking, status: 'PAID' })).toBe(false);
     expect(isBooking({ ...booking, totalAmount: Number.NaN })).toBe(false);
     expect(
@@ -77,7 +77,7 @@ describe('Booking response contract boundary', () => {
     ).toBe(false);
   });
 
-  it('validates availability fields before the panel can trust them', () => {
+  it('Kiểm tra tính hợp lệ của các trường tình trạng sân trống trước khi tin cậy', () => {
     expect(
       isAvailability({
         available: true,
@@ -100,7 +100,7 @@ describe('Booking response contract boundary', () => {
     ).toBe(false);
   });
 
-  it('rejects invalid inventory while preserving valid catalog images', () => {
+  it('Từ chối số lượng tồn kho âm hoặc không hợp lệ của sản phẩm dịch vụ', () => {
     expect(parseServiceProducts([product])).toHaveLength(1);
     expect(() =>
       parseServiceProducts([{ ...product, availableQuantity: -1 }]),
@@ -110,7 +110,7 @@ describe('Booking response contract boundary', () => {
     ).toThrow();
   });
 
-  it('rejects a sale paddle, malformed service totals, and an ignored service selection', () => {
+  it('Từ chối hình thức bán đứt đối với dịch vụ thuê theo giờ và kiểm tra tổng tiền kèm dịch vụ', () => {
     expect(() =>
       parseServiceProducts([{ ...product, billingMode: 'SALE' }]),
     ).toThrow();

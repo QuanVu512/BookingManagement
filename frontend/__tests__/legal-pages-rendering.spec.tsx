@@ -36,8 +36,8 @@ for (const [name, value] of Object.entries({
 
 const { createRoot } = await import('react-dom/client');
 
-describe('Legal Pages & Components Rendering (Phase 1 & 2)', () => {
-  it('T01-1: render đúng cấu trúc semantic HTML của trang Privacy', () => {
+describe('Hiển thị các trang và thành phần pháp lý (Legal Pages & Components - Phase 1 & 2)', () => {
+  it('T01-1 (Trang quyền riêng tư Privacy): hiển thị đúng cấu trúc HTML ngữ nghĩa của tài liệu chính sách', () => {
     const container = dom.window.document.createElement('div');
     dom.window.document.body.appendChild(container);
     const root = createRoot(container);
@@ -66,7 +66,7 @@ describe('Legal Pages & Components Rendering (Phase 1 & 2)', () => {
     container.remove();
   });
 
-  it('T01-2: render đúng cấu trúc semantic HTML của trang Terms và Refund Policy', () => {
+  it('T01-2 (Trang điều khoản Terms và hoàn tiền Refund Policy): hiển thị đúng nội dung và tỷ lệ hoàn tiền', () => {
     const container = dom.window.document.createElement('div');
     dom.window.document.body.appendChild(container);
     const root = createRoot(container);
@@ -90,7 +90,7 @@ describe('Legal Pages & Components Rendering (Phase 1 & 2)', () => {
     container.remove();
   });
 
-  it('T01-3: LegalFooter render đủ 4 liên kết pháp lý và trigger cookie', () => {
+  it('T01-3 (Chân trang pháp lý LegalFooter): hiển thị đủ 4 liên kết pháp lý và nút mở cài đặt cookie', () => {
     const container = dom.window.document.createElement('div');
     dom.window.document.body.appendChild(container);
     const root = createRoot(container);
@@ -121,7 +121,7 @@ describe('Legal Pages & Components Rendering (Phase 1 & 2)', () => {
     container.remove();
   });
 
-  it('T04-1: TransactionTerms hiển thị tóm tắt và yêu cầu người dùng xác nhận', () => {
+  it('T04-1 (Điều khoản giao dịch thanh toán): hiển thị tóm tắt điều khoản và ô tích bắt buộc xác nhận', () => {
     const container = dom.window.document.createElement('div');
     dom.window.document.body.appendChild(container);
     const root = createRoot(container);

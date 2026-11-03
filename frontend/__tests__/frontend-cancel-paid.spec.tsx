@@ -108,8 +108,8 @@ async function waitForText(
   }
 }
 
-describe('CancelPaidBooking (C08)', () => {
-  it('quote → unchecked consent blocks apply → checked consent applies → done reloads', async () => {
+describe('Quy trình hủy đơn đặt sân đã thanh toán CancelPaidBooking (C08: chính sách hoàn tiền có tính phí phạt)', () => {
+  it('C08 (Quy trình hoàn tiền): tính phí hủy, chặn xác nhận khi chưa tích đồng ý, cho phép hủy khi đã tích và hoàn tất quy trình', async () => {
     const calls: string[] = [];
     jest.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
       const url = typeof input === 'string' ? input : input.url;
@@ -155,7 +155,7 @@ describe('CancelPaidBooking (C08)', () => {
     jest.restoreAllMocks();
   });
 
-  it('renders nothing for non-CONFIRMED bookings', () => {
+  it('C08 (Điều kiện hiển thị): không hiển thị nút hủy đối với các đơn chưa thanh toán thành công (khác CONFIRMED)', () => {
     const container = document.createElement('div');
     document.body.appendChild(container);
     const root = createRoot(container);
