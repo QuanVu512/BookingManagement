@@ -1,7 +1,6 @@
 'use client';
 
 import type { ReactNode } from 'react';
-import { useState } from 'react';
 import { SportyHeader } from '../home/sporty-header';
 import { SportyFooter } from '../home/sporty-footer';
 import { ArenaBackground } from './arena-background';
@@ -15,21 +14,18 @@ export function ArenaShell({
   children: ReactNode;
   page?: ArenaPage;
 }) {
-  const [paused, setPaused] = useState(false);
   return (
-    <div className="arena-shell" data-motion={paused ? 'paused' : 'running'}>
-      <ArenaBackground paused={paused} />
+    <div className="arena-shell editorial-grain">
+      <ArenaBackground />
       <SportyHeader currentPage={page} />
+      <aside className="arena-wide" aria-label="Thông báo bản demo">
+        <p role="note">
+          Hệ thống đặt sân thử nghiệm (Project Showcase) — Các thông tin sân bãi
+          và giao dịch chỉ phục vụ mục đích trình diễn công nghệ.
+        </p>
+      </aside>
       {children}
       <SportyFooter linkPrefix="/" />
-      <button
-        className="arena-motion-control"
-        type="button"
-        aria-pressed={paused}
-        onClick={() => setPaused(!paused)}
-      >
-        {paused ? 'Bật animation' : 'Tạm dừng animation'}
-      </button>
     </div>
   );
 }

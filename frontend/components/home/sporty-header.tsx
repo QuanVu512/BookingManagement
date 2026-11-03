@@ -6,6 +6,7 @@ import { HeaderSession } from './header-session';
 import { ArenaIcon, type ArenaIconName } from '../arena/arena-icon';
 import { ArenaLogo } from '../arena/arena-logo';
 import { ArenaLocationButton } from '../arena/arena-location';
+import { ThemeToggle } from '../theme/theme-toggle';
 import type { ArenaPage } from '../arena/arena-shell';
 
 const LINKS: {
@@ -15,7 +16,6 @@ const LINKS: {
   icon: ArenaIconName;
 }[] = [
   { page: 'home', href: '/', label: 'Trang chủ', icon: 'home' },
-  { href: '/#facilities', label: 'Tiện ích', icon: 'layers' },
   { page: 'booking', href: '/booking', label: 'Đặt sân', icon: 'calendar' },
   {
     page: 'bookings',
@@ -119,6 +119,7 @@ function HeaderActions({
 }) {
   return (
     <div className="arena-header-actions">
+      <ThemeToggle compact />
       <a
         className="arena-button arena-button-neon arena-quick-book"
         href="/booking"

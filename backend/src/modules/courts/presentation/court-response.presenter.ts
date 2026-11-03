@@ -20,16 +20,22 @@ export class CourtResponsePresenter {
         court.courtType === 'VIP'
           ? 'Sân Pickleball trong nhà Cushion Pro'
           : 'Sân Pickleball tiêu chuẩn',
-      features: [`Vệ sinh ${court.cleanupMinutes} phút sau lượt chơi`],
+      features:
+        court.cleanupMinutes > 0
+          ? [`Vệ sinh ${court.cleanupMinutes} phút sau lượt chơi`]
+          : ['Vệ sinh theo yêu cầu'],
       pricePerHour: court.startingPrice,
       priceLabel: 'Giá từ trong ngày; giá chính xác theo khoảng đặt',
       imageUrl:
-        court.courtType === 'VIP' ? '/courts/court-1.jpg' : '/courts/court-3.jpg',
+        court.courtType === 'VIP'
+          ? '/courts/court-1.jpg'
+          : '/courts/court-3.jpg',
       rating: 0,
       reviewCount: 0,
       timezone: court.schedule.timezone,
-      branchName: court.branchName,
-      address: court.address,
+      // Public showcase must not reveal a previously seeded real venue.
+      branchName: 'SMASH ARENA — Cơ sở thử nghiệm',
+      address: 'Khu Thể Thao Phức Hợp SMASH ARENA — Hà Nội (Cơ sở thử nghiệm)',
       cleanupMinutes: court.cleanupMinutes,
     };
   }

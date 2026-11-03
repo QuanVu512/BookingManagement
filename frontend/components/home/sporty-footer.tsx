@@ -26,49 +26,79 @@ export function SportyFooter({
   linkPrefix?: string;
 }) {
   return (
-    <footer className="arena-footer" id="about" aria-label="Chân trang hệ thống">
+    <footer
+      className="arena-footer"
+      id="about"
+      aria-label="Chân trang hệ thống"
+    >
       <div className="arena-wide">
         <div className="arena-footer-main">
           <div className="arena-footer-brand-col">
             <FooterBrand />
             <p className="arena-footer-brand-desc">
-              Hệ thống đặt sân thể thao chuyên nghiệp, hỗ trợ giữ chỗ linh hoạt, thi đấu giao lưu và cập nhật lịch trình nhanh chóng.
+              Hệ thống đặt sân thể thao chuyên nghiệp, hỗ trợ giữ chỗ linh hoạt,
+              thi đấu giao lưu và cập nhật lịch trình nhanh chóng.
             </p>
           </div>
 
-          <nav aria-label="Điều hướng chân trang" className="arena-footer-nav-grid">
+          <nav
+            aria-label="Điều hướng chân trang"
+            className="arena-footer-nav-grid"
+          >
             <div className="arena-footer-col">
               <h4 className="arena-footer-col-title">Dịch vụ</h4>
               <ul className="arena-footer-col-links">
-                <li><Link href="/">Trang chủ</Link></li>
-                <li><a href="/#facilities">Tiện ích</a></li>
-                <li><Link href="/booking">Đặt sân</Link></li>
+                <li>
+                  <Link href="/">Trang chủ</Link>
+                </li>
+                <li>
+                  <a href="/#facilities">Tiện ích</a>
+                </li>
+                <li>
+                  <Link href="/booking">Đặt sân</Link>
+                </li>
               </ul>
             </div>
 
             <div className="arena-footer-col">
               <h4 className="arena-footer-col-title">Hỗ trợ</h4>
               <ul className="arena-footer-col-links">
-                <li><Link href="/bookings">Lịch của tôi</Link></li>
-                <li><Link href="/support">Hỗ trợ</Link></li>
-                <li><ArenaLocationButton label="Vị trí cụm sân" /></li>
+                <li>
+                  <Link href="/bookings">Lịch của tôi</Link>
+                </li>
+                <li>
+                  <Link href="/support">Hỗ trợ</Link>
+                </li>
+                <li>
+                  <ArenaLocationButton label="Vị trí cụm sân" />
+                </li>
               </ul>
             </div>
 
             <div className="arena-footer-col">
               <h4 className="arena-footer-col-title">Chính sách</h4>
               <ul className="arena-footer-col-links">
-                <li><Link href="/privacy">Quyền riêng tư</Link></li>
-                <li><Link href="/terms">Điều khoản</Link></li>
-                <li><Link href="/refund-policy">Hoàn tiền</Link></li>
+                <li>
+                  <Link href="/privacy">Quyền riêng tư</Link>
+                </li>
+                <li>
+                  <Link href="/terms">Điều khoản</Link>
+                </li>
+                <li>
+                  <Link href="/refund-policy">Hoàn tiền</Link>
+                </li>
               </ul>
             </div>
 
             <div className="arena-footer-col">
               <h4 className="arena-footer-col-title">Cookie & Pháp lý</h4>
               <ul className="arena-footer-col-links">
-                <li><Link href="/cookies">Cookie</Link></li>
-                <li><CookiePreferencesTrigger /></li>
+                <li>
+                  <Link href="/cookies">Cookie</Link>
+                </li>
+                <li>
+                  <CookiePreferencesTrigger />
+                </li>
               </ul>
             </div>
           </nav>
@@ -79,7 +109,17 @@ export function SportyFooter({
             © 2026 SMASH ARENA. Sân đấu & đặt lịch trực tuyến.
           </p>
           <span className="arena-footer-note">
-            Bảo lưu mọi quyền.
+            Hà Nội (Cơ sở thử nghiệm) • Bảo lưu mọi quyền.
+          </span>
+        </div>
+
+        {/* Oversized High-Fashion Edge-to-Edge Wordmark */}
+        <div
+          className="mt-8 select-none pointer-events-none overflow-hidden text-center"
+          aria-hidden="true"
+        >
+          <span className="block text-[14vw] font-black tracking-widest leading-none opacity-[0.04] uppercase whitespace-nowrap text-[var(--text-primary)]">
+            SMASH
           </span>
         </div>
       </div>

@@ -1,3 +1,5 @@
+'use client';
+
 import Image from 'next/image';
 import Link from 'next/link';
 import type { CourtItem } from '../model/court';
@@ -5,22 +7,38 @@ import { COURT_DETAILS_ENABLED } from '../../../constants/features';
 import { ArenaIcon } from '../../../components/arena/arena-icon';
 import { formatVnd } from '../../booking/model/booking-time';
 
+const SAMPLE_SLOTS = [
+  { time: '16:00', available: true },
+  { time: '17:00', available: false },
+  { time: '18:00', available: true },
+  { time: '19:00', available: true },
+  { time: '20:00', available: true },
+  { time: '21:00', available: true },
+];
+
 function CourtMedia({ court }: { court: CourtItem }) {
   return (
-    <div className="arena-court-media">
+    <div className="arena-court-media relative h-72 bg-[#070F0C] overflow-hidden hairline-b">
       <Image
-        src={court.imageUrl}
+        src={court.imageUrl || '/courts/court-1.jpg'}
         alt={court.name}
         fill
         sizes="(max-width: 767px) 100vw, 600px"
-        className="arena-court-image"
+        className="arena-court-image object-cover zoom-hover"
       />
+      <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-transparent pointer-events-none" />
+
+      {/* Badges */}
       <CourtBadges court={court} />
-      <span className="arena-court-rate">
-        {court.pricePerHour > 0
-          ? `${formatVnd(court.pricePerHour)} / Giờ`
-          : 'Chưa có giá'}
-        <small>Giá tham khảo</small>
+
+      {/* Floating Price Tag */}
+      <span className="arena-court-rate absolute bottom-4 right-4 px-3.5 py-2 rounded-xl bg-black/85 border border-emeraldPro/40 backdrop-blur-md text-right shadow-lg z-10">
+        <span className="font-mono font-extrabold text-sm text-volt block tabular-nums">
+          {court.pricePerHour > 0
+            ? `${formatVnd(court.pricePerHour)} / Giờ`
+            : 'Chưa có giá'}
+        </span>
+        <small className="font-mono text-[10px] text-white/60 block">Giá tham khảo</small>
       </span>
     </div>
   );
@@ -28,28 +46,34 @@ function CourtMedia({ court }: { court: CourtItem }) {
 
 function CourtBadges({ court }: { court: CourtItem }) {
   return (
-    <div className="arena-court-badges">
+    <div className="arena-court-badges absolute top-4 left-4 flex items-center gap-2 z-10">
       <span
         className={
           court.courtType === 'VIP'
-            ? 'arena-badge arena-badge-vip'
-            : 'arena-badge'
+            ? 'arena-badge arena-badge-vip px-3 py-1 rounded-md text-[11px] font-mono font-extrabold uppercase tracking-wider bg-vipGold text-obsidian shadow-md'
+            : 'arena-badge px-3 py-1 rounded-md text-[11px] font-mono font-extrabold uppercase tracking-wider bg-emeraldPro text-obsidian shadow-md'
         }
       >
         {court.courtType === 'VIP' ? 'SÂN VIP' : 'TIÊU CHUẨN'}
       </span>
-      <span className="arena-code">{court.code}</span>
+      <span className="arena-code px-2.5 py-1 rounded-md text-[11px] font-mono font-bold bg-black/75 text-white border border-white/15 backdrop-blur-md">
+        {court.code}
+      </span>
     </div>
   );
 }
 
 function CourtFeatures({ court }: { court: CourtItem }) {
+  if (!court.features || court.features.length === 0) return null;
   return (
-    <div className="arena-court-features">
+    <div className="arena-court-features mt-3 flex flex-wrap gap-2">
       {court.features.map((feature) => (
-        <span key={feature}>
+        <span
+          key={feature}
+          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs bg-[var(--bg-primary)] hairline-box text-[var(--text-secondary)]"
+        >
           <ArenaIcon name="check" />
-          {feature}
+          <span>{feature}</span>
         </span>
       ))}
     </div>
@@ -58,45 +82,84 @@ function CourtFeatures({ court }: { court: CourtItem }) {
 
 function CourtDescription({ court }: { court: CourtItem }) {
   return (
-    <div className="arena-court-description">
-      <div className="arena-court-title-row">
-        <h3>{court.name}</h3>
-        <span className="arena-live">
-          <i />
-          {court.status === 'ACTIVE' ? 'Đang hoạt động' : 'Tạm ngừng'}
-        </span>
+    <div className="arena-court-description p-6 flex-1 flex flex-col justify-between space-y-4">
+      <div>
+        <div className="arena-court-title-row flex items-center justify-between gap-2">
+          <h3 className="text-2xl font-extrabold tracking-tight text-[var(--text-primary)]">
+            {court.name}
+          </h3>
+          <span className="arena-live inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-mono font-semibold bg-emeraldPro/15 text-emeraldPro border border-emeraldPro/30">
+            <i className="w-1.5 h-1.5 rounded-full bg-emeraldPro" />
+            <span>{court.status === 'ACTIVE' ? 'Đang hoạt động' : 'Tạm ngừng'}</span>
+          </span>
+        </div>
+
+        <div className="mt-3 space-y-1.5 text-xs sm:text-sm">
+          <p className="flex items-center gap-2 text-[var(--text-secondary)]">
+            <ArenaIcon name="layers" />
+            <span>Mặt sân:</span>
+            <strong className="font-semibold text-[var(--text-primary)]">{court.surfaceType}</strong>
+          </p>
+          {court.address && (
+            <p className="flex items-center gap-2 text-[var(--text-secondary)]">
+              <ArenaIcon name="pin" />
+              <span>{court.address}</span>
+            </p>
+          )}
+        </div>
+
+        <CourtFeatures court={court} />
       </div>
-      <p>
-        <ArenaIcon name="layers" />
-        Mặt sân: <strong>{court.surfaceType}</strong>
-      </p>
-      {court.address && (
-        <p>
-          <ArenaIcon name="pin" />
-          <span>{court.address}</span>
-        </p>
-      )}
-      <CourtFeatures court={court} />
+
+      {/* Quick Slot Selector */}
+      <div className="pt-4 hairline-t">
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-[10px] font-mono uppercase tracking-wider opacity-60">
+            CHỌN NHANH CA TRỐNG HÔM NAY:
+          </span>
+          <span className="text-[10px] font-mono text-emeraldPro">Nhấn giờ để đặt</span>
+        </div>
+        <div className="flex flex-wrap gap-1.5">
+          {SAMPLE_SLOTS.map((slot) =>
+            slot.available ? (
+              <Link
+                key={slot.time}
+                href={`/booking?courtId=${encodeURIComponent(court.id)}&slot=${encodeURIComponent(slot.time)}`}
+                className="px-2.5 py-1.5 rounded-lg text-[11px] font-mono hairline-box bg-[var(--bg-primary)] hover:border-emeraldPro hover:text-emeraldPro transition-all text-center"
+              >
+                {slot.time}
+              </Link>
+            ) : (
+              <span
+                key={slot.time}
+                className="px-2.5 py-1.5 rounded-lg text-[11px] font-mono hairline-box opacity-35 line-through cursor-not-allowed text-center"
+              >
+                {slot.time}
+              </span>
+            ),
+          )}
+        </div>
+      </div>
     </div>
   );
 }
 
 export function ArenaCourtCard({ court }: { court: CourtItem }) {
   return (
-    <article className="arena-court-card">
+    <article className="arena-court-card lookbook-card rounded-2xl hairline-box bg-[var(--bg-secondary)] overflow-hidden flex flex-col justify-between group hover:border-emeraldPro/60 transition-all duration-300 shadow-xl">
       <CourtMedia court={court} />
       <CourtDescription court={court} />
-      <div className="arena-court-action">
+      <div className="arena-court-action p-6 pt-0">
         {COURT_DETAILS_ENABLED && court.status === 'ACTIVE' ? (
           <Link
             href={`/courts/${encodeURIComponent(court.id)}`}
-            className="arena-button"
+            className="arena-button w-full py-3.5 rounded-xl hairline-box bg-[var(--bg-primary)] hover:bg-emeraldPro hover:text-obsidian hover:border-emeraldPro font-extrabold text-xs uppercase tracking-widest flex items-center justify-center gap-2 transition-all"
           >
             <span>Đặt sân này ngay</span>
             <ArenaIcon name="arrow" />
           </Link>
         ) : (
-          <button type="button" className="arena-button" disabled>
+          <button type="button" className="arena-button w-full py-3.5 rounded-xl opacity-50 cursor-not-allowed" disabled>
             Tạm ngừng đặt sân
           </button>
         )}

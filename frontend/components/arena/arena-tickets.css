@@ -31,6 +31,13 @@
   color: #10e760;
   border-color: #10e760;
 }
+:root[data-theme='light'] .arena-history-tabs a {
+  color: #64748b;
+}
+:root[data-theme='light'] .arena-history-tabs a[aria-current='page'] {
+  color: #059669;
+  border-color: #059669;
+}
 .arena-ticket-filters {
   display: flex;
   gap: 8px;
@@ -38,6 +45,9 @@
   border-bottom: 1px solid #1e293b;
   padding-bottom: 12px;
   margin: 20px 0 24px;
+}
+:root[data-theme='light'] .arena-ticket-filters {
+  border-bottom-color: #e2e8f0;
 }
 .arena-ticket-filters button {
   border: 1px solid transparent;
@@ -52,13 +62,25 @@
     background 0.2s,
     border-color 0.2s;
 }
+:root[data-theme='light'] .arena-ticket-filters button {
+  color: #475569;
+}
 .arena-ticket-filters button[aria-pressed='true'] {
   color: #10e760;
   background: rgb(16 185 129 / 20%);
   border-color: rgb(16 185 129 / 40%);
 }
+:root[data-theme='light'] .arena-ticket-filters button[aria-pressed='true'] {
+  color: #ffffff;
+  background: #059669;
+  border-color: #059669;
+}
 .arena-ticket-filters button:hover {
   color: white;
+}
+:root[data-theme='light'] .arena-ticket-filters button:hover {
+  color: #0f172a;
+  background: #f1f5f9;
 }
 .arena-ticket-list {
   display: grid;
@@ -74,8 +96,16 @@
   background: rgba(11, 18, 32, 0.92);
   transition: border-color 0.2s;
 }
+:root[data-theme='light'] .arena-ticket {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.06);
+}
 .arena-ticket:hover {
   border-color: rgb(16 185 129 / 30%);
+}
+:root[data-theme='light'] .arena-ticket:hover {
+  border-color: #059669;
 }
 .arena-ticket-main {
   min-width: 0;
@@ -98,16 +128,30 @@
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
+:root[data-theme='light'] .arena-ticket-status {
+  background: #f1f5f9;
+  color: #475569;
+}
 .arena-ticket-status[data-status='CONFIRMED'],
 .arena-ticket-status[data-status='CHECKED_IN'] {
   color: #020617;
   background: #10e760;
   box-shadow: var(--arena-glow);
 }
+:root[data-theme='light'] .arena-ticket-status[data-status='CONFIRMED'],
+:root[data-theme='light'] .arena-ticket-status[data-status='CHECKED_IN'] {
+  background: #059669;
+  color: #ffffff;
+}
 .arena-ticket-status[data-status='HOLDING'] {
   color: #fbbf24;
   background: rgb(245 158 11 / 15%);
   border: 1px solid rgb(245 158 11 / 30%);
+}
+:root[data-theme='light'] .arena-ticket-status[data-status='HOLDING'] {
+  color: #b45309;
+  background: #fef3c7;
+  border-color: #fde68a;
 }
 .arena-ticket-status[data-status='CANCELLED'],
 .arena-ticket-status[data-status='EXPIRED'] {
@@ -115,17 +159,29 @@
   background: rgb(239 68 68 / 20%);
   border: 1px solid rgb(239 68 68 / 30%);
 }
+:root[data-theme='light'] .arena-ticket-status[data-status='CANCELLED'],
+:root[data-theme='light'] .arena-ticket-status[data-status='EXPIRED'] {
+  color: #b91c1c;
+  background: #fee2e2;
+  border-color: #fecaca;
+}
 .arena-ticket-code {
   font-size: 12px;
   font-family: monospace;
   color: #94a3b8;
   overflow-wrap: anywhere;
 }
+:root[data-theme='light'] .arena-ticket-code {
+  color: #64748b;
+}
 .arena-shell .arena-ticket h2 {
   color: white;
   font-size: 24px;
   font-weight: 800;
   margin: 0 0 16px;
+}
+:root[data-theme='light'] .arena-shell .arena-ticket h2 {
+  color: #0f172a;
 }
 .arena-ticket-fields {
   display: grid;
@@ -138,11 +194,18 @@
   padding: 12px;
   border-radius: 12px;
 }
+:root[data-theme='light'] .arena-ticket-fields > div {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+}
 .arena-ticket-fields span {
   display: block;
   font-size: 10px;
   color: #94a3b8;
   text-transform: uppercase;
+}
+:root[data-theme='light'] .arena-ticket-fields span {
+  color: #64748b;
 }
 .arena-ticket-fields strong {
   display: block;
@@ -150,11 +213,18 @@
   margin-top: 4px;
   color: #10e760;
 }
+:root[data-theme='light'] .arena-ticket-fields strong {
+  color: #059669;
+}
 .arena-shell .arena-ticket-timezone,
 .arena-shell .arena-ticket-expiry {
   font-size: 11px;
   color: #94a3b8;
   margin: 8px 0;
+}
+:root[data-theme='light'] .arena-shell .arena-ticket-timezone,
+:root[data-theme='light'] .arena-shell .arena-ticket-expiry {
+  color: #64748b;
 }
 .arena-ticket-services {
   font-size: 11px;
@@ -163,14 +233,23 @@
   list-style: none;
   padding-left: 0;
 }
+:root[data-theme='light'] .arena-ticket-services {
+  color: #334155;
+}
 .arena-shell .arena-ticket-total {
   font-size: 12px;
   color: #94a3b8;
   margin: 16px 0;
 }
+:root[data-theme='light'] .arena-shell .arena-ticket-total {
+  color: #64748b;
+}
 .arena-ticket-total strong {
   color: #10e760;
   font-weight: 800;
+}
+:root[data-theme='light'] .arena-ticket-total strong {
+  color: #059669;
 }
 .arena-ticket-actions {
   display: flex;
@@ -180,6 +259,9 @@
   padding-top: 16px;
   margin-top: 16px;
   border-top: 1px solid #1e293b;
+}
+:root[data-theme='light'] .arena-ticket-actions {
+  border-top-color: #e2e8f0;
 }
 .arena-ticket-actions .arena-button {
   font-size: 11px;
@@ -197,6 +279,10 @@
   border-left: 1px dashed rgb(255 255 255 / 20%);
   gap: 8px;
 }
+:root[data-theme='light'] .arena-ticket-pass {
+  background: #f8fafc;
+  border-left: 1px dashed #cbd5e1;
+}
 .arena-ticket-pass::before,
 .arena-ticket-pass::after {
   content: '';
@@ -207,6 +293,11 @@
   border-radius: 50%;
   background: #060911;
   border: 1px solid #1e293b;
+}
+:root[data-theme='light'] .arena-ticket-pass::before,
+:root[data-theme='light'] .arena-ticket-pass::after {
+  background: #f8fafc;
+  border-color: #cbd5e1;
 }
 .arena-ticket-pass::before {
   top: -10px;
@@ -226,10 +317,18 @@
   border-radius: 12px;
   margin-bottom: 8px;
 }
+:root[data-theme='light'] .arena-ticket-stub {
+  background: #ffffff;
+  border-color: #cbd5e1;
+  color: #059669;
+}
 .arena-ticket-pass > span {
   font-size: 10px;
   color: #94a3b8;
   letter-spacing: 0.15em;
+}
+:root[data-theme='light'] .arena-ticket-pass > span {
+  color: #64748b;
 }
 .arena-ticket-pass > strong {
   font-size: 15px;
@@ -238,10 +337,16 @@
   font-weight: 800;
   overflow-wrap: anywhere;
 }
+:root[data-theme='light'] .arena-ticket-pass > strong {
+  color: #059669;
+}
 .arena-ticket-pass > small {
   font-size: 10px;
   color: #94a3b8;
   line-height: 1.6;
+}
+:root[data-theme='light'] .arena-ticket-pass > small {
+  color: #64748b;
 }
 .arena-muted {
   font-size: 11px;

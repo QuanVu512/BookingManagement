@@ -72,17 +72,28 @@ export function CourtCatalogView({
     );
   }, [courts, filter, query]);
   return (
-    <section id="courts-catalog" className="arena-catalog arena-wide">
-      <div className="arena-section-heading">
+    <section id="courts-section" className="arena-catalog arena-wide py-16 sm:py-24 hairline-b">
+      <div className="arena-section-heading flex flex-col lg:flex-row lg:items-end justify-between gap-6 pb-10 hairline-b">
         <div>
-          <h2>
-            DANH SÁCH SÂN ĐẤU <span className="arena-live">Danh mục sân</span>
-          </h2>
-          <p>Khám phá thông số chi tiết và giữ chỗ ngay cho trận đấu của bạn</p>
+          <div className="flex items-center gap-3 mb-2">
+            <span className="px-2.5 py-0.5 rounded-full text-[11px] font-mono bg-emeraldPro/15 text-emeraldPro border border-emeraldPro/30">
+              Danh mục sân
+            </span>
+          </div>
+          <div className="flex flex-wrap items-baseline gap-4">
+            <h2 className="text-3xl sm:text-5xl font-extrabold tracking-tight uppercase">
+              DANH SÁCH SÂN ĐẤU
+            </h2>
+            <span className="font-serif italic text-2xl text-emeraldPro hidden sm:inline">
+              The Four Signatures
+            </span>
+          </div>
         </div>
         <CatalogFilters courts={courts} filter={filter} onChange={setFilter} />
       </div>
-      <CatalogCards courts={visibleCourts} />
+      <div className="mt-10">
+        <CatalogCards courts={visibleCourts} />
+      </div>
     </section>
   );
 }

@@ -33,6 +33,33 @@ function barHeight(x: number, frame: ArenaWaveFrame) {
   );
 }
 
+const gradientCache = new Map<number, CanvasGradient>();
+let lastContext: CanvasRenderingContext2D | null = null;
+
+function getBarGradient(
+  context: CanvasRenderingContext2D,
+  height: number,
+): CanvasGradient {
+  if (lastContext !== context) {
+    gradientCache.clear();
+    lastContext = context;
+  }
+  const rounded = Math.round(height);
+  let gradient = gradientCache.get(rounded);
+  if (!gradient) {
+    const top = ARENA_WAVE.centerY - rounded / 2;
+    const bottom = ARENA_WAVE.centerY + rounded / 2;
+    gradient = context.createLinearGradient(0, top, 0, bottom);
+    gradient.addColorStop(0, 'rgba(16,231,96,0)');
+    gradient.addColorStop(0.3, 'rgba(52,211,153,.45)');
+    gradient.addColorStop(0.5, 'rgba(16,231,96,.85)');
+    gradient.addColorStop(0.7, 'rgba(16,185,129,.45)');
+    gradient.addColorStop(1, 'rgba(5,150,105,0)');
+    gradientCache.set(rounded, gradient);
+  }
+  return gradient;
+}
+
 function paintBar(
   context: CanvasRenderingContext2D,
   x: number,
@@ -40,16 +67,10 @@ function paintBar(
 ) {
   const top = ARENA_WAVE.centerY - height / 2;
   const bottom = ARENA_WAVE.centerY + height / 2;
-  const gradient = context.createLinearGradient(0, top, 0, bottom);
-  gradient.addColorStop(0, 'rgba(16,231,96,0)');
-  gradient.addColorStop(0.3, 'rgba(52,211,153,.45)');
-  gradient.addColorStop(0.5, 'rgba(16,231,96,.85)');
-  gradient.addColorStop(0.7, 'rgba(16,185,129,.45)');
-  gradient.addColorStop(1, 'rgba(5,150,105,0)');
   context.beginPath();
   context.lineWidth = ARENA_WAVE.barWidth;
   context.lineCap = 'round';
-  context.strokeStyle = gradient;
+  context.strokeStyle = getBarGradient(context, height);
   context.moveTo(x, top);
   context.lineTo(x, bottom);
   context.stroke();

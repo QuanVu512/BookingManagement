@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Script from 'next/script';
 import { Inter, Plus_Jakarta_Sans } from 'next/font/google';
 import './globals.css';
+import '../components/arena/homepage-draft.css';
 import '../components/arena/arena.css';
 import '../components/arena/arena-booking.css';
 import '../components/arena/arena-tickets.css';
@@ -41,7 +42,7 @@ export default function RootLayout({
     >
       <body>
         <Script id="theme-preference" strategy="beforeInteractive">
-          {`try { const saved = localStorage.getItem('smash-arena-theme'); document.documentElement.dataset.theme = saved === 'dark' ? 'dark' : 'light'; document.documentElement.style.colorScheme = document.documentElement.dataset.theme; } catch { document.documentElement.dataset.theme = 'light'; }`}
+          {`try { const saved = localStorage.getItem('smash-arena-theme'); const t = saved === 'light' ? 'light' : 'dark'; document.documentElement.dataset.theme = t; document.documentElement.classList.add(t); document.documentElement.style.colorScheme = t; } catch { document.documentElement.dataset.theme = 'dark'; document.documentElement.classList.add('dark'); }`}
         </Script>
         <ThemeProvider>
           <AuthProvider>

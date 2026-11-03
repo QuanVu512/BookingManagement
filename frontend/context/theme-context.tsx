@@ -48,6 +48,8 @@ function saveTheme(theme: ThemeMode) {
 function applyTheme(theme: ThemeMode) {
   document.documentElement.dataset.theme = theme;
   document.documentElement.style.colorScheme = theme;
+  document.documentElement.classList.remove('light', 'dark');
+  document.documentElement.classList.add(theme);
 }
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {

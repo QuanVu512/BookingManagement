@@ -89,11 +89,29 @@ export function attachArenaWave(
   if (!surface) return;
   const frame = initialFrame();
   const playback = wavePlayback(surface, frame);
+  let isScrolling = false;
+  let scrollTimer: ReturnType<typeof setTimeout> | undefined;
+
   const synchronize = () => {
     playback.stop();
     playback.paint();
-    if (!options.paused && !document.hidden) playback.play();
+    if (!options.paused && !document.hidden && !isScrolling) playback.play();
   };
+
+  const onScroll = () => {
+    if (!isScrolling) {
+      isScrolling = true;
+      playback.stop();
+    }
+    if (scrollTimer) clearTimeout(scrollTimer);
+    scrollTimer = setTimeout(() => {
+      isScrolling = false;
+      if (!options.paused && !document.hidden) {
+        playback.play();
+      }
+    }, 120);
+  };
+
   const pointerController = pointerListeners(surface, frame);
   const resize = () => {
     surface.resize();
@@ -102,12 +120,15 @@ export function attachArenaWave(
     synchronize();
   };
   window.addEventListener('resize', resize);
+  window.addEventListener('scroll', onScroll, { passive: true });
   document.addEventListener('visibilitychange', synchronize);
   synchronize();
   return () => {
+    if (scrollTimer) clearTimeout(scrollTimer);
     playback.stop();
     pointerController.release();
     window.removeEventListener('resize', resize);
+    window.removeEventListener('scroll', onScroll);
     document.removeEventListener('visibilitychange', synchronize);
   };
 }

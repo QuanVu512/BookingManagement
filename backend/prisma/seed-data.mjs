@@ -9,7 +9,7 @@ export const SEED_BRANCH = {
   id: '10000000-0000-4000-8000-000000000001',
   code: 'MVP-DEMO',
   name: 'SMASH ARENA — Chi nhánh demo',
-  address: 'Phù Đổng, Hà Nội',
+  address: 'Khu Thể Thao Phức Hợp SMASH ARENA — Hà Nội (Cơ sở thử nghiệm)',
   phone: '02400000000',
   timezone: 'Asia/Ho_Chi_Minh',
 };
@@ -166,10 +166,7 @@ function parseDatabaseUrl(value) {
     throw new SeedError('SEED_ENV_DENIED', 'DATABASE_URL không hợp lệ.');
   }
   if (url.protocol !== 'postgresql:' && url.protocol !== 'postgres:') {
-    throw new SeedError(
-      'SEED_ENV_DENIED',
-      'DATABASE_URL phải là PostgreSQL.',
-    );
+    throw new SeedError('SEED_ENV_DENIED', 'DATABASE_URL phải là PostgreSQL.');
   }
   const database = decodeURIComponent(url.pathname.replace(/^\//, ''));
   if (!database) {
@@ -237,16 +234,25 @@ export function normalizeVietnamPhone(value) {
 }
 
 export function assertManifestConsistency() {
-  const ids = new Set([SEED_BRANCH.id, ...SEED_COURTS.map((court) => court.id)]);
+  const ids = new Set([
+    SEED_BRANCH.id,
+    ...SEED_COURTS.map((court) => court.id),
+  ]);
   const codes = new Set(SEED_COURTS.map((court) => court.code));
-  if (ids.size !== SEED_COURTS.length + 1 || codes.size !== SEED_COURTS.length) {
+  if (
+    ids.size !== SEED_COURTS.length + 1 ||
+    codes.size !== SEED_COURTS.length
+  ) {
     throw new SeedError(
       'SEED_MANIFEST_INVALID',
       'Manifest seed chứa ID hoặc code trùng lặp.',
     );
   }
   for (const court of SEED_COURTS) {
-    if (!court.priceId || SEED_COURTS.some((other) => other.id === court.priceId)) {
+    if (
+      !court.priceId ||
+      SEED_COURTS.some((other) => other.id === court.priceId)
+    ) {
       throw new SeedError(
         'SEED_MANIFEST_INVALID',
         'Price ID seed phải tách biệt với court ID.',

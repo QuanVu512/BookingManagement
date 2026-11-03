@@ -107,7 +107,8 @@ describe('Public court catalog has no silent fixture fallback', () => {
     });
     expect(await facade.getPublicCourt('court-1')).toMatchObject({
       id: 'court-1',
-      branchName: 'Test branch',
+      branchName: 'SMASH ARENA — Cơ sở thử nghiệm',
+      address: 'Khu Thể Thao Phức Hợp SMASH ARENA — Hà Nội (Cơ sở thử nghiệm)',
       pricePerHour: 100000,
       features: ['Vệ sinh 15 phút sau lượt chơi'],
     });
