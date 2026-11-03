@@ -657,7 +657,6 @@ async function fixtures(prisma: PrismaService) {
       branchId,
       code: 'TEST',
       name: 'Test court',
-      cleanupMinutes: 15,
       priceRules: {
         create: [
           {
