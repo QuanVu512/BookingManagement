@@ -29,6 +29,7 @@ async function request(
   caller?: AbortSignal,
   csrfRetried = false,
   guestToken?: string,
+  checkoutToken?: string,
 ): Promise<{ success: boolean; data: unknown }> {
   const signal = AbortSignal.any([
     AbortSignal.timeout(AUTH_REQUEST_TIMEOUT_MS),
@@ -39,13 +40,19 @@ async function request(
     // Guest-token-only: không gửi cookie credentials để giữ tách phiên.
     headers['X-Booking-Access-Token'] = guestToken;
   }
+  if (checkoutToken) {
+    // CheckoutRecoveryToken: chỉ đọc recovery và tạo PREPAYMENT cho đúng đơn
+    // đã bind; không mở quyền manage/refund.
+    headers['X-Booking-Checkout-Token'] = checkoutToken;
+  }
+  const omitCredentials = Boolean(guestToken || checkoutToken);
   if (method !== 'GET') {
     headers['X-CSRF-Token'] = await csrfToken(signal);
     headers['Content-Type'] = 'application/json';
   }
   const response = await fetch(`${API_BASE_URL}/api/${path}`, {
     method,
-    credentials: guestToken ? 'omit' : 'include',
+    credentials: omitCredentials ? 'omit' : 'include',
     cache: 'no-store',
     signal,
     headers,
@@ -71,7 +78,15 @@ async function request(
     });
     // MIG-12: retry đúng một lần cho CSRF đã nhận diện, không retry RBAC 403.
     if (error.isCsrf() && !csrfRetried && method !== 'GET') {
-      return request(path, method, body, caller, true, guestToken);
+      return request(
+        path,
+        method,
+        body,
+        caller,
+        true,
+        guestToken,
+        checkoutToken,
+      );
     }
     throw error;
   }
@@ -94,9 +109,13 @@ export async function createPaymentRequest(input: {
   method: PaymentMethod;
   idempotencyKey: string;
   signal?: AbortSignal;
+  guestToken?: string;
 }) {
+  const path = input.guestToken
+    ? 'guest/payments/requests'
+    : 'payments/requests';
   const payload = await request(
-    'payments/requests',
+    path,
     'POST',
     {
       bookingId: input.bookingId,
@@ -106,16 +125,54 @@ export async function createPaymentRequest(input: {
       idempotencyKey: input.idempotencyKey,
     },
     input.signal,
+    false,
+    input.guestToken,
   );
   return parsePaymentRequest(payload.data);
 }
 
-export async function getPaymentRequest(id: string, signal?: AbortSignal) {
+/**
+ * S5-01 — tạo yêu cầu thu PREPAYMENT bằng CheckoutRecoveryToken (tab sạch từ
+ * email, không có ManageToken). Server bind token đúng booking, chỉ cho tạo
+ * trong cửa sổ giữ chỗ còn hạn, khóa idempotency chuẩn của booking.
+ */
+export async function createGuestPrepaymentRequest(input: {
+  bookingId: string;
+  prepaymentPercent?: 30;
+  method?: 'PAYOS_TRANSFER';
+  signal?: AbortSignal;
+  checkoutToken: string;
+}) {
   const payload = await request(
-    `payments/requests/${encodeURIComponent(id)}`,
+    `guest/bookings/${encodeURIComponent(input.bookingId)}/payment-requests`,
+    'POST',
+    {
+      prepaymentPercent: input.prepaymentPercent ?? 30,
+      method: input.method ?? 'PAYOS_TRANSFER',
+    },
+    input.signal,
+    false,
+    undefined,
+    input.checkoutToken,
+  );
+  return parsePaymentRequest(payload.data);
+}
+
+export async function getPaymentRequest(
+  id: string,
+  signal?: AbortSignal,
+  guestToken?: string,
+) {
+  const path = guestToken
+    ? `guest/payments/requests/${encodeURIComponent(id)}`
+    : `payments/requests/${encodeURIComponent(id)}`;
+  const payload = await request(
+    path,
     'GET',
     undefined,
     signal,
+    false,
+    guestToken,
   );
   return parsePaymentRequest(payload.data);
 }
@@ -140,12 +197,18 @@ export async function quoteRefund(input: {
 export async function getPaymentOutcome(
   requestId: string,
   signal?: AbortSignal,
+  guestToken?: string,
 ) {
+  const path = guestToken
+    ? `guest/payments/requests/${encodeURIComponent(requestId)}/status`
+    : `payments/requests/${encodeURIComponent(requestId)}/status`;
   const payload = await request(
-    `payments/requests/${encodeURIComponent(requestId)}/status`,
+    path,
     'GET',
     undefined,
     signal,
+    false,
+    guestToken,
   );
   return parsePaymentOutcome(payload.data);
 }
@@ -181,6 +244,51 @@ export async function getBookingRefunds(
   return parseRefundTracker(payload.data);
 }
 
+export interface DemoSimulateResult {
+  eventId: string;
+  status: 'processed' | 'accepted';
+  outcome: ReturnType<typeof parseNullablePaymentOutcome>;
+}
+
+/**
+ * FE-PAY-DEMO — Gọi simulator showcase của server. Server authorize owner,
+ * ký webhook demo và xử lý qua canonical receipt path; client chỉ poll
+ * outcome sau đó, không tự kết luận thành công từ response này.
+ */
+export async function simulateDemoPayment(input: {
+  requestId: string;
+  orderCode?: string | null;
+  signal?: AbortSignal;
+  guestToken?: string;
+  bookingId?: string;
+}): Promise<DemoSimulateResult> {
+  const payload = await request(
+    'webhooks/payos/simulate',
+    'POST',
+    {
+      ...(input.orderCode
+        ? { orderCode: Number(input.orderCode) }
+        : { requestId: input.requestId }),
+      ...(input.guestToken ? { bookingId: input.bookingId } : {}),
+    },
+    input.signal,
+    false,
+    input.guestToken,
+  );
+  if (!isRecord(payload.data)) {
+    throw new Error('Phản hồi mô phỏng không hợp lệ.');
+  }
+  const record = payload.data;
+  if (typeof record.eventId !== 'string') {
+    throw new Error('Phản hồi mô phỏng không hợp lệ.');
+  }
+  return {
+    eventId: record.eventId,
+    status: record.status === 'accepted' ? 'accepted' : 'processed',
+    outcome: parseNullablePaymentOutcome(record.outcome ?? null),
+  };
+}
+
 /** Guest: outcome qua scoped token (header, không cookie). */
 export async function getGuestPaymentOutcome(input: {
   requestId: string;
@@ -198,6 +306,115 @@ export async function getGuestPaymentOutcome(input: {
   return parsePaymentOutcome(payload.data);
 }
 
+export interface GuestHoldRecoverySnapshot {
+  booking: {
+    id: string;
+    code: string;
+    courtId: string;
+    courtName: string;
+    courtCode: string;
+    startsAt: string;
+    endsAt: string;
+    totalAmount: number;
+    prepaymentAmount: number;
+    status: string;
+    holdExpiresAt: string;
+  };
+  serverClock: {
+    serverNow: string;
+    remainingHoldSeconds: number;
+    isHoldExpired: boolean;
+  };
+  payment: {
+    requestId: string;
+    provider: string;
+    status: string;
+    amount: number;
+    vietQrPayload?: string;
+    checkoutUrl?: string;
+    outcomeScreen: string;
+    requiresReview: boolean;
+  } | null;
+  allowedActions: {
+    canReadRecovery: boolean;
+    canPay: boolean;
+    canShowQr: boolean;
+    canCreatePayment: boolean;
+    canCancelHold: boolean;
+    requiresReview: boolean;
+    isHoldExpired: boolean;
+  };
+}
+
+function readGuestCheckoutToken(bookingId: string): string | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    // Token khôi phục lượt checkout; dự phòng token quản lý khi đơn được chia
+    // sẻ qua link khôi phục chỉ mang một token.
+    return (
+      sessionStorage.getItem(`guest-checkout-token:${bookingId}`) ??
+      sessionStorage.getItem(`guest-manage-token:${bookingId}`)
+    );
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * STEP4-P1-2 — Đọc snapshot phục hồi server-authoritative, CHỈ GET.
+ * Dùng cho nút "Đọc lại trạng thái đơn" và mở lại QR từ cảnh báo pending:
+ * tuyệt đối không POST tạo payment/retry trên đường này. Hết quyền đọc
+ * (401/403) hoặc lỗi mạng giữ snapshot cũ và báo lỗi, không suy trạng thái.
+ */
+export async function getGuestHoldRecovery(
+  bookingId: string,
+  signal?: AbortSignal,
+): Promise<GuestHoldRecoverySnapshot> {
+  const token = readGuestCheckoutToken(bookingId);
+  const headers: Record<string, string> = {};
+  if (token) headers['X-Booking-Checkout-Token'] = token;
+  const response = await fetch(
+    `${API_BASE_URL}/api/guest/bookings/${encodeURIComponent(bookingId)}/recovery`,
+    { method: 'GET', credentials: 'omit', cache: 'no-store', signal, headers },
+  );
+  const payload: unknown = await response.json();
+  if (
+    !response.ok ||
+    !isRecord(payload) ||
+    payload.success !== true ||
+    !isRecord(payload.data)
+  ) {
+    const message =
+      isRecord(payload) && typeof payload.message === 'string'
+        ? payload.message
+        : 'Chưa đọc được trạng thái đơn. Vui lòng thử lại.';
+    throw new Error(message);
+  }
+  return payload.data as unknown as GuestHoldRecoverySnapshot;
+}
+
+/**
+ * Task 5.3 — gửi yêu cầu tra cứu đơn giữ chỗ (SĐT hoặc email).
+ * Máy chủ luôn trả cùng thông báo chung (AC-22), kể cả khi không có đơn
+ * hoặc vượt giới hạn; không bao giờ lộ danh sách đơn/email ra màn hình.
+ */
+export async function requestGuestRecoveryLink(
+  contact: string,
+  signal?: AbortSignal,
+): Promise<{ message: string }> {
+  const payload = await request(
+    'guest/bookings/lookup',
+    'POST',
+    { contact },
+    signal,
+  );
+  const data = payload as { success: boolean; message?: unknown };
+  if (typeof data.message !== 'string' || !data.message) {
+    throw new Error('Phản hồi tra cứu không hợp lệ.');
+  }
+  return { message: data.message };
+}
+
 export interface GuestHoldCreatedResponse {
   bookingId: string;
   bookingCode: string;
@@ -209,6 +426,8 @@ export interface GuestHoldCreatedResponse {
   checkoutToken: string;
   checkoutTokenExpiresAt: string;
   checkoutIntentId: string;
+  paymentRequestId?: string | null;
+  paymentStatus?: string | null;
   serverNow: string;
 }
 

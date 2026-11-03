@@ -1,5 +1,6 @@
 'use client';
 
+import { saveGuestCheckoutToken } from '../api/cancel-checkout-hold';
 import React, { useRef, useState } from 'react';
 import {
   formatVnd,
@@ -169,6 +170,7 @@ export function GuestBookingForm({
     });
 
     saveGuestManageToken(result.bookingId, result.accessToken);
+    saveGuestCheckoutToken(result.bookingId, result.checkoutToken);
 
     // Lưu vào pending booking state để phục hồi khi rớt mạng / F5
     const previousPending = getPendingBooking();

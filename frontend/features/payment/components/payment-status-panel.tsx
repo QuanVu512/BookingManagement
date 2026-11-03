@@ -1,7 +1,9 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
+import { PAYMENT_SIMULATION_ENABLED } from '../../../constants/features';
 import type { BookingRecord } from '../../booking/model/booking';
 import { useBookingCheckout } from '../hooks/use-payment-status';
+import { useDemoSimulate } from '../hooks/use-demo-simulate';
 import { formatVnd } from '../../booking/model/booking-time';
 import { isPaymentSuccess } from '../api/payment-contract';
 import type { PaymentOutcome, PaymentRequestRecord } from '../model/payment';
@@ -164,20 +166,52 @@ function CheckoutCode({
   checkout: BookingCheckoutState;
   countdown: { remainingMs: number; expired: boolean };
 }) {
+  const status = checkout.request?.status;
+  const payload = checkout.request?.vietQrPayload;
+  const ended = status === 'CANCELLED' || status === 'EXPIRED';
+  // Terminal payment (CANCELLED/EXPIRED) thắng generic error: không mời
+  // retry tạo mã mới và không render QR/link cũ.
+  if (ended) {
+    return (
+      <p role="status">
+        Yêu cầu thanh toán đã kết thúc. Vui lòng tạo booking mới nếu bạn vẫn
+        muốn giữ sân.
+      </p>
+    );
+  }
   if (!checkout.canPay) return null;
+  const creating =
+    !payload &&
+    !checkout.error &&
+    (checkout.loading || !checkout.request || status === 'CREATING');
+  const failed = !creating && (status === 'FAILED' || Boolean(checkout.error));
+  const waiting = !payload && !creating && !failed;
   return (
     <>
-      {checkout.request?.vietQrPayload && checkout.outcome?.serverNow && (
+      {payload && checkout.outcome?.serverNow && (
         <p role="timer" aria-live="off">
           {formatCountdown(countdown.remainingMs)}
         </p>
       )}
-      {!countdown.expired && checkout.request?.vietQrPayload && (
-        <PaymentQr payload={checkout.request.vietQrPayload} />
-      )}
-      {!checkout.loading && !checkout.request?.vietQrPayload && (
-        <p role="status">Chưa có mã QR thanh toán. Vui lòng thử lại.</p>
-      )}
+      {creating ? (
+        <p role="status">
+          Đang khởi tạo mã thanh toán từ ngân hàng, vui lòng đợi…
+        </p>
+      ) : null}
+      {failed ? (
+        <div role="alert">
+          <p>{checkout.error || 'Chưa tạo được mã thanh toán.'}</p>
+          <button
+            type="button"
+            onClick={checkout.refresh}
+            disabled={checkout.loading}
+          >
+            Thử tạo lại mã QR
+          </button>
+        </div>
+      ) : null}
+      {waiting ? <p role="status">Đang chờ mã QR từ ngân hàng…</p> : null}
+      {!countdown.expired && payload && <PaymentQr payload={payload} />}
       {!countdown.expired && checkout.request?.checkoutUrl && (
         <a
           href={checkout.request.checkoutUrl}
@@ -190,7 +224,65 @@ function CheckoutCode({
     </>
   );
 }
+/**
+ * FE-PAY-DEMO — Banner + nút mô phỏng showcase (F04/F07 review).
+ * - Chỉ hiện khi cờ client bật; server vẫn là authority (404 khi tắt).
+ * - Sau khi gọi xong, component báo checkout poll outcome server-confirmed;
+ *   không redirect vé/QR check-in từ response mô phỏng. QR check-in thật vẫn
+ *   theo eligibility tiền + giờ hiện hành.
+ */
+export function DemoSimulateSection({
+  requestId,
+  orderCode,
+  bookingId,
+  visible,
+  onSimulated,
+}: {
+  requestId: string | null;
+  orderCode?: string | null;
+  bookingId: string;
+  visible: boolean;
+  onSimulated: () => void;
+}) {
+  const demo = useDemoSimulate({
+    requestId,
+    orderCode,
+    bookingId,
+    onSimulated,
+    enabled: visible && PAYMENT_SIMULATION_ENABLED,
+  });
+  if (!PAYMENT_SIMULATION_ENABLED || !visible) return null;
+  return (
+    <section aria-label="Chế độ Showcase">
+      <p role="note">
+        Chế độ Showcase: bạn không cần chuyển khoản thật. Nhấn nút bên dưới để
+        mô phỏng thanh toán thành công qua luồng webhook demo.
+      </p>
+      <button
+        type="button"
+        className="btn btn-secondary"
+        disabled={!requestId || !demo.canSimulate}
+        onClick={demo.simulate}
+      >
+        {demo.phase === 'loading'
+          ? 'Đang mô phỏng…'
+          : '⚡ Giả lập thanh toán thành công (Demo Mode)'}
+      </button>
+      {demo.phase === 'error' && <p role="alert">{demo.error}</p>}
+    </section>
+  );
+}
 function CheckoutMessages({ checkout }: { checkout: BookingCheckoutState }) {
+  // State đã khóa (terminal/review/payment-ended/PAID) không cung cấp đường
+  // retry/create vòng ngoài: refresh ở đây re-POST createCheckout.
+  // PAID kể cả khi outcome chưa đọc được (GET lỗi) cũng không tạo thu mới —
+  // lỗi đọc chỉ cho phép tải lại trạng thái qua refreshRead của countdown.
+  const locked =
+    checkout.success ||
+    checkout.terminal ||
+    checkout.reviewRequired ||
+    checkout.paymentTerminal ||
+    checkout.request?.status === 'PAID';
   return (
     <>
       {checkout.loading && <p role="status">Đang tạo mã thanh toán…</p>}
@@ -198,7 +290,7 @@ function CheckoutMessages({ checkout }: { checkout: BookingCheckoutState }) {
       {checkout.outcome?.reviewRequired && (
         <p role="status">Khoản thanh toán đang được kiểm tra.</p>
       )}
-      {!checkout.success && (
+      {!locked && (
         <button
           type="button"
           className="btn btn-secondary"
@@ -222,13 +314,22 @@ export function BookingPaymentCheckout({
   const countdown = usePaymentCountdown({
     expiresAt: checkout.request?.expiresAt ?? booking.holdExpiresAt,
     serverNow: checkout.outcome?.serverNow ?? null,
-    onExpired: checkout.refresh,
+    onExpired: checkout.refreshRead,
   });
   return (
     <section className="payment-checkout" aria-label="Thanh toán đặt sân">
       <h3>{checkout.title}</h3>
       <p>{booking.bookingCode}</p>
       <CheckoutCode checkout={checkout} countdown={countdown} />
+      <DemoSimulateSection
+        requestId={checkout.request?.id ?? null}
+        orderCode={checkout.request?.providerOrderCode}
+        bookingId={booking.id}
+        visible={
+          checkout.canPay && checkout.request !== null && !countdown.expired
+        }
+        onSimulated={checkout.refreshRead}
+      />
       <CheckoutMessages checkout={checkout} />
       {checkout.terminal && onReset && (
         <button type="button" className="btn btn-primary" onClick={onReset}>

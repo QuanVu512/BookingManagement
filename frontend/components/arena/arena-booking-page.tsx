@@ -1,15 +1,17 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import { cancelCheckoutHold } from '../../features/payment/api/cancel-checkout-hold';
+import React, { useState, useEffect, useRef } from 'react';
 import { useCourtCatalog } from '../../features/courts/hooks/use-court-catalog';
 import { ArenaCourtTabs } from '../../features/courts/components/arena-court-switcher';
 import { CourtInfoCard } from '../../features/courts/components/court-info-card';
 import {
-  GuestBookingModal,
-  type GuestHoldCreated,
-} from '../../features/payment/components/guest-booking-form';
+  UnifiedCheckoutDialog,
+  type UnifiedCheckoutParams,
+} from '../../features/payment/components/unified-checkout-dialog';
 import { GuestManagePanel } from '../../features/payment/components/guest-manage-panel';
 import { BookingQrModal } from '../../features/payment/components/booking-qr-modal';
+import type { GuestHoldCreated } from '../../features/payment/components/guest-booking-form';
 import {
   PendingBookingAlert,
   getPendingBooking,
@@ -17,6 +19,8 @@ import {
   type PendingBookingState,
 } from '../../features/booking/components/pending-booking-alert';
 import { ArenaBookingHeading } from './arena-booking-heading';
+import Link from 'next/link';
+import { useRecoveryLink } from '../../features/payment/hooks/use-recovery-link';
 import { ArenaShell } from './arena-shell';
 import { ArenaLoadStatus } from './arena-load-status';
 
@@ -26,15 +30,20 @@ export function ArenaBookingPage() {
   const prepaymentPercent = 30 as const;
   const [guestHold, setGuestHold] = useState<GuestHoldCreated | null>(null);
 
-  // Guest booking modal state & prefilled parameters
-  const [guestModalOpen, setGuestModalOpen] = useState(false);
-  const [selectedWindow, setSelectedWindow] = useState<{ start: string; end: string } | null>(null);
-  const [selectedQuote, setSelectedQuote] = useState<{ totalAmount?: number; prepaymentAmount?: number } | null>(null);
+  // Bước 4: một dialog hợp nhất thay cho hai modal rời rạc trước đây.
+  const [checkoutOpen, setCheckoutOpen] = useState(false);
+  const [checkoutParams, setCheckoutParams] =
+    useState<UnifiedCheckoutParams | null>(null);
+  const lastTriggerRef = useRef<HTMLElement | null>(null);
 
-  // Pending booking recovery state
-  const [pendingAlert, setPendingAlert] = useState<PendingBookingState | null>(null);
+  // Giữ tương thích pha QR cũ (resume từ cảnh báo pending mở lại đúng pha QR).
+  const [pendingAlert, setPendingAlert] = useState<PendingBookingState | null>(
+    null,
+  );
+  // STEP4-P1-2: mở QR từ resume (cảnh báo pending/link khôi phục) thì chỉ đọc
+  // recovery (GET), không POST tạo payment khi mount.
+  const [qrResumeOnly, setQrResumeOnly] = useState(false);
 
-  // Active QR Modal state
   const [activeQr, setActiveQr] = useState<{
     bookingId: string;
     bookingCode: string;
@@ -60,65 +69,39 @@ export function ArenaBookingPage() {
     }
   }, [selectedId]);
 
-  // Phục hồi đơn qua query URL (?recover=<bookingId>&token=<accessToken>)
+  // Task 5.2 — phục hồi đơn từ link email: mã đơn ở query (?recover=, không
+  // bí mật), mã bí mật ở fragment (#recovery=). Hook đọc xong xóa sạch URL
+  // (AC-19), đồng hồ theo giờ máy chủ từ GET /recovery (AC-14).
+  const recoveryLink = useRecoveryLink();
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const searchParams = new URLSearchParams(window.location.search);
-    const recoverBookingId = searchParams.get('recover');
-    const token = searchParams.get('token');
-
-    if (recoverBookingId) {
-      if (token) {
-        try {
-          sessionStorage.setItem(`guest-manage-token:${recoverBookingId}`, token);
-        } catch {
-          // ignore
-        }
-      }
-      const existing = getPendingBooking();
-      if (existing && existing.bookingId === recoverBookingId) {
-        setActiveQr({
-          bookingId: existing.bookingId,
-          bookingCode: existing.bookingCode,
-          courtName: existing.courtName,
-          courtCode: existing.courtCode,
-          startsAt: existing.startsAt,
-          endsAt: existing.endsAt,
-          totalAmount: existing.totalAmount,
-          prepaymentAmount: existing.prepaymentAmount,
-          holdExpiresAt: existing.holdExpiresAt,
-        });
-      } else {
-        setActiveQr({
-          bookingId: recoverBookingId,
-          bookingCode: `BK-${recoverBookingId.slice(0, 8).toUpperCase()}`,
-          courtName: court?.name,
-          courtCode: court?.code,
-          prepaymentAmount: 0,
-          holdExpiresAt: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
-        });
-      }
-    }
-  }, [court?.name, court?.code]);
-
-  function handleOpenGuestModal(params: {
-    courtId: string;
-    courtName?: string;
-    courtCode?: string;
-    window: { start: string; end: string };
-    totalAmount?: number;
-    prepaymentAmount?: number;
-  }) {
-    setSelectedWindow(params.window);
-    setSelectedQuote({
-      totalAmount: params.totalAmount,
-      prepaymentAmount: params.prepaymentAmount,
+    if (recoveryLink.status !== 'ready' || !recoveryLink.snapshot) return;
+    const snapshotBooking = recoveryLink.snapshot.booking;
+    // Mở QR ở chế độ chỉ-đọc (GET), không POST tạo thanh toán khi mount.
+    setQrResumeOnly(true);
+    setActiveQr({
+      bookingId: snapshotBooking.id,
+      bookingCode: snapshotBooking.code,
+      courtName: snapshotBooking.courtName,
+      courtCode: snapshotBooking.courtCode,
+      startsAt: snapshotBooking.startsAt,
+      endsAt: snapshotBooking.endsAt,
+      totalAmount: snapshotBooking.totalAmount,
+      prepaymentAmount: snapshotBooking.prepaymentAmount,
+      holdExpiresAt: snapshotBooking.holdExpiresAt,
     });
-    setGuestModalOpen(true);
+  }, [recoveryLink.status, recoveryLink.snapshot]);
+
+  function handleOpenGuestModal(params: UnifiedCheckoutParams) {
+    if (typeof document !== 'undefined') {
+      const active = document.activeElement;
+      if (active instanceof HTMLElement) lastTriggerRef.current = active;
+    }
+    setCheckoutParams(params);
+    setCheckoutOpen(true);
   }
 
   function handleSelectCourt(id: string) {
-    if (activeQr) return; // Khóa không cho đổi sân khi đang mở modal thanh toán
+    if (checkoutOpen || activeQr) return; // Khóa không cho đổi sân khi đang mở dialog thanh toán
     setSelectedId(id);
     const existing = getPendingBooking();
     if (existing) {
@@ -128,19 +111,23 @@ export function ArenaBookingPage() {
 
   function handleGuestCreated(result: GuestHoldCreated) {
     setGuestHold(result);
-    setActiveQr({
-      bookingId: result.bookingId,
-      bookingCode: result.bookingCode,
-      courtName: court?.name,
-      courtCode: court?.code,
-      totalAmount: result.totalAmount,
-      prepaymentAmount: result.prepaymentAmount,
-      holdExpiresAt: result.holdExpiresAt,
-    });
+    // Dialog hợp nhất tự chuyển sang pha QR; không mở thêm modal rời rạc.
+    // Đồng bộ cảnh báo pending ngay để nút hủy trong dialog tìm đúng đơn
+    // (STEP4-P1-1 dependency: cancel theo chính booking vừa tạo).
+    const saved = getPendingBooking();
+    if (saved && saved.bookingId === result.bookingId) {
+      setPendingAlert(saved);
+    }
   }
 
   function handleResumePending() {
     if (!pendingAlert) return;
+    if (typeof document !== 'undefined') {
+      const active = document.activeElement;
+      if (active instanceof HTMLElement) lastTriggerRef.current = active;
+    }
+    // STEP4-P1-2:Resume chỉ đọc — modal mở ở chế độ resumeOnly.
+    setQrResumeOnly(true);
     setActiveQr({
       bookingId: pendingAlert.bookingId,
       bookingCode: pendingAlert.bookingCode,
@@ -154,11 +141,25 @@ export function ArenaBookingPage() {
     });
   }
 
-  function handleCancelPending() {
+  function handleCheckoutClose() {
+    // AC-24/R5: đóng chỉ ẩn dialog, tuyệt đối không hủy giữ chỗ ngầm.
+    // Đơn còn hiệu lực được theo dõi tiếp qua PendingBookingAlert.
+    const existing = getPendingBooking();
+    if (existing) setPendingAlert(existing);
+    setCheckoutOpen(false);
+  }
+
+  async function handleCancelPending() {
+    const bookingId =
+      activeQr?.bookingId ?? guestHold?.bookingId ?? pendingAlert?.bookingId;
+    if (!bookingId) throw new Error('Không tìm thấy đơn cần hủy.');
+    await cancelCheckoutHold(bookingId, pendingAlert?.type ?? 'guest');
     clearPendingBooking();
+    window.dispatchEvent(new Event('booking-hold-released'));
     setGuestHold(null);
     setActiveQr(null);
     setPendingAlert(null);
+    setCheckoutOpen(false);
   }
 
   return (
@@ -175,6 +176,38 @@ export function ArenaBookingPage() {
             onCancel={handleCancelPending}
           />
         )}
+
+        {/* Task 5.2 — trạng thái mở link phục hồi từ email */}
+        {(recoveryLink.status === 'expired-hold' ||
+          recoveryLink.status === 'expired-link' ||
+          recoveryLink.status === 'invalid' ||
+          recoveryLink.status === 'error') && (
+          <div
+            className="arena-recovery-notice"
+            role={recoveryLink.status === 'error' ? 'alert' : 'status'}
+            aria-live="polite"
+          >
+            <p>{recoveryLink.message}</p>
+            <p>
+              {recoveryLink.status === 'error' && (
+                <button
+                  type="button"
+                  className="arena-btn-secondary"
+                  onClick={recoveryLink.retry}
+                >
+                  Thử lại
+                </button>
+              )}
+              <Link href="/booking/lookup" className="arena-btn-secondary">
+                Tìm lại đơn giữ chỗ
+              </Link>
+            </p>
+          </div>
+        )}
+
+        <p className="arena-lookup-hint">
+          <Link href="/booking/lookup">Tìm lại đơn giữ chỗ chưa thanh toán</Link>
+        </p>
 
         <ArenaCourtTabs
           courts={catalog.courts}
@@ -195,7 +228,10 @@ export function ArenaBookingPage() {
           }}
         >
           <p role="note" style={{ margin: 0 }}>
-            <strong>Chính sách đặt cọc:</strong> Áp dụng đặt cọc bắt buộc đúng <strong>30% tiền thuê sân</strong> cho tất cả khách hàng (thành viên và khách vãng lai). 70% tiền thuê sân còn lại sẽ được thanh toán sau theo quy trình tại cơ sở.
+            <strong>Chính sách đặt cọc:</strong> Áp dụng đặt cọc bắt buộc đúng{' '}
+            <strong>30% tiền thuê sân</strong> cho tất cả khách hàng (thành viên
+            và khách vãng lai). 70% tiền thuê sân còn lại sẽ được thanh toán sau
+            theo quy trình tại cơ sở.
           </p>
         </section>
 
@@ -211,8 +247,8 @@ export function ArenaBookingPage() {
         {guestHold && (
           <div className="arena-guest-manage-section">
             <p role="status">
-              Đã giữ chỗ khách <strong>{guestHold.bookingCode}</strong> — mở checkout trước{' '}
-              {guestHold.holdExpiresAt}.
+              Đã giữ chỗ khách <strong>{guestHold.bookingCode}</strong> — mở
+              checkout trước {guestHold.holdExpiresAt}.
             </p>
             <GuestManagePanel
               bookingId={guestHold.bookingId}
@@ -222,23 +258,26 @@ export function ArenaBookingPage() {
         )}
       </main>
 
-      {/* Modal đặt sân dành cho khách chưa có tài khoản (khách vãng lai) - đặt ngoài main để không bị stacking context của main/footer che khuất */}
-      {court && (
-        <GuestBookingModal
-          isOpen={guestModalOpen}
-          onClose={() => setGuestModalOpen(false)}
-          courtId={court.id}
-          courtName={court.name}
-          courtCode={court.code}
+      {/* Bước 4: một dialog hợp nhất (form khách → QR) thay hai modal rời rạc.
+          Đặt ngoài main để không bị stacking context che khuất. */}
+      {court && checkoutParams && (
+        <UnifiedCheckoutDialog
+          isOpen={checkoutOpen}
+          onClose={handleCheckoutClose}
+          courtId={checkoutParams.courtId}
+          courtName={checkoutParams.courtName}
+          courtCode={checkoutParams.courtCode}
+          window={checkoutParams.window}
+          totalAmount={checkoutParams.totalAmount}
+          prepaymentAmount={checkoutParams.prepaymentAmount}
           timezone={court.timezone}
-          preselectedWindow={selectedWindow ?? undefined}
-          totalAmount={selectedQuote?.totalAmount}
-          prepaymentAmount={selectedQuote?.prepaymentAmount}
-          onCreated={handleGuestCreated}
+          triggerRef={lastTriggerRef}
+          onHoldCreated={handleGuestCreated}
+          onCancelHold={handleCancelPending}
         />
       )}
 
-      {/* Modal Popup QR Code thanh toán (PayOS / VietQR) có backdrop khóa giao diện bên ngoài */}
+      {/* Resume từ cảnh báo pending / link khôi phục: mở thẳng pha QR đã tồn tại */}
       {activeQr && (
         <BookingQrModal
           isOpen={Boolean(activeQr)}
@@ -254,7 +293,13 @@ export function ArenaBookingPage() {
           checkoutUrl={activeQr.checkoutUrl}
           vietQrPayload={activeQr.vietQrPayload}
           onCancel={handleCancelPending}
-          onClose={() => setActiveQr(null)}
+          onClose={() => {
+            setActiveQr(null);
+            setQrResumeOnly(false);
+            lastTriggerRef.current?.focus?.();
+          }}
+          resumeOnly={qrResumeOnly}
+          triggerRef={lastTriggerRef}
         />
       )}
     </ArenaShell>

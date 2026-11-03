@@ -20,6 +20,14 @@ export interface LiveBookingViewProps {
   onQuote: () => void;
   onCreate: () => void;
   onSignIn: () => void;
+  /**
+   * Trạng thái phiên đăng nhập (AC-23/AC-25): phân biệt `unknown`/đang tải với
+   * khách vãng lai để không tự mở form khách khi chưa xác định danh tính.
+   * Tùy chọn để tương thích các màn hình chưa truyền trạng thái phiên.
+   */
+  sessionStatus?: 'authenticated' | 'unauthenticated' | 'unknown';
+  sessionLoading?: boolean;
+  onRetrySession?: () => void;
   /** Day-grid occupancy feed (optional: absent keeps legacy static labels). */
   courtId?: string;
   occupancy?: OccupancyGridState | null;

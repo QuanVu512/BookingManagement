@@ -129,11 +129,47 @@ function HoldButton(
   const isAvailable = state.quote
     ? Boolean(state.quote.available)
     : hasTime && !isPast;
+  // AC-23: phiên chưa xác định (unknown) hoặc đang tải tuyệt đối không được
+  // coi là khách vãng lai. Nút khóa/mở lối thử lại phiên, không gọi onGuestBook.
+  const sessionUnknown = props.sessionStatus === 'unknown';
+  const sessionChecking =
+    props.sessionLoading === true && props.sessionStatus !== 'authenticated';
   // Window-level conflict or grid failure locks NEW submits, but the
   // idempotent "retry request" action stays available per replay contract.
   const gridBlocked = props.gridConflict === true || props.gridLocked === true;
   const isDisabled =
-    !isAvailable || gridBlocked || Boolean(state.booking) || isPast || !hasTime;
+    !isAvailable ||
+    gridBlocked ||
+    Boolean(state.booking) ||
+    isPast ||
+    !hasTime ||
+    sessionUnknown ||
+    sessionChecking;
+
+  if (sessionChecking) {
+    return (
+      <button type="button" className="btn btn-primary" disabled aria-label="Đang kiểm tra phiên đăng nhập">
+        Đang kiểm tra phiên...
+      </button>
+    );
+  }
+
+  if (sessionUnknown) {
+    // AC-23: nút thử lại phiên luôn sẵn sàng (trừ khi lưới sân khóa hẳn hoặc
+    // đã có đơn), và tuyệt đối không gọi onGuestBook.
+    const retryDisabled = gridBlocked || Boolean(state.booking);
+    return (
+      <button
+        type="button"
+        className="btn btn-primary"
+        disabled={retryDisabled}
+        onClick={props.onRetrySession}
+        aria-label="Không thể kiểm tra phiên đăng nhập, bấm để thử lại"
+      >
+        Không thể kiểm tra phiên đăng nhập, bấm để thử lại
+      </button>
+    );
+  }
 
   return (
     <button
@@ -168,6 +204,12 @@ function BookingCheckout(
     <form
       onSubmit={(event) => {
         event.preventDefault();
+        // AC-23: phiên chưa xác định hoặc đang kiểm tra thì chặn submit mở
+        // form khách; lối duy nhất là nút thử lại phiên trong HoldButton.
+        if (props.sessionStatus === 'unknown' || props.sessionLoading === true) {
+          props.onRetrySession?.();
+          return;
+        }
         if (props.authenticated) {
           if (!termsAccepted) return;
           props.onCreate();

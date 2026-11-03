@@ -35,10 +35,10 @@ export function getPendingBooking(): PendingBookingState | null {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as PendingBookingState;
-    if (new Date(parsed.holdExpiresAt).getTime() <= Date.now()) {
-      localStorage.removeItem(STORAGE_KEY);
-      return null;
-    }
+    if (!parsed || typeof parsed.bookingId !== 'string') return null;
+    // R4 (S4-P2-1): không xóa bản ghi khôi phục chỉ vì đồng hồ máy client đã
+    // vượt hạn. Trạng thái hết hạn thật do server xác nhận; component hiển thị
+    // quyết định theo server, không theo Date.now() lúc đọc storage.
     return parsed;
   } catch {
     return null;
@@ -63,21 +63,101 @@ export function PendingBookingAlert({
   onCancel: () => Promise<void> | void;
 }) {
   const [cancelling, setCancelling] = useState(false);
+  const [cancelError, setCancelError] = useState('');
+  const [confirmCancel, setConfirmCancel] = useState(false);
   const countdown = usePaymentCountdown({
     expiresAt: pending.holdExpiresAt,
     serverNow: null,
+    // R1 (S4-P1-1): hết giờ client chỉ đọc lại trạng thái bằng GET do component
+    // cha truyền qua onResume; không tự gán EXPIRED, không xóa storage tại đây.
+    onExpired: undefined,
   });
 
+  // R4 (S4-P2-1) + AC-24: không side-effect trong thân render. Khi hết giờ
+  // client, GIỮ bản ghi và thanh cảnh báo, hiện trạng thái "đang kiểm tra lại"
+  // kèm nút đọc lại (GET) — chỉ xóa storage khi hủy thành công có server xác nhận.
   if (countdown.expired) {
-    clearPendingBooking();
-    return null;
+    return (
+      <div
+        className="arena-pending-alert-banner"
+        role="status"
+        aria-live="polite"
+      >
+        <div className="arena-pending-alert-content">
+          <div className="arena-pending-icon-wrap">
+            <span className="pending-badge-icon">⏰</span>
+          </div>
+          <div className="arena-pending-text">
+            <div className="arena-pending-heading">
+              <strong>Hết thời gian giữ chỗ hiển thị — đang kiểm tra lại trạng thái đơn.</strong>
+            </div>
+            <p className="arena-pending-desc">
+              Mã đơn: <strong>{pending.bookingCode}</strong> — {pending.courtName || pending.courtCode || 'Sân đấu'}.
+              Khung giờ chưa chắc đã được giải phóng; bấm đọc lại để nhận kết quả mới nhất từ máy chủ.
+            </p>
+          </div>
+        </div>
+
+        <div className="arena-pending-alert-actions">
+          {cancelError && <p role="alert">{cancelError}</p>}
+          <button
+            type="button"
+            className="arena-btn-primary arena-btn-sm"
+            onClick={onResume}
+          >
+            Đọc lại trạng thái đơn
+          </button>
+          <Link
+            href="/bookings"
+            className="arena-btn-secondary arena-btn-sm"
+          >
+            Lịch sử đặt sân
+          </Link>
+          {!confirmCancel ? (
+            <button
+              type="button"
+              className="arena-btn-danger arena-btn-sm"
+              onClick={() => setConfirmCancel(true)}
+            >
+              Hủy đơn này
+            </button>
+          ) : (
+            <>
+              <span role="note">Xác nhận hủy giữ chỗ này?</span>
+              <button
+                type="button"
+                className="arena-btn-danger arena-btn-sm"
+                onClick={() => void handleCancel()}
+                disabled={cancelling}
+              >
+                {cancelling ? 'Đang hủy…' : 'Xác nhận hủy'}
+              </button>
+              <button
+                type="button"
+                className="arena-btn-secondary arena-btn-sm"
+                onClick={() => setConfirmCancel(false)}
+                disabled={cancelling}
+              >
+                Giữ lại đơn
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+    );
   }
 
   async function handleCancel() {
     setCancelling(true);
     try {
+      setCancelError('');
       await onCancel();
+      // Chỉ xóa storage khi máy chủ đã xác nhận hủy thành công (R4).
       clearPendingBooking();
+      setConfirmCancel(false);
+    } catch (error) {
+      // Lỗi mạng/server: GIỮ nguyên cảnh báo, báo rõ, không xóa storage.
+      setCancelError(error instanceof Error ? error.message : 'Chưa xác nhận được hủy, vui lòng thử lại.');
     } finally {
       setCancelling(false);
     }
@@ -109,6 +189,7 @@ export function PendingBookingAlert({
       </div>
 
       <div className="arena-pending-alert-actions">
+        {cancelError && <p role="alert">{cancelError}</p>}
         <button
           type="button"
           className="arena-btn-primary arena-btn-sm"
@@ -122,14 +203,35 @@ export function PendingBookingAlert({
         >
           Lịch sử đặt sân
         </Link>
-        <button
-          type="button"
-          className="arena-btn-danger arena-btn-sm"
-          onClick={handleCancel}
-          disabled={cancelling}
-        >
-          {cancelling ? 'Đang hủy…' : 'Hủy đơn này'}
-        </button>
+        {!confirmCancel ? (
+          <button
+            type="button"
+            className="arena-btn-danger arena-btn-sm"
+            onClick={() => setConfirmCancel(true)}
+          >
+            Hủy đơn này
+          </button>
+        ) : (
+          <>
+            <span role="note">Xác nhận hủy giữ chỗ này?</span>
+            <button
+              type="button"
+              className="arena-btn-danger arena-btn-sm"
+              onClick={() => void handleCancel()}
+              disabled={cancelling}
+            >
+              {cancelling ? 'Đang hủy…' : 'Xác nhận hủy'}
+            </button>
+            <button
+              type="button"
+              className="arena-btn-secondary arena-btn-sm"
+              onClick={() => setConfirmCancel(false)}
+              disabled={cancelling}
+            >
+              Giữ lại đơn
+            </button>
+          </>
+        )}
       </div>
     </div>
   );

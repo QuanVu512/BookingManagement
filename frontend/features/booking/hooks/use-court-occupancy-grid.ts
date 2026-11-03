@@ -174,10 +174,12 @@ export function useCourtOccupancyGrid(
     };
     document.addEventListener('visibilitychange', onVisible);
     window.addEventListener('focus', onFocus);
+    window.addEventListener('booking-hold-released', onFocus);
     return () => {
       clearInterval(timer);
       document.removeEventListener('visibilitychange', onVisible);
       window.removeEventListener('focus', onFocus);
+      window.removeEventListener('booking-hold-released', onFocus);
     };
   }, [active, fetchGrid]);
 

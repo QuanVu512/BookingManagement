@@ -1,5 +1,6 @@
 'use client';
 
+import { saveGuestCheckoutToken } from '../api/cancel-checkout-hold';
 import React, { useState, useEffect, useRef } from 'react';
 import {
   formatVnd,
@@ -41,6 +42,12 @@ export interface GuestBookingModalProps {
   totalAmount?: number;
   prepaymentAmount?: number;
   onCreated: (result: GuestHoldCreated) => void;
+  /**
+   * Nhúng trong hộp thoại hợp nhất (STEP4-P1-1): tạo hold thành công thì ở lại
+   * để cha chuyển pha sang QR, KHÔNG tự phát sự kiện đóng. Nút [X]/đóng của
+   * người dùng vẫn gọi `onClose` bình thường.
+   */
+  stayOpenOnCreated?: boolean;
 }
 
 export function GuestBookingModal({
@@ -54,6 +61,7 @@ export function GuestBookingModal({
   totalAmount,
   prepaymentAmount,
   onCreated,
+  stayOpenOnCreated = false,
 }: GuestBookingModalProps) {
   // Step state: 'info' (nhập thông tin) | 'otp' (xác thực mã 6 số)
   const [step, setStep] = useState<'info' | 'otp'>('info');
@@ -224,6 +232,7 @@ export function GuestBookingModal({
       });
 
       saveGuestManageToken(result.bookingId, result.accessToken);
+      saveGuestCheckoutToken(result.bookingId, result.checkoutToken);
 
       const previousPending = getPendingBooking();
       savePendingBooking({
@@ -240,7 +249,11 @@ export function GuestBookingModal({
         type: 'guest',
       });
 
-      onClose();
+      // STEP4-P1-1: khi nhúng trong dialog hợp nhất, tạo hold xong ở lại để cha
+      // chuyển pha sang QR; chỉ phát onClose khi dùng modal rời rạc.
+      if (!stayOpenOnCreated) {
+        onClose();
+      }
       onCreated(result);
     } catch (err) {
       setError(

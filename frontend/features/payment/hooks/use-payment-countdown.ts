@@ -57,14 +57,27 @@ function startCountdown(
   }, 1000);
   return () => window.clearInterval(timer);
 }
+function initialRemainingMs(expiresAt: string | null, serverNow: string | null): number {
+  if (!expiresAt) return 0;
+  const now = serverNow ? Date.parse(serverNow) : Date.now();
+  const diff = Date.parse(expiresAt) - now;
+  return Number.isFinite(diff) && diff > 0 ? diff : 0;
+}
 export function usePaymentCountdown(input: CountdownInput): CountdownState {
-  const [remainingMs, setRemainingMs] = useState(0);
+  // Khởi tạo lười từ expiresAt để frame render đầu tiên đã đúng khi còn hạn,
+  // thay vì mặc định 0 khiến `expired` bị bật sai (PROBE-4, S4-P2-1).
+  const [remainingMs, setRemainingMs] = useState(() =>
+    initialRemainingMs(input.expiresAt, input.serverNow),
+  );
   const notified = useRef<string | null>(null);
   const sample = useRef<CountdownSample | null>(null);
   const callback = useRef(input.onExpired);
   callback.current = input.onExpired;
   useEffect(() => {
     if (!input.expiresAt) return;
+    if (sample.current?.expiry !== input.expiresAt) {
+      notified.current = null;
+    }
     const nowStr = input.serverNow || new Date().toISOString();
     const current = captureCountdown(
       input.expiresAt,
@@ -78,9 +91,18 @@ export function usePaymentCountdown(input: CountdownInput): CountdownState {
       callback.current?.();
     });
   }, [input.expiresAt, input.serverNow]);
+  // STEP4-P2-1: khi expiry đổi (null → có hạn, đơn A → đơn B), sample/state cũ
+  // vẫn còn cho tới khi effect commit. Frame đầu sau đổi phải suy trực tiếp từ
+  // input mới, không trả remainingMs/expired của subject cũ (kẻo UI ẩn QR hoặc
+  // bắn effect sai). Cùng expiry thì giữ tính đơn điệu qua sample/state.
+  const sampleMismatch =
+    Boolean(input.expiresAt) && sample.current?.expiry !== input.expiresAt;
+  const displayRemainingMs = sampleMismatch
+    ? initialRemainingMs(input.expiresAt, input.serverNow)
+    : remainingMs;
   return {
-    remainingMs,
-    expired: Boolean(input.expiresAt && remainingMs <= 0),
+    remainingMs: displayRemainingMs,
+    expired: Boolean(input.expiresAt && displayRemainingMs <= 0),
   };
 }
 

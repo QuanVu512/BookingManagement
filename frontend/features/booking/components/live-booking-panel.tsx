@@ -40,6 +40,11 @@ function useBookingController(
     state,
     timezone,
     authenticated: session.isAuthenticated,
+    sessionStatus: session.status,
+    sessionLoading: session.isLoading,
+    onRetrySession: () => {
+      void refreshSession();
+    },
     showSignIn: !session.isLoading && !session.isAuthenticated,
     signInLabel,
     onChangeWindow: state.changeWindow,
