@@ -247,7 +247,7 @@ async function apply(client, config, plan, counts) {
     } else {
       await insert(client, `court ${entry.court.code}`, {
         text: `INSERT INTO courts (id, branch_id, code, name, court_type, cleanup_minutes)
-               VALUES ($1, $2, $3, $4, $5, 15) RETURNING id`,
+               VALUES ($1, $2, $3, $4, $5, 0) RETURNING id`,
         values: [
           entry.court.id,
           SEED_BRANCH.id,

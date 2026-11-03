@@ -356,7 +356,7 @@ model Court {
   name String @map("name") @db.VarChar(100)
   courtType CourtType @default(STANDARD) @map("court_type")
   status CourtStatus @default(ACTIVE) @map("status")
-  cleanupMinutes Int @default(15) @map("cleanup_minutes") @db.SmallInt
+  cleanupMinutes Int @default(0) @map("cleanup_minutes") @db.SmallInt
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
@@ -441,7 +441,7 @@ model Booking {
   /// Kết thúc chơi
   endsAt DateTime @map("ends_at") @db.Timestamptz(6)
   /// Snapshot khoảng vệ sinh tại lúc đặt
-  cleanupMinutes Int @default(15) @map("cleanup_minutes") @db.SmallInt
+  cleanupMinutes Int @default(0) @map("cleanup_minutes") @db.SmallInt
   /// Tổng giá sân đã chốt
   totalAmount Decimal @map("total_amount") @db.Decimal(14,0)
   /// Snapshot 30.00 hoặc 100.00 lịch sử; policy tạo mới Member/Guest bắt buộc 30.
