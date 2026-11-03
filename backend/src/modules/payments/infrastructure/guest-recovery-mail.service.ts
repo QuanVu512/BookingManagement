@@ -42,10 +42,12 @@ export class GuestRecoveryMailService {
       this.from = config.getOrThrow<string>('SMTP_FROM');
       if (!this.from || !this.from.includes('@'))
         throw new Error('Invalid SMTP_FROM configuration.');
+      this.webOrigin = resolveWebOrigin(config);
     } else {
       this.from = config.get<string>('SMTP_FROM') || 'test@localhost';
+      this.webOrigin =
+        config.get<string>('WEB_ORIGIN') ?? 'http://localhost:4001';
     }
-    this.webOrigin = resolveWebOrigin(config);
   }
 
   recoveryLink(bookingId: string, token: string): string {
