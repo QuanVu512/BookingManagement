@@ -36,13 +36,14 @@ export class GuestRecoveryMailService {
 
   constructor(private readonly config: ConfigService) {
     this.memoryMode =
-      config.get<string>('GUEST_RECOVERY_MAIL_MEMORY') === 'true';
+      config.get<string>('GUEST_RECOVERY_MAIL_MEMORY') === 'true' ||
+      config.get<string>('NODE_ENV') === 'test';
     if (!this.memoryMode) {
       this.from = config.getOrThrow<string>('SMTP_FROM');
       if (!this.from || !this.from.includes('@'))
         throw new Error('Invalid SMTP_FROM configuration.');
     } else {
-      this.from = 'test@localhost';
+      this.from = config.get<string>('SMTP_FROM') || 'test@localhost';
     }
     this.webOrigin = resolveWebOrigin(config);
   }
