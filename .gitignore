@@ -91,6 +91,7 @@ skills-lock.json
 # Next.js and generated Prisma Client
 /.next
 /frontend/.next
+/frontend/next-env.d.ts
 /backend/dist
 /backend/src/generated/prisma
 
@@ -110,3 +111,8 @@ skills-lock.json
 /docs/*PILOT*.md
 /docs/adr/*pilot*.md
 /GLOSSARY.md
+
+# Design backups
+/backup/
+/frontend/backup/
+/drafts/
