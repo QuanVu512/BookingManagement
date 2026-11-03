@@ -114,6 +114,7 @@ export async function depositFixtures(prisma: PrismaService) {
       branchId: branch.id,
       code: 'DEPOSIT',
       name: 'Deposit test court',
+      cleanupMinutes: 15,
       priceRules: {
         create: {
           startTime: new Date('1970-01-01T06:00:00Z'),
@@ -145,11 +146,11 @@ export async function insertSnapshot(
     `INSERT INTO bookings (
     id, booking_code, user_id, branch_id, court_id, source,
     customer_name, customer_email, customer_phone, starts_at, ends_at,
-    total_amount, prepayment_percent, required_prepayment_amount, hold_expires_at,
+    cleanup_minutes, total_amount, prepayment_percent, required_prepayment_amount, hold_expires_at,
     cancellation_rule, cancellation_deadline_at, policy_version, policy_accepted_at, idempotency_key
   ) VALUES ($1, $2, $3, $4, $5, 'CUSTOMER_WEB',
     'Synthetic deposit fixture', 'deposit@example.test', '+84912345678',
-    '2035-01-08T01:00:00Z', '2035-01-08T02:00:00Z', $6, $7, $8,
+    '2035-01-08T01:00:00Z', '2035-01-08T02:00:00Z', 15, $6, $7, $8,
     clock_timestamp() + interval '5 minutes', 'BEFORE_START', '2035-01-08T01:00:00Z',
     'legacy-policy-v1', clock_timestamp(), $9)`,
     [
