@@ -34,6 +34,15 @@ export const PAYMENT_TRANSACTION_OPTIONS = {
   maxWait: 5_000,
 };
 
+/**
+ * Contract F5 — một khóa idempotency canonical cho ý định thu cọc của guest.
+ * Hold và lần gọi `POST /requests` sau đó phải dùng cùng khóa để replay cùng
+ * một `PaymentRequest`, không sinh lệnh thứ hai. 46 ký tự < VARCHAR(100).
+ */
+export function guestPaymentIdempotencyKey(bookingId: string): string {
+  return `pay_guest_${bookingId}`;
+}
+
 export type AllowedPrepaymentPercent =
   (typeof ALLOWED_PREPAYMENT_PERCENTS)[number];
 

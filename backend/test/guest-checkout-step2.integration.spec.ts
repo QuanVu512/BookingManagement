@@ -11,10 +11,14 @@ import { VerifyGuestOtpUseCase } from '../src/modules/payments/application/verif
 import { ResumeGuestIntentUseCase } from '../src/modules/payments/application/resume-guest-intent.use-case.js';
 import { CancelGuestHoldUseCase } from '../src/modules/payments/application/cancel-guest-hold.use-case.js';
 import { GetGuestHoldRecoveryUseCase } from '../src/modules/payments/application/get-guest-hold-recovery.use-case.js';
+import { CreatePaymentRequestUseCase } from '../src/modules/payments/application/create-payment-request.use-case.js';
 import { GuestCheckoutReconcileService } from '../src/modules/payments/application/guest-checkout-reconcile.service.js';
 import { PaymentOutcomeService } from '../src/modules/payments/application/payment-outcome.service.js';
 import { PrismaGuestCheckoutStore } from '../src/modules/payments/infrastructure/prisma-guest-checkout-store.js';
+import { PrismaPaymentStore } from '../src/modules/payments/infrastructure/prisma-payment-store.js';
 import { GuestTokenService } from '../src/modules/payments/infrastructure/guest-token.service.js';
+import { GuestRecoveryOutboxCrypto } from '../src/modules/payments/infrastructure/guest-recovery-outbox-crypto.js';
+import { GuestRecoveryOutboxWriter } from '../src/modules/payments/application/guest-recovery-outbox.writer.js';
 import { GuestOtpSender } from '../src/modules/payments/ports/guest-otp-sender.js';
 import { depositFixtures } from './helpers/booking-deposit.fixture.js';
 
@@ -95,6 +99,9 @@ storageDescribe('guest checkout Bước 2 trên PostgreSQL thật', () => {
   let resume: ResumeGuestIntentUseCase;
   let cancelHold: CancelGuestHoldUseCase;
   let recovery: GetGuestHoldRecoveryUseCase;
+  let createPayment: CreatePaymentRequestUseCase;
+  let failingCreatePayment: CreatePaymentRequestUseCase;
+  let providerOrderCodes: number[];
   let reconcile: GuestCheckoutReconcileService;
   let fixtures: Awaited<ReturnType<typeof depositFixtures>>;
   let slot = 0;
@@ -161,6 +168,12 @@ storageDescribe('guest checkout Bước 2 trên PostgreSQL thật', () => {
     prismaB = new PrismaService(config);
     await prismaA.$connect();
     await prismaB.$connect();
+    // Hợp đồng hạ tầng: Prisma encode DateTime theo UTC wall-clock nên session
+    // PostgreSQL phải là UTC. Nếu server/role để timezone khác, mốc do app ghi
+    // lệch đúng offset và mọi so sánh SQL với clock_timestamp() sai.
+    const [{ tz }] = await prismaA.$queryRaw<{ tz: string }[]>`
+      SELECT current_setting('TimeZone') AS tz`;
+    expect(tz).toBe('UTC');
     storeA = new PrismaGuestCheckoutStore(prismaA);
     storeB = new PrismaGuestCheckoutStore(prismaB);
     tokensA = new GuestTokenService(prismaA, config);
@@ -171,6 +184,10 @@ storageDescribe('guest checkout Bước 2 trên PostgreSQL thật', () => {
       config,
       storeA,
       tokensA,
+      new PrismaPaymentStore(prismaA),
+      new GuestRecoveryOutboxWriter(
+        new GuestRecoveryOutboxCrypto(config),
+      ),
     );
     guestB = new GuestCreateHoldUseCase(
       prismaB,
@@ -178,6 +195,10 @@ storageDescribe('guest checkout Bước 2 trên PostgreSQL thật', () => {
       config,
       storeB,
       new GuestTokenService(prismaB, config),
+      new PrismaPaymentStore(prismaB),
+      new GuestRecoveryOutboxWriter(
+        new GuestRecoveryOutboxCrypto(config),
+      ),
     );
     sender = new CapturingOtpSender();
     sendOtp = new SendGuestOtpUseCase(storeA, sender);
@@ -187,6 +208,39 @@ storageDescribe('guest checkout Bước 2 trên PostgreSQL thật', () => {
     recovery = new GetGuestHoldRecoveryUseCase(
       prismaA,
       new PaymentOutcomeService(prismaA),
+    );
+    providerOrderCodes = [];
+    const providerGateway = {
+      isConfigured: () => true,
+      createLink: async (input: { orderCode: number }) => {
+        providerOrderCodes.push(input.orderCode);
+        return {
+          paymentLinkId: `link-step3-${input.orderCode}`,
+          checkoutUrl: `https://pay.example/step3/${input.orderCode}`,
+          qrCode: 'qr-step3',
+          accountNumber: '123',
+          accountName: 'Test',
+          bin: '970422',
+        };
+      },
+    };
+    const failingGateway = {
+      isConfigured: () => true,
+      createLink: async () => {
+        throw new Error('provider timeout');
+      },
+    };
+    createPayment = new CreatePaymentRequestUseCase(
+      new PrismaPaymentStore(prismaA),
+      providerGateway as never,
+      { isDemoAvailable: () => false } as never,
+      config,
+    );
+    failingCreatePayment = new CreatePaymentRequestUseCase(
+      new PrismaPaymentStore(prismaA),
+      failingGateway as never,
+      { isDemoAvailable: () => false } as never,
+      config,
     );
     reconcile = new GuestCheckoutReconcileService(storeA);
     fixtures = await depositFixtures(prismaA);
@@ -379,6 +433,163 @@ storageDescribe('guest checkout Bước 2 trên PostgreSQL thật', () => {
     expect(
       await prismaA.bookingAccessToken.count({
         where: { bookingId: first.bookingId, purpose: 'MANAGE_BOOKING' },
+      }),
+    ).toBe(1);
+    // Bước 3 — Phase 1: hold tạo đúng một PaymentRequest CREATING canonical.
+    const requests = await prismaA.paymentRequest.findMany({
+      where: { referenceId: first.bookingId },
+    });
+    expect(requests).toHaveLength(1);
+    expect(requests[0]).toMatchObject({
+      status: 'CREATING',
+      purpose: 'PREPAYMENT',
+      method: 'PAYOS_TRANSFER',
+      idempotencyKey: `pay_guest_${first.bookingId}`,
+    });
+    expect(Number(requests[0].amount)).toBe(first.prepaymentAmount);
+    expect(first.paymentRequestId).toBe(requests[0].id);
+    expect(second.paymentRequestId).toBe(requests[0].id);
+    expect(second.paymentStatus).toBe('CREATING');
+  });
+
+  it('Bước 3: recovery trả payment CREATING với canShowQr=false', async () => {
+    const { result } = await newHold(`recovery3-${randomUUID()}@example.test`);
+    const countBefore = await prismaA.paymentRequest.count({
+      where: { referenceId: result.bookingId },
+    });
+    const snapshot = await recovery.execute(result.bookingId);
+    // AC3.2-2: recovery chỉ đọc, không tạo request/không gọi provider.
+    expect(
+      await prismaA.paymentRequest.count({
+        where: { referenceId: result.bookingId },
+      }),
+    ).toBe(countBefore);
+    expect(snapshot.payment?.requestId).toBe(result.paymentRequestId);
+    expect(snapshot.payment?.status).toBe('CREATING');
+    expect(snapshot.payment?.vietQrPayload).toBeUndefined();
+    expect(snapshot.allowedActions.canCreatePayment).toBe(true);
+    expect(snapshot.allowedActions.canShowQr).toBe(false);
+    expect(snapshot.allowedActions.canPay).toBe(true);
+  });
+
+  it('Bước 3: POST create replay canonical key rồi fill PENDING một lần', async () => {
+    const { result } = await newHold(`create3-${randomUUID()}@example.test`);
+    const input = {
+      bookingId: result.bookingId,
+      purpose: 'PREPAYMENT' as const,
+      prepaymentPercent: 30 as const,
+      method: 'PAYOS_TRANSFER' as const,
+      idempotencyKey: `booking-checkout:${result.bookingId}`,
+    };
+    providerOrderCodes.length = 0;
+    const created = await createPayment.execute({ userId: null }, input);
+    expect(created.status).toBe('PENDING');
+    expect(created.vietQrPayload).toBe('qr-step3');
+    expect(
+      await prismaA.paymentRequest.count({
+        where: { referenceId: result.bookingId },
+      }),
+    ).toBe(1);
+
+    const replayed = await createPayment.execute({ userId: null }, input);
+    expect(replayed.id).toBe(created.id);
+    expect(replayed.status).toBe('PENDING');
+
+    // Retry/reconcile dùng lại đúng order code deterministic.
+    const orphan = await createPayment.recoverOrphanedIntent(created.id);
+    expect(orphan?.status).toBe('PENDING');
+    expect(providerOrderCodes).toHaveLength(1);
+
+    const payload = await prismaA.paymentRequest.findUniqueOrThrow({
+      where: { id: created.id },
+    });
+    expect(payload.providerOrderCode?.toString()).toBe(
+      String(providerOrderCodes[0]),
+    );
+  });
+
+  it('Bước 3: provider lỗi giữ CREATING, không suy FAILED và không tạo request mới', async () => {
+    const { result } = await newHold(`createfail3-${randomUUID()}@example.test`);
+    const input = {
+      bookingId: result.bookingId,
+      purpose: 'PREPAYMENT' as const,
+      prepaymentPercent: 30 as const,
+      method: 'PAYOS_TRANSFER' as const,
+      idempotencyKey: `booking-checkout:${result.bookingId}`,
+    };
+    const attempt = await failingCreatePayment.execute({ userId: null }, input);
+    expect(attempt.status).toBe('CREATING');
+    const rows = await prismaA.paymentRequest.findMany({
+      where: { referenceId: result.bookingId },
+    });
+    expect(rows).toHaveLength(1);
+    expect(rows[0].status).toBe('CREATING');
+    expect(rows[0].vietQrPayload).toBeNull();
+  });
+
+  it('Remediation P1-1: replay sau khi hold het han bi chan, khong goi provider', async () => {
+    const { result } = await newHold(`expired3-${randomUUID()}@example.test`);
+    // Quy chuan test expiry: doi ca created_at + hold_expires_at de giu
+    // bookings_hold_deadline_check (hold > created, hold <= starts_at).
+    // Dung raw SQL mot lenh de tranh race giua hai update rieng le.
+    await prismaA.$executeRaw`
+      UPDATE bookings
+      SET created_at = NOW() - INTERVAL '10 minutes',
+        hold_expires_at = NOW() - INTERVAL '1 minute'
+      WHERE id = ${result.bookingId}::uuid
+    `;
+    await prismaA.paymentRequest.updateMany({
+      where: { referenceId: result.bookingId },
+      data: { expiresAt: new Date(Date.now() - 60_000) },
+    });
+    // Expired request phai duoc phan anh trong snapshot tra ve: refresh
+    // paymentRequestId van tro dung row (khong tao moi khi bi chan).
+    const callsBefore = providerOrderCodes.length;
+    const input = {
+      bookingId: result.bookingId,
+      purpose: 'PREPAYMENT' as const,
+      prepaymentPercent: 30 as const,
+      method: 'PAYOS_TRANSFER' as const,
+      idempotencyKey: `booking-checkout:${result.bookingId}`,
+    };
+    await expectHttpError(
+      createPayment.execute({ userId: null }, input),
+      409,
+      'CHECKOUT_READ_ONLY',
+    );
+    expect(providerOrderCodes.length).toBe(callsBefore);
+    const rows = await prismaA.paymentRequest.findMany({
+      where: { referenceId: result.bookingId },
+    });
+    expect(rows).toHaveLength(1);
+    expect(rows[0].status).toBe('CREATING');
+  });
+
+  it('Remediation P2-1: FAILED chua co link duoc retry tren cung intent', async () => {
+    const { result } = await newHold(`failedretry3-${randomUUID()}@example.test`);
+    const row = await prismaA.paymentRequest.findFirstOrThrow({
+      where: { referenceId: result.bookingId },
+    });
+    await prismaA.paymentRequest.update({
+      where: { id: row.id },
+      data: { status: 'FAILED' },
+    });
+    const input = {
+      bookingId: result.bookingId,
+      purpose: 'PREPAYMENT' as const,
+      prepaymentPercent: 30 as const,
+      method: 'PAYOS_TRANSFER' as const,
+      idempotencyKey: `booking-checkout:${result.bookingId}`,
+    };
+    const callsBefore = providerOrderCodes.length;
+    const retried = await createPayment.execute({ userId: null }, input);
+    expect(retried.id).toBe(row.id);
+    expect(retried.status).toBe('PENDING');
+    expect(retried.vietQrPayload).toBe('qr-step3');
+    expect(providerOrderCodes.length).toBe(callsBefore + 1);
+    expect(
+      await prismaA.paymentRequest.count({
+        where: { referenceId: result.bookingId },
       }),
     ).toBe(1);
   });
@@ -619,7 +830,13 @@ storageDescribe('guest checkout Bước 2 trên PostgreSQL thật', () => {
     const { result } = await newHold(`recovery-${randomUUID()}@example.test`);
     const live = await recovery.execute(result.bookingId);
     expect(live.booking.status).toBe('HOLDING');
-    expect(live.payment).toBeNull();
+    // Bước 3 — Phase 1: hold đã có intent CREATING nhưng chưa có QR.
+    expect(live.payment).toMatchObject({
+      status: 'CREATING',
+      requestId: result.paymentRequestId,
+    });
+    expect(live.payment?.vietQrPayload).toBeUndefined();
+    expect(live.allowedActions.canCreatePayment).toBe(true);
     expect(live.allowedActions.canCancelHold).toBe(true);
     expect(live.allowedActions.canShowQr).toBe(false);
     expect(live.serverClock.remainingHoldSeconds).toBeGreaterThan(240);

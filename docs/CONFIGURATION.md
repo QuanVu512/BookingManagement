@@ -42,6 +42,7 @@ AUTH_MAIL_MAX_PER_HOUR=60
 PAYOS_CLIENT_ID=
 PAYOS_API_KEY=
 PAYOS_CHECKSUM_KEY=
+ENABLE_PAYMENT_SIMULATION=true
 SEED_ENABLED=false
 SEED_ALLOWED_HOST=localhost
 SEED_ALLOWED_DATABASE=pickleball
@@ -75,6 +76,7 @@ NEXT_PUBLIC_API_URL=http://localhost:4000
 NEXT_PUBLIC_SITE_ORIGIN=http://localhost:4001
 NEXT_PUBLIC_COURT_DETAILS_ENABLED=true
 NEXT_PUBLIC_AI_ASSISTANT_ENABLED=true
+NEXT_PUBLIC_PAYMENT_SIMULATION_ENABLED=true
 ```
 
 `NEXT_PUBLIC_*` đi vào bundle trình duyệt; không đặt JWT secret, URL DB, SMTP password hay provider key. Feature flag không thay quyền backend. Production build cần API origin HTTPS hợp lệ.
@@ -97,3 +99,5 @@ Redis host port `6380`; Mailpit SMTP/UI `1025`/`8025` nằm trong [Compose](../i
 Nest hỗ trợ env root cũ. `start:dev` đổi cwd sang `backend/`; `start:prod` từ root có thể có thứ tự khác. Prisma tự nạp `backend/.env` khi process chưa có `DATABASE_URL`, ngoại trừ seed. Next nạp env trong `frontend/`, config vẫn có fallback root. Biến process thường ưu tiên file; `dotenv run --override` là ngoại lệ.
 
 Sau chuyển cấu hình, kiểm tra env root để tránh giá trị cũ. Restart API/frontend sau đổi env; public variables cần build lại ở production. Không in env thật để chẩn đoán.
+
+Mẫu trên dành cho showcase: bật `ENABLE_PAYMENT_SIMULATION=true` ở backend và `NEXT_PUBLIC_PAYMENT_SIMULATION_ENABLED=true` ở frontend. Backend mặc định tắt nếu thiếu cờ. Dùng checksum key demo riêng để ký/xác minh HMAC; để `PAYOS_CLIENT_ID` và `PAYOS_API_KEY` rỗng để tạo link demo cục bộ, không gọi ngân hàng. Simulator chỉ chấp nhận link `DEMO_`, kiểm tra chủ đơn bằng JWT và CSRF hoặc guest manage token. `POST /api/webhooks/payos/simulate` nhận `{ requestId }` hoặc `{ orderCode }`; khách gửi thêm `bookingId` và header `X-Booking-Access-Token`. Sau thao tác, frontend đọc lại trạng thái máy chủ; cọc 30% không tự cấp quyền check-in khi chưa đủ điều kiện. Deployment thu tiền thật phải tắt cả hai cờ.

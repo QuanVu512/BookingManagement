@@ -19,8 +19,13 @@ import {
   HOLD_DURATION_MS,
 } from '../../bookings/booking.constants.js';
 import { isExclusionConflictError } from '../../bookings/domain/booking-errors.js';
-import { PAYMENT_TRANSACTION_OPTIONS } from '../payment.constants.js';
+import {
+  PAYMENT_LINK_TTL_MINUTES,
+  PAYMENT_TRANSACTION_OPTIONS,
+  guestPaymentIdempotencyKey,
+} from '../payment.constants.js';
 import { prepaymentAmountFor } from '../domain/money.js';
+import { PaymentStore } from '../ports/payment-store.js';
 import {
   GuestCheckoutPayloadError,
   createGuestHoldFingerprint,
@@ -42,6 +47,7 @@ import {
 import { GuestCheckoutStore } from '../ports/guest-checkout-store.js';
 import type { StoredGuestCheckoutIntent } from '../ports/guest-checkout-store.js';
 import { GuestTokenService } from '../infrastructure/guest-token.service.js';
+import { GuestRecoveryOutboxWriter } from './guest-recovery-outbox.writer.js';
 import { RedisService } from '../../../infrastructure/redis/redis.service.js';
 import { invalidateCourtDayCache } from '../../bookings/application/get-court-day-occupancies.use-case.js';
 
@@ -71,6 +77,8 @@ export interface GuestHoldResult {
   checkoutToken: string;
   checkoutTokenExpiresAt: string;
   checkoutIntentId: string;
+  paymentRequestId: string | null;
+  paymentStatus: string | null;
   serverNow: string;
 }
 
@@ -112,6 +120,8 @@ export class GuestCreateHoldUseCase {
     private readonly config: ConfigService,
     private readonly guestStore: GuestCheckoutStore,
     private readonly tokens: GuestTokenService,
+    private readonly payments: PaymentStore,
+    private readonly recoveryOutbox: GuestRecoveryOutboxWriter,
     @Optional() private readonly redis?: RedisService,
   ) {}
 
@@ -457,6 +467,38 @@ export class GuestCreateHoldUseCase {
       },
     });
 
+    // Contract F5 Phase 1 — ý định thu bền vững nằm trong CÙNG transaction hold.
+    // Provider I/O (Phase 2) chạy sau commit qua CreatePaymentRequestUseCase;
+    // crash ở đây không để lại booking thiếu intent hoặc intent mồ côi.
+    const paymentRequest = await this.payments.insertPaymentRequest(
+      transaction,
+      {
+        paymentCode: `PAY-${randomUUID().replaceAll('-', '').slice(0, 24).toUpperCase()}`,
+        referenceType: 'BOOKING',
+        referenceId: booking.id,
+        purpose: 'PREPAYMENT',
+        amount: required,
+        currency: 'VND',
+        method: 'PAYOS_TRANSFER',
+        provider: 'PAYOS',
+        providerChannelId: 'PAYOS',
+        providerOrderCode: null,
+        providerPaymentLinkId: null,
+        checkoutUrl: null,
+        vietQrPayload: null,
+        providerAccountName: null,
+        providerBin: null,
+        expiresAt: new Date(
+          Math.min(
+            holdExpiresAt.getTime(),
+            now.getTime() + PAYMENT_LINK_TTL_MINUTES * 60_000,
+          ),
+        ),
+        createdByUserId: null,
+        idempotencyKey: guestPaymentIdempotencyKey(booking.id),
+      },
+    );
+
     await this.guestStore.insertIntent(transaction, {
       checkoutIntentId: input.checkoutIntentId,
       bookingId: booking.id,
@@ -489,6 +531,17 @@ export class GuestCreateHoldUseCase {
       transaction,
     });
 
+    // Task 5.1: ghi thư mời phục hồi trong cùng transaction giữ chỗ. Replay
+    // không đi qua đây (đã return ở replayIntent) nên không ghi trùng; thiếu
+    // khóa mã hóa thì writer bỏ qua + cảnh báo, đặt sân vẫn thành công (Q3).
+    await this.recoveryOutbox.writeInTransaction(transaction, {
+      bookingId: booking.id,
+      email: normalized.email,
+      token: checkout.rawToken,
+      eventType: 'guest.recovery.invite',
+      expiresAt: holdExpiresAt,
+    });
+
     return this.present(
       booking,
       rawToken,
@@ -496,6 +549,7 @@ export class GuestCreateHoldUseCase {
       checkout,
       now,
       input.checkoutIntentId,
+      { id: paymentRequest.id, status: paymentRequest.status },
     );
   }
 
@@ -538,6 +592,25 @@ export class GuestCreateHoldUseCase {
       holdIssuedAt: booking.createdAt,
       transaction,
     });
+    const payment = transaction
+      ? await transaction.paymentRequest.findFirst({
+          where: {
+            referenceType: 'BOOKING',
+            referenceId: booking.id,
+            purpose: 'PREPAYMENT',
+          },
+          orderBy: { createdAt: 'desc' },
+          select: { id: true, status: true },
+        })
+      : await this.prisma.paymentRequest.findFirst({
+          where: {
+            referenceType: 'BOOKING',
+            referenceId: booking.id,
+            purpose: 'PREPAYMENT',
+          },
+          orderBy: { createdAt: 'desc' },
+          select: { id: true, status: true },
+        });
     return this.present(
       booking,
       null,
@@ -545,6 +618,7 @@ export class GuestCreateHoldUseCase {
       checkout,
       now,
       intent.checkoutIntentId,
+      payment ? { id: payment.id, status: String(payment.status) } : null,
     );
   }
 
@@ -555,6 +629,7 @@ export class GuestCreateHoldUseCase {
     checkout: { rawToken: string; expiresAt: Date },
     now: Date,
     checkoutIntentId: string,
+    payment: { id: string; status: string } | null,
   ): GuestHoldResult {
     const totalAmount = Number(booking.totalAmount.toString());
     const prepaymentAmount =
@@ -574,6 +649,8 @@ export class GuestCreateHoldUseCase {
       checkoutToken: checkout.rawToken,
       checkoutTokenExpiresAt: checkout.expiresAt.toISOString(),
       checkoutIntentId,
+      paymentRequestId: payment?.id ?? null,
+      paymentStatus: payment?.status ?? null,
       serverNow: now.toISOString(),
     };
   }

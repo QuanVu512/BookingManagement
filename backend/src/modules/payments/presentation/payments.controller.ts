@@ -378,7 +378,39 @@ export class RefundsController {
 @Controller('api/guest/payments')
 @UseGuards(GuestTokenGuard)
 export class GuestPaymentsController {
-  constructor(private readonly outcomes: PaymentOutcomeService) {}
+  constructor(
+    private readonly outcomes: PaymentOutcomeService,
+    private readonly createRequest: CreatePaymentRequestUseCase,
+    private readonly receipts: VerifyReceiptUseCase,
+  ) {}
+
+  @Get('requests/:id')
+  @Header('Cache-Control', 'no-store, private')
+  @ApiOperation({ summary: 'Chi tiết yêu cầu thu cho khách vãng lai' })
+  async requestById(
+    @Req() request: Request,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    const reqRecord = await this.receipts.readRequest(id);
+    if (!reqRecord) return { success: false, error: { code: 'PAYMENT_NOT_FOUND' } };
+    const owned = await this.outcomes.ownsBooking(reqRecord.referenceId, this.subject(request));
+    if (!owned) return { success: false, error: { code: 'PAYMENT_NOT_FOUND' } };
+    return { success: true, data: presentRequest(reqRecord) };
+  }
+
+  @Post('requests')
+  @Header('Cache-Control', 'no-store, private')
+  @ApiOperation({ summary: 'E3: tạo yêu cầu thanh toán cho khách vãng lai' })
+  async create(
+    @Req() request: Request,
+    @Body() input: CreatePaymentRequestDto,
+  ) {
+    const created = await this.createRequest.execute(
+      { userId: null },
+      input as CreatePaymentRequestInput,
+    );
+    return { success: true, data: presentRequest(created) };
+  }
 
   private subject(request: Request): {
     userId: string | null;

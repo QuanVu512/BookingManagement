@@ -19,13 +19,16 @@ import { StaffBalanceUseCase } from './application/staff-balance.use-case.js';
 import { StaffAllocateUseCase } from './application/staff-allocate.use-case.js';
 import { StaffRefundsUseCase } from './application/staff-refunds.use-case.js';
 import { StaffReconcileUseCase } from './application/staff-reconcile.use-case.js';
+import { SimulateDemoPaymentUseCase } from './application/simulate-demo-payment.use-case.js';
 import {
   PAYMENTS_QUEUE,
   PaymentsJobScheduler,
   PaymentsWorker,
 } from './application/payments-workers.js';
 import { PayosSignatureService } from './infrastructure/payos-signature.service.js';
+import { PayosDemoSigner } from './infrastructure/payos-demo-signer.js';
 import { PayosGatewayAdapter } from './infrastructure/payos-gateway.adapter.js';
+import { PayosDemoGatewayAdapter } from './infrastructure/payos-demo-gateway.adapter.js';
 import { PayosWebhookInbox } from './infrastructure/payos-webhook-inbox.js';
 import { GuestTokenService } from './infrastructure/guest-token.service.js';
 import { GuestTokenGuard } from './infrastructure/guest-token.guard.js';
@@ -34,6 +37,11 @@ import { PrismaGuestCheckoutStore } from './infrastructure/prisma-guest-checkout
 import { AuthGuestOtpSender } from './infrastructure/auth-guest-otp-sender.js';
 import { GuestCheckoutStore } from './ports/guest-checkout-store.js';
 import { GuestOtpSender } from './ports/guest-otp-sender.js';
+import { GuestRecoveryOutboxCrypto } from './infrastructure/guest-recovery-outbox-crypto.js';
+import { GuestRecoveryMailService } from './infrastructure/guest-recovery-mail.service.js';
+import { GuestRecoveryOutboxWriter } from './application/guest-recovery-outbox.writer.js';
+import { GuestRecoveryMailWorker } from './application/guest-recovery-mail.worker.js';
+import { RequestGuestRecoveryLinkUseCase } from './application/request-guest-recovery-link.use-case.js';
 import { PaymentAuditLogger } from './infrastructure/payment-audit-logger.js';
 import { RefundDestinationCrypto } from './infrastructure/refund-destination-crypto.js';
 import { PrismaPaymentStore } from './infrastructure/prisma-payment-store.js';
@@ -48,6 +56,12 @@ import {
 } from './presentation/payments.controller.js';
 import { StaffRefundsController } from './presentation/staff-refunds.controller.js';
 import { PayosWebhookController } from './presentation/payos-webhook.controller.js';
+import { PayosSimulationController } from './presentation/payos-simulation.controller.js';
+import { DemoPaymentAccessGuard } from './infrastructure/demo-payment-access.guard.js';
+import {
+  GuestDemoPaymentsController,
+  MemberDemoPaymentsController,
+} from './presentation/demo-payment.controller.js';
 import {
   GuestBookingsController,
   StaffGuestTokenController,
@@ -75,11 +89,16 @@ import {
     StaffRefundsController,
     StaffLookupController,
     PayosWebhookController,
+    PayosSimulationController,
+    MemberDemoPaymentsController,
+    GuestDemoPaymentsController,
     GuestBookingsController,
     StaffGuestTokenController,
   ],
   providers: [
     CreatePaymentRequestUseCase,
+    SimulateDemoPaymentUseCase,
+    DemoPaymentAccessGuard,
     VerifyReceiptUseCase,
     RefundOrchestration,
     BookingConfirmationCoordinator,
@@ -89,6 +108,9 @@ import {
     ResumeGuestIntentUseCase,
     CancelGuestHoldUseCase,
     GetGuestHoldRecoveryUseCase,
+    RequestGuestRecoveryLinkUseCase,
+    GuestRecoveryOutboxWriter,
+    GuestRecoveryMailWorker,
     GuestCheckoutReconcileService,
     PaymentOutcomeService,
     StaffBalanceUseCase,
@@ -96,13 +118,17 @@ import {
     StaffRefundsUseCase,
     StaffReconcileUseCase,
     PayosSignatureService,
+    PayosDemoSigner,
     PayosGatewayAdapter,
+    PayosDemoGatewayAdapter,
     PayosWebhookInbox,
     GuestTokenService,
     GuestTokenGuard,
     GuestCheckoutTokenGuard,
-    PaymentAuditLogger,
     RefundDestinationCrypto,
+    GuestRecoveryOutboxCrypto,
+    GuestRecoveryMailService,
+    PaymentAuditLogger,
     PaymentsJobScheduler,
     PaymentsWorker,
     { provide: PaymentStore, useClass: PrismaPaymentStore },

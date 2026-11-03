@@ -5,6 +5,7 @@ import {
   Get,
   Header,
   HttpCode,
+  Ip,
   Param,
   ParseUUIDPipe,
   Post,
@@ -12,7 +13,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiOperation } from '@nestjs/swagger';
-import { Throttle } from '@nestjs/throttler';
+import { SkipThrottle, Throttle } from '@nestjs/throttler';
 import type { Request } from 'express';
 import {
   IsEmail,
@@ -33,11 +34,14 @@ import {
   GuestCreateHoldUseCase,
   type GuestCreateHoldInput,
 } from '../application/guest-create-hold.use-case.js';
+import { CreatePaymentRequestUseCase } from '../application/create-payment-request.use-case.js';
+import { guestPaymentIdempotencyKey } from '../payment.constants.js';
 import { SendGuestOtpUseCase } from '../application/send-guest-otp.use-case.js';
 import { VerifyGuestOtpUseCase } from '../application/verify-guest-otp.use-case.js';
 import { ResumeGuestIntentUseCase } from '../application/resume-guest-intent.use-case.js';
 import { CancelGuestHoldUseCase } from '../application/cancel-guest-hold.use-case.js';
 import { GetGuestHoldRecoveryUseCase } from '../application/get-guest-hold-recovery.use-case.js';
+import { RequestGuestRecoveryLinkUseCase } from '../application/request-guest-recovery-link.use-case.js';
 import { GuestCheckoutTokenGuard } from '../infrastructure/guest-checkout-token.guard.js';
 import { GuestTokenService } from '../infrastructure/guest-token.service.js';
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service.js';
@@ -98,6 +102,45 @@ export class ResumeGuestIntentDto {
   recoverySecret!: string;
 }
 
+export class GuestLookupContactDto {
+  @IsString()
+  @Length(3, 150)
+  contact!: string;
+}
+
+export class CreateGuestPrepaymentRequestDto {
+  @IsOptional()
+  @IsInt()
+  @IsIn([30])
+  prepaymentPercent?: 30;
+
+  @IsOptional()
+  @IsIn(['PAYOS_TRANSFER'])
+  method?: 'PAYOS_TRANSFER';
+}
+
+import type { StoredPaymentRequest } from '../ports/payment-store.js';
+
+function presentGuestPaymentRequest(request: StoredPaymentRequest) {
+  return {
+    id: request.id,
+    paymentCode: request.paymentCode,
+    purpose: request.purpose,
+    amount: Number(request.amount),
+    currency: request.currency,
+    method: request.method,
+    providerOrderCode: request.providerOrderCode,
+    checkoutUrl: request.checkoutUrl,
+    vietQrPayload: request.vietQrPayload,
+    status: request.status,
+    expiresAt: request.expiresAt ? request.expiresAt.toISOString() : null,
+    // Review-required hợp nhất ở tầng outcome (BE-PAY-06/MIG-14); slice tạo
+    // mới trả mặc định false như luồng member.
+    reviewRequired: false,
+    reviewReasonCode: null,
+  };
+}
+
 /**
  * E3 — Guest booking entry (MIG-11).
  * Public + rate limit 10/IP/5 phút. Có session/JWT → 422 GUEST_JWT_REJECTED
@@ -114,6 +157,8 @@ export class GuestBookingsController {
     private readonly resumeGuestIntent: ResumeGuestIntentUseCase,
     private readonly cancelGuestHold: CancelGuestHoldUseCase,
     private readonly getRecovery: GetGuestHoldRecoveryUseCase,
+    private readonly requestRecoveryLink: RequestGuestRecoveryLinkUseCase,
+    private readonly createPaymentRequest: CreatePaymentRequestUseCase,
   ) {}
 
   @Post('send-otp')
@@ -157,6 +202,22 @@ export class GuestBookingsController {
     return { success: true, data: result };
   }
 
+  /**
+   * Task 5.3 — tra cứu đơn giữ chỗ cho khách vãng lai (AC-22 chống dò).
+   * Luôn trả 202 cùng nội dung, có/không có đơn hay vượt giới hạn. Bỏ qua guard
+   * toàn cục ở route này (S5-06) để không bao giờ trả 429: quota 3 lượt/15 phút
+   * IP và 3 thư/15 phút email nằm trong use-case và vẫn trả 202 generic.
+   */
+  @Post('lookup')
+  @HttpCode(202)
+  @SkipThrottle()
+  @Header('Cache-Control', 'no-store, private')
+  @ApiOperation({ summary: 'Task 5.3: gửi liên kết khôi phục tới email chủ đơn' })
+  async lookup(@Body() body: GuestLookupContactDto, @Ip() ip: string) {
+    const result = await this.requestRecoveryLink.execute(body.contact, ip);
+    return { success: true, message: result.message };
+  }
+
   @Post(':bookingId/cancel-hold')
   @HttpCode(200)
   @UseGuards(GuestCheckoutTokenGuard)
@@ -176,6 +237,36 @@ export class GuestBookingsController {
   async recovery(@Param('bookingId', ParseUUIDPipe) bookingId: string) {
     const result = await this.getRecovery.execute(bookingId);
     return { success: true, data: result };
+  }
+
+  /**
+   * S5-01 — tạo yêu cầu thanh toán đặt cọc bằng CheckoutRecoveryToken.
+   * Guard đã ràng token đúng booking trên path. Chỉ cho PREPAYMENT trong cửa
+   * sổ giữ chỗ còn hạn (use-case tự từ chối terminal/hết hạn, F2); khóa
+   * idempotency chuẩn `pay_guest_{bookingId}` để replay cùng intent, không
+   * sinh yêu cầu trùng. Không mở quyền refund/manage.
+   */
+  @Post(':bookingId/payment-requests')
+  @HttpCode(201)
+  @UseGuards(GuestCheckoutTokenGuard)
+  @Throttle({ default: { limit: 10, ttl: 300_000 } })
+  @Header('Cache-Control', 'no-store, private')
+  @ApiOperation({ summary: 'S5-01: tạo yêu cầu thu PREPAYMENT bằng checkout token' })
+  async createGuestPrepaymentRequest(
+    @Param('bookingId', ParseUUIDPipe) bookingId: string,
+    @Body() input: CreateGuestPrepaymentRequestDto,
+  ) {
+    const created = await this.createPaymentRequest.execute(
+      { userId: null },
+      {
+        bookingId,
+        purpose: 'PREPAYMENT',
+        prepaymentPercent: input.prepaymentPercent ?? 30,
+        method: input.method ?? 'PAYOS_TRANSFER',
+        idempotencyKey: guestPaymentIdempotencyKey(bookingId),
+      },
+    );
+    return { success: true, data: presentGuestPaymentRequest(created) };
   }
 
   @Post()

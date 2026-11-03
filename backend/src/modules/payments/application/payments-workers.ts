@@ -8,6 +8,8 @@ import { VerifyReceiptUseCase } from './verify-receipt.use-case.js';
 import { GuestCheckoutReconcileService } from './guest-checkout-reconcile.service.js';
 import { PayosWebhookInbox } from '../infrastructure/payos-webhook-inbox.js';
 import { PayosGatewayAdapter } from '../infrastructure/payos-gateway.adapter.js';
+import { isDemoLinkId } from '../infrastructure/payos-demo-gateway.adapter.js';
+import { GuestRecoveryMailWorker } from './guest-recovery-mail.worker.js';
 
 export const PAYMENTS_QUEUE = 'payments';
 
@@ -37,6 +39,7 @@ export class PaymentsJobScheduler implements OnModuleInit {
       { id: 'cancel-retry', every: 900_000 },
       { id: 'outbox-dispatch', every: 30_000 },
       { id: 'guest-checkout-reconcile', every: 60_000 },
+      { id: 'guest-recovery-mail', every: 15_000 },
     ];
     for (const schedule of schedules) {
       await this.queue.upsertJobScheduler(
@@ -64,12 +67,15 @@ export class PaymentsWorker extends WorkerHost {
     private readonly gateway: PayosGatewayAdapter,
     private readonly paymentRequests: CreatePaymentRequestUseCase,
     private readonly guestCheckoutReconcile: GuestCheckoutReconcileService,
+    private readonly guestRecoveryMail: GuestRecoveryMailWorker,
   ) {
     super();
   }
 
   async process(job: Job): Promise<unknown> {
     switch (job.name) {
+      case 'guest-recovery-mail':
+        return this.guestRecoveryMail.runOnce();
       case 'expiry-sweep':
         return this.expirySweep();
       case 'webhook-retry':
@@ -284,6 +290,8 @@ export class PaymentsWorker extends WorkerHost {
     });
     let checked = 0;
     for (const row of live) {
+      // BE-PAY-DEMO: intent demo không bao giờ query provider thật.
+      if (isDemoLinkId(row.providerPaymentLinkId)) continue;
       try {
         const link = await this.gateway.getLink(
           row.providerPaymentLinkId as string,
@@ -341,6 +349,8 @@ export class PaymentsWorker extends WorkerHost {
     });
     let cancelled = 0;
     for (const row of stale) {
+      // BE-PAY-DEMO: intent demo không có link provider thật để hủy.
+      if (isDemoLinkId(row.providerPaymentLinkId)) continue;
       const ok = await this.gateway.cancelLink(
         row.providerPaymentLinkId as string,
         `Booking terminal (${row.paymentCode})`,

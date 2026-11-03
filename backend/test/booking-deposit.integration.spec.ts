@@ -9,7 +9,10 @@ import { PrismaBookingStore } from '../src/modules/bookings/infrastructure/prism
 import { PrismaCourtScheduleReader } from '../src/modules/courts/infrastructure/prisma-court-schedule-reader.js';
 import { GuestCreateHoldUseCase } from '../src/modules/payments/application/guest-create-hold.use-case.js';
 import { PrismaGuestCheckoutStore } from '../src/modules/payments/infrastructure/prisma-guest-checkout-store.js';
+import { PrismaPaymentStore } from '../src/modules/payments/infrastructure/prisma-payment-store.js';
 import { GuestTokenService } from '../src/modules/payments/infrastructure/guest-token.service.js';
+import { GuestRecoveryOutboxCrypto } from '../src/modules/payments/infrastructure/guest-recovery-outbox-crypto.js';
+import { GuestRecoveryOutboxWriter } from '../src/modules/payments/application/guest-recovery-outbox.writer.js';
 import {
   applyDepositMigration,
   applyHistoricalMigrations,
@@ -96,6 +99,10 @@ storageDescribe('Guest deposit migration on real isolated PostgreSQL', () => {
       config,
       new PrismaGuestCheckoutStore(prisma),
       new GuestTokenService(prisma, config),
+      new PrismaPaymentStore(prisma),
+      new GuestRecoveryOutboxWriter(
+        new GuestRecoveryOutboxCrypto(config),
+      ),
     );
     legacyIds = [];
     for (const userId of [fixtures.userId, null]) {

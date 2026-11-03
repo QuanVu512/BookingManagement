@@ -84,6 +84,15 @@ export class ResumeGuestIntentUseCase {
       throw error;
     }
     const now = await this.guestStore.databaseNow();
+    const payment = await this.prisma.paymentRequest.findFirst({
+      where: {
+        referenceType: 'BOOKING',
+        referenceId: booking.id,
+        purpose: 'PREPAYMENT',
+      },
+      orderBy: { createdAt: 'desc' },
+      select: { id: true, status: true },
+    });
 
     return {
       bookingId: booking.id,
@@ -96,6 +105,8 @@ export class ResumeGuestIntentUseCase {
       checkoutToken: checkout.rawToken,
       checkoutTokenExpiresAt: checkout.expiresAt.toISOString(),
       checkoutIntentId: intent.checkoutIntentId,
+      paymentRequestId: payment?.id ?? null,
+      paymentStatus: payment ? String(payment.status) : null,
       serverNow: now.toISOString(),
     };
   }

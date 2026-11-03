@@ -13,10 +13,12 @@ import {
   ALLOWED_PREPAYMENT_PERCENTS,
   PAYMENTS_CREATION_ENABLED,
   PAYMENT_LINK_TTL_MINUTES,
+  guestPaymentIdempotencyKey,
   isAllowedPrepaymentPercent,
 } from '../payment.constants.js';
 import { prepaymentAmountFor } from '../domain/money.js';
 import { PayosGatewayAdapter } from '../infrastructure/payos-gateway.adapter.js';
+import { PayosDemoGatewayAdapter } from '../infrastructure/payos-demo-gateway.adapter.js';
 import {
   PaymentStore,
   type StoredPaymentRequest,
@@ -46,6 +48,7 @@ export class CreatePaymentRequestUseCase {
   constructor(
     private readonly payments: PaymentStore,
     private readonly gateway: PayosGatewayAdapter,
+    private readonly demoGateway: PayosDemoGatewayAdapter,
     private readonly config: ConfigService,
   ) {}
 
@@ -85,7 +88,8 @@ export class CreatePaymentRequestUseCase {
 
   /**
    * C07 — Phục hồi intent CREATING mồ côi (reconciler/worker gọi).
-   * Đọc lại row; chỉ fill link khi row VẪN CREATING + PAYOS + chưa có link.
+   * Đọc lại row; chỉ fill link khi row VẪN CREATING + PAYOS + chưa có link
+   * VÀ cửa sổ hold còn mở (F2 — kể cả intent legacy key cũ, RR-P1-1).
    * Mọi nhánh còn lại trả nguyên trạng — không bao giờ suy FAILED ở đây.
    */
   async recoverOrphanedIntent(
@@ -102,17 +106,35 @@ export class CreatePaymentRequestUseCase {
     ) {
       return current;
     }
+    if (await this.isIntentWindowClosed(current)) {
+      this.logger.warn(
+        'Intent window closed; reconciler keeps CREATING without provider call.',
+      );
+      return current;
+    }
     return this.attachProviderLink(current);
   }
 
   private async attachProviderLink(
     created: StoredPaymentRequest,
   ): Promise<StoredPaymentRequest> {
+    if (
+      created.method === 'PAYOS_TRANSFER' &&
+      this.demoGateway.isDemoAvailable()
+    ) {
+      return this.attachDemoLink(created);
+    }
     if (!this.gateway.isConfigured()) {
       this.logger.warn('payOS not configured; request stays CREATING.');
       return created;
     }
-    const orderCode = this.newOrderCode();
+    // Không gọi provider khi chính request đã quá hạn (replay dữ liệu cũ):
+    // tránh mời khách thanh toán cho cửa sổ đã đóng.
+    if (await this.isIntentWindowClosed(created)) {
+      this.logger.warn('Intent window closed; provider not called.');
+      return created;
+    }
+    const orderCode = this.orderCodeForIntent(created);
     const webOrigin =
       this.config.get<string>('WEB_ORIGIN') ?? 'http://localhost:4001';
     let link: {
@@ -141,44 +163,143 @@ export class CreatePaymentRequestUseCase {
       );
       return created;
     }
-    // Conditional update fill-once: chỉ khi row còn CREATING (MIG-09 —
-    // không downgrade khi status đã vượt).
-    const updated = await this.payments.withTransaction(
-      async (transaction, store) => {
-        void store;
-        const row = await transaction.paymentRequest.updateMany({
-          where: { id: created.id, status: 'CREATING' },
-          data: {
-            status: 'PENDING',
-            providerOrderCode: BigInt(orderCode),
-            providerPaymentLinkId: link.paymentLinkId,
-            checkoutUrl: link.checkoutUrl,
-            vietQrPayload: link.qrCode || null,
-            providerAccountName: link.accountName || null,
-            providerBin: link.bin || null,
-          },
-        });
-        if (!row.count) return null;
-        return transaction.paymentRequest.findUnique({
-          where: { id: created.id },
-        });
-      },
-    );
-    if (!updated) return created;
-    return {
-      ...created,
-      status: 'PENDING',
-      providerOrderCode: String(orderCode),
+    return this.fillIntentWithLink(created, {
+      providerOrderCode: BigInt(orderCode),
       providerPaymentLinkId: link.paymentLinkId,
       checkoutUrl: link.checkoutUrl,
       vietQrPayload: link.qrCode || null,
-    };
+      providerAccountName: link.accountName || null,
+      providerBin: link.bin || null,
+    });
   }
 
-  private newOrderCode(): number {
-    return (
-      (Date.now() % 1_000_000) * 1000 + Math.floor(Math.random() * 1000)
-    );
+  /**
+   * Phase 3 — chỉ fill-once khi row còn CREATING **và** cửa sổ hold còn mở
+   * (guest PREPAYMENT). Luôn trả row đọc lại trong cùng transaction nên thua
+   * race (cancel/sweep) sẽ trả trạng thái hiện hành, không phải snapshot cũ.
+   */
+  private async fillIntentWithLink(
+    created: StoredPaymentRequest,
+    data: {
+      providerOrderCode: bigint;
+      providerPaymentLinkId: string;
+      checkoutUrl: string;
+      vietQrPayload: string | null;
+      providerAccountName: string | null;
+      providerBin: string | null;
+    },
+  ): Promise<StoredPaymentRequest> {
+    return this.payments.withTransaction(async (transaction, store) => {
+      if (await this.isIntentWindowClosed(created, transaction, store)) {
+        this.logger.warn(
+          'Hold closed after provider I/O; link not persisted for CREATING intent.',
+        );
+        return (
+          (await store.readPaymentRequest(transaction, created.id)) ?? created
+        );
+      }
+      const updated = await transaction.paymentRequest.updateMany({
+        where: { id: created.id, status: 'CREATING' },
+        data: { status: 'PENDING', ...data },
+      });
+      // Thua race (cancel/sweep/worker): trả trạng thái hiện hành, không trả
+      // snapshot CREATING cũ (F5).
+      if (!updated.count) {
+        return (
+          (await store.readPaymentRequest(transaction, created.id)) ?? created
+        );
+      }
+      return {
+        ...created,
+        status: 'PENDING',
+        providerOrderCode: data.providerOrderCode.toString(),
+        providerPaymentLinkId: data.providerPaymentLinkId,
+        checkoutUrl: data.checkoutUrl,
+        vietQrPayload: data.vietQrPayload,
+      };
+    });
+  }
+
+  /**
+   * Cửa sổ thu đã đóng? Chỉ áp cho guest PREPAYMENT — nhận diện bằng booking
+   * owner facts (userId null) + purpose, KHÔNG bằng format key, để intent
+   * legacy dùng key cũ (AC3.1-5) tuân cùng F2 với canonical. Đơn thành
+   * viên/BALANCE không có hold nên không guard. Dùng DB clock.
+   */
+  private async isIntentWindowClosed(
+    request: StoredPaymentRequest,
+    existingTransaction?: TransactionContext,
+    existingStore?: PaymentStore,
+  ): Promise<boolean> {
+    if (request.purpose !== 'PREPAYMENT') return false;
+    const peek = async (
+      transaction: TransactionContext,
+      store: PaymentStore,
+    ): Promise<boolean> => {
+      const money = await store.readBookingMoney(
+        transaction,
+        request.referenceId,
+      );
+      if (!money) return true;
+      if ((money.userId ?? null) !== null) return false;
+      const now = await store.databaseNow(transaction);
+      if (
+        request.expiresAt !== null &&
+        now.getTime() >= request.expiresAt.getTime()
+      )
+        return true;
+      if (money.status === 'CANCELLED' || money.status === 'EXPIRED')
+        return true;
+      return Boolean(
+        money.holdExpiresAt && now.getTime() >= money.holdExpiresAt.getTime(),
+      );
+    };
+    if (existingTransaction && existingStore) {
+      return peek(existingTransaction, existingStore);
+    }
+    return this.payments.withTransaction(peek);
+  }
+
+  /**
+   * Link demo cục bộ được ưu tiên khi cờ showcase bật, kể cả có credential.
+   * Không gọi mạng payOS, không QR ngân hàng thật; conditional update
+   * fill-once như nhánh provider để giữ invariant CREATING→PENDING.
+   */
+  private async attachDemoLink(
+    created: StoredPaymentRequest,
+  ): Promise<StoredPaymentRequest> {
+    if (await this.isIntentWindowClosed(created)) {
+      this.logger.warn('Intent window closed; demo link not created.');
+      return created;
+    }
+    const link = await this.demoGateway.createDemoLink({
+      paymentCode: created.paymentCode,
+      amount: created.amount,
+    });
+    return this.fillIntentWithLink(created, {
+      providerOrderCode: BigInt(link.orderCode),
+      providerPaymentLinkId: link.paymentLinkId,
+      checkoutUrl: link.checkoutUrl,
+      vietQrPayload: link.qrCode || null,
+      providerAccountName: link.accountName || null,
+      providerBin: link.bin || null,
+    });
+  }
+
+  /**
+   * Order code ổn định theo ý định thu (booking + purpose). Retry/reconcile
+   * dùng lại đúng code để provider không nhận hai lệnh cho cùng intent.
+   * Không tuyên bố provider dedup (OPEN-1 vẫn mở).
+   */
+  private orderCodeForIntent(request: StoredPaymentRequest): number {
+    if (request.providerOrderCode) {
+      const existing = Number(request.providerOrderCode);
+      if (Number.isSafeInteger(existing)) return existing;
+    }
+    const digest = createHash('sha256')
+      .update(`payos-order:${request.referenceId}:${request.purpose}`)
+      .digest();
+    return Number(digest.readBigUInt64BE(0) % 9_000_000_000_000_000n);
   }
 
   private validateInput(input: CreatePaymentRequestInput): void {
@@ -242,9 +363,72 @@ export class CreatePaymentRequestUseCase {
       transaction,
       this.bindKey(subject, input),
     );
+
+    // F2 — mutation cửa sổ hold do server quyết định: hết hạn/terminal thì
+    // không replay thành công, không gọi provider, kể cả khi sweep chưa chạy.
+    const guestPrepayment =
+      subject.userId === null && input.purpose === 'PREPAYMENT';
+    if (guestPrepayment) {
+      if (money.status === 'CANCELLED' || money.status === 'EXPIRED') {
+        throw new GoneException({
+          code: 'BOOKING_TERMINAL',
+          message: 'Booking đã kết thúc, không tạo yêu cầu thu mới.',
+        });
+      }
+      if (
+        money.holdExpiresAt !== null &&
+        now.getTime() >= money.holdExpiresAt.getTime()
+      ) {
+        throw new ConflictException({
+          code: 'CHECKOUT_READ_ONLY',
+          message:
+            'Đã hết thời gian giữ chỗ; đơn chỉ còn tra cứu, không thể tạo thanh toán.',
+        });
+      }
+    }
+
+    const { summarizeBookingMoney } = await import('../domain/money.js');
+    const summary = summarizeBookingMoney({
+      totalAmount: money.totalAmount,
+      allocatedReceiptAmounts: money.allocatedReceiptAmounts,
+      completedRefundAmounts: money.completedRefundAmounts,
+    });
+    const amount =
+      input.purpose === 'PREPAYMENT'
+        ? Math.min(
+            prepaymentAmountFor(money.totalAmount, percent),
+            summary.balanceDue,
+          )
+        : summary.balanceDue;
     if (replay) {
-      this.assertSameIntent(replay, input);
+      this.assertSameIntent(replay, input, amount);
+      // P2-1: FAILED chưa từng có link provider là retry an toàn trên cùng
+      // intent (deadline/tiền đã kiểm). FAILED đã có link ⇒ không retry mù vì
+      // trạng thái phía provider chưa chắc chắn; trả nguyên row cho reconcile.
+      if (
+        replay.status === 'FAILED' &&
+        replay.providerPaymentLinkId === null &&
+        replay.method === 'PAYOS_TRANSFER'
+      ) {
+        return (
+          (await store.retryFailedRequest(transaction, replay.id)) ?? replay
+        );
+      }
       return replay;
+    }
+
+    // Dữ liệu trước Bước 3 có thể đã tạo request cho booking này bằng khóa
+    // khác. Tái sử dụng request còn sống thay vì sinh lệnh thứ hai.
+    if (subject.userId === null && input.purpose === 'PREPAYMENT') {
+      const open = await store.findOpenRequestForBooking(
+        transaction,
+        input.bookingId,
+        input.purpose,
+      );
+      if (open) {
+        this.assertSameIntent(open, input, amount);
+        return open;
+      }
     }
 
     if (!PAYMENTS_CREATION_ENABLED) {
@@ -254,29 +438,20 @@ export class CreatePaymentRequestUseCase {
     }
 
     if (money.status === 'CANCELLED' || money.status === 'EXPIRED') {
-      throw new GoneException('Booking đã kết thúc, không tạo yêu cầu thu mới.');
+      throw new GoneException(
+        'Booking đã kết thúc, không tạo yêu cầu thu mới.',
+      );
     }
 
-    const { summarizeBookingMoney } = await import('../domain/money.js');
-    const summary = summarizeBookingMoney({
-      totalAmount: money.totalAmount,
-      allocatedReceiptAmounts: money.allocatedReceiptAmounts,
-      completedRefundAmounts: money.completedRefundAmounts,
-    });
     if (summary.balanceDue <= 0) {
-      throw new ConflictException('Booking đã đủ tiền, không tạo yêu cầu thu mới.');
+      throw new ConflictException(
+        'Booking đã đủ tiền, không tạo yêu cầu thu mới.',
+      );
     }
 
     // Số tiền request: PREPAYMENT theo % đã chốt trên snapshot; BALANCE
     // theo dư nợ thực (MIG-02). Không dùng hold deadline chặn BALANCE
     // của booking CONFIRMED.
-    const amount =
-      input.purpose === 'PREPAYMENT'
-        ? Math.min(
-            prepaymentAmountFor(money.totalAmount, percent),
-            summary.balanceDue,
-          )
-        : summary.balanceDue;
 
     const expiresAt =
       input.method === 'PAYOS_TRANSFER'
@@ -309,6 +484,11 @@ export class CreatePaymentRequestUseCase {
     subject: { userId: string | null },
     input: CreatePaymentRequestInput,
   ): string {
+    // Contract F5: guest PREPAYMENT dùng đúng một khóa canonical để hold và
+    // lần gọi create sau đó replay cùng một PaymentRequest.
+    if (subject.userId === null && input.purpose === 'PREPAYMENT') {
+      return guestPaymentIdempotencyKey(input.bookingId);
+    }
     // BLK-02: VARCHAR(100) — hash SHA-256 cố định 64 ký tự thay nối chuỗi dài.
     const raw = [
       subject.userId ?? 'guest',
@@ -324,13 +504,18 @@ export class CreatePaymentRequestUseCase {
   private assertSameIntent(
     replay: StoredPaymentRequest,
     input: CreatePaymentRequestInput,
+    expectedAmount?: number,
   ): void {
     const percent = input.prepaymentPercent ?? 30;
     if (
       replay.referenceId !== input.bookingId ||
       replay.purpose !== input.purpose ||
       replay.method !== input.method ||
-      Number((replay as { prepaymentPercent?: unknown }).prepaymentPercent ?? percent) !== percent
+      Number(
+        (replay as { prepaymentPercent?: unknown }).prepaymentPercent ??
+          percent,
+      ) !== percent ||
+      (expectedAmount !== undefined && replay.amount !== expectedAmount)
     ) {
       throw new ConflictException(
         'Khóa idempotency đã dùng cho ý định thu khác (409).',

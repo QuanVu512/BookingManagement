@@ -26,6 +26,7 @@ function toStoredPaymentRequest(row: {
   expiresAt: Date | null;
   status: unknown;
   createdAt: Date;
+  idempotencyKey: string;
 }): StoredPaymentRequest {
   return {
     id: row.id,
@@ -44,6 +45,7 @@ function toStoredPaymentRequest(row: {
     status: String(row.status),
     expiresAt: row.expiresAt,
     createdAt: row.createdAt,
+    idempotencyKey: row.idempotencyKey,
   };
 }
 
@@ -127,6 +129,45 @@ export class PrismaPaymentStore extends PaymentStore {
     id: string,
   ): Promise<StoredPaymentRequest | null> {
     const row = await transaction.paymentRequest.findUnique({ where: { id } });
+    return row ? toStoredPaymentRequest(row) : null;
+  }
+
+  async findRequestsByOrderCode(
+    orderCode: number,
+  ): Promise<StoredPaymentRequest[]> {
+    const rows = await this.prisma.paymentRequest.findMany({
+      where: { provider: 'PAYOS', providerOrderCode: BigInt(orderCode) },
+      take: 2,
+    });
+    return rows.map(toStoredPaymentRequest);
+  }
+
+  async retryFailedRequest(
+    transaction: TransactionContext,
+    id: string,
+  ): Promise<StoredPaymentRequest | null> {
+    await transaction.paymentRequest.updateMany({
+      where: { id, status: 'FAILED', providerPaymentLinkId: null },
+      data: { status: 'CREATING' },
+    });
+    const row = await transaction.paymentRequest.findUnique({ where: { id } });
+    return row ? toStoredPaymentRequest(row) : null;
+  }
+
+  async findOpenRequestForBooking(
+    transaction: TransactionContext,
+    bookingId: string,
+    purpose: 'PREPAYMENT' | 'BALANCE',
+  ): Promise<StoredPaymentRequest | null> {
+    const row = await transaction.paymentRequest.findFirst({
+      where: {
+        referenceType: 'BOOKING',
+        referenceId: bookingId,
+        purpose,
+        status: { notIn: ['CANCELLED', 'EXPIRED', 'FAILED'] },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
     return row ? toStoredPaymentRequest(row) : null;
   }
 

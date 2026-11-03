@@ -7,6 +7,12 @@ import { PayOS, type Webhook } from '@payos/node';
  * Luôn verify FULL webhook envelope qua SDK `payos.webhooks.verify` với
  * checksum key cấu hình trên server; chỉ dùng signed data trả về.
  * Outer success / redirect không bao giờ thay thế signed success.
+ *
+ * Verify-only: client dựng được khi có PAYOS_CHECKSUM_KEY (clientId/apiKey
+ * có thể để trống ở deployment demo không thu tiền thật). Gateway chuyển
+ * tiền thật (PayosGatewayAdapter) vẫn yêu cầu đủ ba key — tách "xác minh
+ * được" khỏi "được phép moving money" để demo ký/xác minh nội bộ mà không
+ * bao giờ gọi mạng payOS (F02/F06 review).
  */
 export interface VerifiedWebhookData {
   orderCode: number;
@@ -34,11 +40,17 @@ export class PayosSignatureService {
   private readonly client: PayOS | null;
 
   constructor(configService: ConfigService) {
-    const clientId = configService.get<string>('PAYOS_CLIENT_ID');
-    const apiKey = configService.get<string>('PAYOS_API_KEY');
+    // Verify chỉ cần checksum key; clientId/apiKey thiếu thì dùng placeholder
+    // không bao giờ được gửi đi ở đường verify (MIG-20 giữ fail-closed khi
+    // thiếu checksum key).
     const checksumKey = configService.get<string>('PAYOS_CHECKSUM_KEY');
-    if (clientId && apiKey && checksumKey) {
-      this.client = new PayOS({ clientId, apiKey, checksumKey });
+    if (checksumKey) {
+      this.client = new PayOS({
+        clientId:
+          configService.get<string>('PAYOS_CLIENT_ID') || 'unconfigured',
+        apiKey: configService.get<string>('PAYOS_API_KEY') || 'unconfigured',
+        checksumKey,
+      });
     } else {
       this.client = null;
     }
@@ -52,9 +64,7 @@ export class PayosSignatureService {
    * Verify envelope { data, signature }. Ném lỗi khi thiếu field,
    * chữ ký sai, hoặc provider chưa cấu hình (fail-closed, MIG-20).
    */
-  async verifyEnvelope(
-    envelope: unknown,
-  ): Promise<VerifiedWebhookData> {
+  async verifyEnvelope(envelope: unknown): Promise<VerifiedWebhookData> {
     if (!this.client) {
       throw new Error('payOS chưa được cấu hình trên server.');
     }

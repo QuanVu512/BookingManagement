@@ -35,18 +35,22 @@ const databaseUrl = process.env.BOOKING_DATABASE_TEST_URL;
 const redisUrl = process.env.BOOKING_REDIS_TEST_URL;
 const storageDescribe = databaseUrl && redisUrl ? describe : describe.skip;
 
-const branchId = randomUUID();
-const courtId = randomUUID();
+let branchId = randomUUID();
+let courtId = randomUUID();
 const userA = randomUUID();
 const userB = randomUUID();
 
 // C00-Correction-1: bookings sở hữu fixture IDs để cleanup đúng phạm vi.
 let ownedBookingIds: string[] = [];
 // C00-Correction-1: mỗi booking chiếm slot riêng, tránh exclusion conflict
-// giữa các ACTIVE occupancies trên cùng sân.
+// giữa các ACTIVE occupancies trên cùng sân. Ngày bắt đầu ngẫu nhiên theo
+// run vì DB test dùng chung: slot cố định kẹt overlap với occupancy sót lại.
+const slotBase =
+  Date.UTC(2035, 0, 8, 1, 0, 0) +
+  Math.floor(Math.random() * 180) * 24 * 3_600_000;
 let slotSeq = 0;
 function nextSlot(): { startsAt: Date; endsAt: Date; occupiedUntil: Date } {
-  const base = Date.UTC(2035, 0, 8, 1, 0, 0) + slotSeq * 3 * 3_600_000;
+  const base = slotBase + slotSeq * 3 * 3_600_000;
   slotSeq += 1;
   const startsAt = new Date(base);
   const endsAt = new Date(base + 3_600_000);
@@ -88,8 +92,10 @@ async function makeStaff(prisma: PrismaService): Promise<string> {
 }
 
 async function fixtures(prisma: PrismaService): Promise<void> {
-  await prisma.branch.upsert({
-    where: { id: branchId },
+  // DB test dùng chung giữa các run: upsert theo code duy nhất, dùng id thực
+  // tế tìm được để tránh kẹt unique khi row cũ còn sót.
+  const branch = await prisma.branch.upsert({
+    where: { code: 'Q-PAY' },
     update: {},
     create: {
       id: branchId,
@@ -99,8 +105,9 @@ async function fixtures(prisma: PrismaService): Promise<void> {
       phone: '0900000000',
     },
   });
-  await prisma.court.upsert({
-    where: { id: courtId },
+  branchId = branch.id;
+  const court = await prisma.court.upsert({
+    where: { branchId_code: { branchId, code: 'C1' } },
     update: {},
     create: {
       id: courtId,
@@ -109,6 +116,7 @@ async function fixtures(prisma: PrismaService): Promise<void> {
       name: 'Court 1',
     },
   });
+  courtId = court.id;
   await makeUser(prisma, userA, 'a');
   await makeUser(prisma, userB, 'b');
 }
@@ -119,6 +127,7 @@ async function makeBooking(
     // C00-Correction-1: 'userId' in overrides phân biệt guest null tường minh.
     userId?: string | null;
     holdExpiresAt?: Date;
+    createdAt?: Date;
     status?: 'HOLDING' | 'CANCELLED' | 'CONFIRMED';
     total?: number;
     required?: number;
@@ -129,7 +138,9 @@ async function makeBooking(
   const status = overrides.status ?? 'HOLDING';
   const row = await prisma.booking.create({
     data: {
-      bookingCode: `BK-${randomUUID().replaceAll('-', '').slice(0, 24)}`,
+      // E12 lookup chuẩn hóa query về chữ hoa: fixture sinh code chữ hoa để
+      // khớp, không đổi semantics lookup ở source.
+      bookingCode: `BK-${randomUUID().replaceAll('-', '').slice(0, 24).toUpperCase()}`,
       userId: 'userId' in overrides ? overrides.userId ?? null : userA,
       courtId,
       branchId,
@@ -144,6 +155,11 @@ async function makeBooking(
       prepaymentPercent: 30,
       requiredPrepaymentAmount: overrides.required ?? 45_000,
       status,
+      // DB check bookings_cancellation_timestamp_check: CANCELLED phải có
+      // cancelledAt; explicit createdAt cho ca hold đã hết hạn
+      // (bookings_hold_deadline_check đòi hold > created_at).
+      createdAt: overrides.createdAt ?? now,
+      cancelledAt: status === 'CANCELLED' ? now : null,
       holdExpiresAt:
         overrides.holdExpiresAt ?? new Date(now.getTime() + 300_000),
       cancellationRule: 'BEFORE_START',
@@ -249,9 +265,13 @@ storageDescribe('Payments coordinator + outcome + guest token (real PG)', () => 
               REDIS_PORT: redis.port,
               JWT_SECRET: randomBytes(32).toString('hex'),
               WEB_ORIGIN: 'http://127.0.0.1:4001',
+              SMTP_FROM: 'no-reply@example.test',
+              SMTP_HOST: '127.0.0.1',
+              SMTP_PORT: '1025',
               PAYOS_CLIENT_ID: 'test-client',
               PAYOS_API_KEY: 'test-key',
               PAYOS_CHECKSUM_KEY: 'test-checksum-key-1234567890',
+              REFUND_DESTINATION_KEY: randomBytes(32).toString('hex'),
             }),
           ],
         }),
@@ -378,6 +398,7 @@ storageDescribe('Payments coordinator + outcome + guest token (real PG)', () => 
 
   it('hết hạn trước rồi mới có tiền: expire tạo obligation, không confirm', async () => {
     const bookingId = await makeBooking(prisma, {
+      createdAt: new Date(Date.now() - 600_000),
       holdExpiresAt: new Date(Date.now() - 1_000),
     });
     await makeReceipt(prisma, bookingId, 45_000);
@@ -542,7 +563,7 @@ storageDescribe('Payments coordinator + outcome + guest token (real PG)', () => 
         idempotencyKey: randomUUID(),
         staffUserId: staffId,
       }),
-    ).rejects.toMatchObject({ message: expect.stringContaining('PAYMENT_AMOUNT_STALE') });
+    ).rejects.toMatchObject({ message: expect.stringContaining('Số dư đã thay đổi') });
     await staffBalance.execute({
       bookingId,
       method: 'CASH',
@@ -556,7 +577,7 @@ storageDescribe('Payments coordinator + outcome + guest token (real PG)', () => 
         idempotencyKey: randomUUID(),
         staffUserId: staffId,
       }),
-    ).rejects.toMatchObject({ message: expect.stringContaining('BALANCE_ALREADY_PAID') });
+    ).rejects.toMatchObject({ message: expect.stringContaining('Booking đã đủ tiền') });
   });
 
   it('E16 allocate guards: chưa verify / đã allocate / refund flow', async () => {
@@ -598,11 +619,16 @@ storageDescribe('Payments coordinator + outcome + guest token (real PG)', () => 
         idempotencyKey: randomUUID(),
         staffUserId: staffId,
       }),
-    ).rejects.toMatchObject({ message: expect.stringContaining('RECEIPT_NOT_VERIFIED') });
+    ).rejects.toMatchObject({ message: expect.stringContaining('Receipt chưa được xác minh') });
 
     await prisma.paymentTransaction.update({
       where: { id: unverified.id },
-      data: { verificationStatus: 'VERIFIED' },
+      // DB check đòi verifiedByUserId + verifiedAt khi STAFF xác minh.
+      data: {
+        verificationStatus: 'VERIFIED',
+        verifiedByUserId: staffId,
+        verifiedAt: new Date(),
+      },
     });
     const allocated = await staffAllocate.execute({
       receiptId: unverified.id,
@@ -618,7 +644,7 @@ storageDescribe('Payments coordinator + outcome + guest token (real PG)', () => 
         idempotencyKey: randomUUID(),
         staffUserId: staffId,
       }),
-    ).rejects.toMatchObject({ message: expect.stringContaining('RECEIPT_ALREADY_ALLOCATED') });
+    ).rejects.toMatchObject({ message: expect.stringContaining('Receipt đã được phân bổ') });
 
     // Receipt trong refund flow bị chặn.
     const receipt2 = await prisma.paymentTransaction.create({
@@ -630,8 +656,11 @@ storageDescribe('Payments coordinator + outcome + guest token (real PG)', () => 
         amount: 10_000,
         currency: 'VND',
         verificationStatus: 'VERIFIED',
+        verifiedByUserId: staffId,
+        verifiedAt: new Date(),
         allocationStatus: 'UNALLOCATED',
         confirmationSource: 'STAFF',
+        recordedByUserId: staffId,
         fundsReceivedAt: new Date(),
         idempotencyKey: randomUUID(),
       },
@@ -656,7 +685,7 @@ storageDescribe('Payments coordinator + outcome + guest token (real PG)', () => 
         idempotencyKey: randomUUID(),
         staffUserId: staffId,
       }),
-    ).rejects.toMatchObject({ message: expect.stringContaining('RECEIPT_IN_REFUND_FLOW') });
+    ).rejects.toMatchObject({ message: expect.stringContaining('Receipt đang trong luồng hoàn tiền') });
   });
 
   it('E18/E19 four-eyes, double-approve, reject chặn attempt live', async () => {
@@ -684,12 +713,17 @@ storageDescribe('Payments coordinator + outcome + guest token (real PG)', () => 
         idempotencyKey: randomUUID(),
         approverUserId: requester,
       }),
-    ).rejects.toMatchObject({ message: expect.stringContaining('SELF_APPROVAL_FORBIDDEN') });
+    ).rejects.toMatchObject({ message: expect.stringContaining('Người yêu cầu không được tự duyệt') });
     const approved = await staffRefunds.approve({
       refundId: refund.id,
       idempotencyKey: randomUUID(),
       approverUserId: approver,
-      destination: { bankBin: '970422', accountLast4: '7890', accountName: 'Test' },
+      destination: {
+        bankBin: '970422',
+        accountLast4: '7890',
+        accountName: 'Test',
+        accountNumber: '970422001237890',
+      },
     });
     expect(approved.status).toBe('APPROVED');
     await expect(
@@ -698,7 +732,7 @@ storageDescribe('Payments coordinator + outcome + guest token (real PG)', () => 
         idempotencyKey: randomUUID(),
         approverUserId: approver,
       }),
-    ).rejects.toMatchObject({ message: expect.stringContaining('REFUND_ALREADY_CLOSED') });
+    ).rejects.toMatchObject({ message: expect.stringContaining('Refund không ở trạng thái chờ duyệt') });
 
     // Attempt live chặn reject.
     await prisma.refundAttempt.create({
@@ -710,8 +744,10 @@ storageDescribe('Payments coordinator + outcome + guest token (real PG)', () => 
         idempotencyKey: randomUUID(),
         sourceAccountKey: 'CASH:COUNTER',
         amount: 45_000,
-        currency: 'VND',
         status: 'CREATED',
+        // DB check refund_attempts_manual_executor_check: attempt thủ công
+        // phải có người thực hiện.
+        executedByUserId: approver,
       },
     });
     await expect(
@@ -721,7 +757,7 @@ storageDescribe('Payments coordinator + outcome + guest token (real PG)', () => 
         idempotencyKey: randomUUID(),
         actorUserId: approver,
       }),
-    ).rejects.toMatchObject({ message: expect.stringContaining('REFUND_ATTEMPT_IN_FLIGHT') });
+    ).rejects.toMatchObject({ message: expect.stringContaining('Đang có attempt chưa rõ kết quả') });
   });
 
   it('E4 detail mask reference; E12 lookup + audit', async () => {

@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service.js';
 import { PayosGatewayAdapter } from '../infrastructure/payos-gateway.adapter.js';
+import { isDemoLinkId } from '../infrastructure/payos-demo-gateway.adapter.js';
 import { PaymentAuditLogger } from '../infrastructure/payment-audit-logger.js';
 
 /**
@@ -26,7 +27,11 @@ export class StaffReconcileUseCase {
       where: { id: input.requestId },
     });
     if (!request) throw new BadRequestException('PAYMENT_REQUEST_NOT_FOUND');
-    if (!request.providerPaymentLinkId || !this.gateway.isConfigured()) {
+    if (
+      !request.providerPaymentLinkId ||
+      isDemoLinkId(request.providerPaymentLinkId) ||
+      !this.gateway.isConfigured()
+    ) {
       throw new BadRequestException({
         code: 'PROVIDER_UNAVAILABLE',
         message: 'Không có link provider để đối soát.',
@@ -40,8 +45,13 @@ export class StaffReconcileUseCase {
       providerPaid = link.amountPaid ?? 0;
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'unknown';
-      const code = /timeout/i.test(message) ? 'PROVIDER_TIMEOUT' : 'PROVIDER_UNAVAILABLE';
-      throw new BadRequestException({ code, message: 'Provider tạm không khả dụng.' });
+      const code = /timeout/i.test(message)
+        ? 'PROVIDER_TIMEOUT'
+        : 'PROVIDER_UNAVAILABLE';
+      throw new BadRequestException({
+        code,
+        message: 'Provider tạm không khả dụng.',
+      });
     }
     const diff = {
       providerStatus,

@@ -43,6 +43,7 @@ export interface StoredPaymentRequest {
   status: string;
   expiresAt: Date | null;
   createdAt: Date;
+  idempotencyKey: string;
 }
 
 export interface ReceiptIngest {
@@ -102,6 +103,30 @@ export abstract class PaymentStore {
     id: string,
   ): Promise<StoredPaymentRequest | null>;
 
+  abstract findRequestsByOrderCode(
+    orderCode: number,
+  ): Promise<StoredPaymentRequest[]>;
+
+  /**
+   * Retry có kiểm soát cho intent `FAILED` chưa từng tạo link provider:
+   * chỉ chuyển FAILED → CREATING bằng conditional update, trả row mới nhất.
+   * Không dùng cho intent đã có link (trạng thái provider chưa chắc chắn).
+   */
+  abstract retryFailedRequest(
+    transaction: TransactionContext,
+    id: string,
+  ): Promise<StoredPaymentRequest | null>;
+
+  /**
+   * Request còn sống gần nhất của booking/purpose — dùng để tái sử dụng intent
+   * đã tạo trước thay đổi khóa idempotency (tránh thu trùng).
+   */
+  abstract findOpenRequestForBooking(
+    transaction: TransactionContext,
+    bookingId: string,
+    purpose: 'PREPAYMENT' | 'BALANCE',
+  ): Promise<StoredPaymentRequest | null>;
+
   abstract readBookingMoney(
     transaction: TransactionContext,
     bookingId: string,
@@ -110,7 +135,11 @@ export abstract class PaymentStore {
   abstract findReceiptByCanonicalIdentity(
     transaction: TransactionContext,
     canonicalIdentity: string,
-  ): Promise<{ id: string; amount: number; receivingAccountKey: string } | null>;
+  ): Promise<{
+    id: string;
+    amount: number;
+    receivingAccountKey: string;
+  } | null>;
 
   abstract insertReceipt(
     transaction: TransactionContext,
