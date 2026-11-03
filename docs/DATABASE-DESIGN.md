@@ -1,23 +1,23 @@
 # Thiết kế CSDL đặt sân Pickleball
 
-Data dictionary gốc được thiết kế ngày 2026-10-09 cho modular monolith. Tham chiếu hiện hành là [schema](../backend/prisma/schema.prisma), SQL migrations và [DATABASE.md](DATABASE.md): schema hiện có 27 model, gồm audit, guest OTP/checkout và outbox mới ngoài bộ bảng v1. Các bảng chi tiết bên dưới mô tả nền tảng v1, không thay đầy đủ migration sau đó. Trạng thái apply phải kiểm tra DB đích, không khẳng định từ tài liệu.
+Từ điển dữ liệu (Data Dictionary) chi tiết cho kiến trúc modular monolith trên PostgreSQL 16. Nguồn chuẩn hiện hành là [`backend/prisma/schema.prisma`](../backend/prisma/schema.prisma), chuỗi 11 SQL migrations trong `backend/prisma/migrations/` và tài liệu tổng quan [DATABASE.md](DATABASE.md): schema hiện có **27 model** (27 bảng) và **27 enum**, bao gồm bộ bảng v1 cùng các bảng kiểm toán thanh toán (`payment_audit_logs`), xác thực OTP/khôi phục phiên thanh toán khách vãng lai (`guest_otp_challenges`, `guest_otp_proofs`, `guest_checkout_intents`) và hàng đợi gửi thư mã hóa (`outbox_messages`).
 
 ## Quy tắc nghiệp vụ
 
 | Nội dung               | Quy tắc áp dụng                                                                                                                                                                                                  |
 | ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Khoảng chơi            | Giờ bắt đầu/kết thúc linh hoạt. Không tự suy diễn rằng giờ chọn phải nằm trên lưới 15 phút.                                                                                                                      |
-| Vệ sinh                | Hai lượt cùng sân cách nhau ít nhất 15 phút. Booking 18:00–19:00 chiếm lịch 18:00–19:15; lượt tiếp theo sớm nhất 19:15.                                                                                          |
-| Có tài khoản           | Booking mới bắt buộc cọc 30%; snapshot 100% lịch sử vẫn hợp lệ, không backfill.                                                                                                                                  |
-| Vãng lai               | Không tạo user giả; user_id NULL. Có tên/email/điện thoại và proof OTP; booking mới cọc 30% theo policy hiện hành.                                                                                               |
-| Giữ chỗ                | HOLDING trong 5 phút để hoàn tất khoản trả trước bắt buộc.                                                                                                                                                       |
+| Khoảng chơi            | Giờ bắt đầu/kết thúc linh hoạt theo phút (giây bằng 0). Không tự suy diễn rằng giờ chọn bắt buộc phải nằm cứng trên lưới 15 phút nếu cấu hình không yêu cầu.                                                     |
+| Vệ sinh (`cleanup`)    | Từ migration `20261031000000_allow_zero_cleanup`, `cleanup_minutes` cho phép `>= 0` (mặc định `0` trong schema và seed). Nếu sân cấu hình `cleanup_minutes = 15`, booking 18:00–19:00 chiếm lịch 18:00–19:15.    |
+| Có tài khoản (Member)  | Booking mới bắt buộc đặt cọc 30% (`prepayment_percent = 30.00`); snapshot 100% lịch sử vẫn hợp lệ trong DB để đọc đối soát, không backfill.                                                                      |
+| Khách vãng lai (Guest) | Không tạo user giả (`user_id NULL`). Bắt buộc xác thực email OTP (`GuestOtpProof`) và gắn `GuestCheckoutIntent`; từ migration `20261026000000_guest_deposit_policy`, đơn mới cũng đặt cọc 30% như Member.        |
+| Giữ chỗ (`HOLDING`)    | Giữ chỗ trong 5 phút để hoàn tất khoản cọc 30%. Đối với Guest, bản ghi `PaymentRequest` trạng thái `CREATING` và `OutboxMessage` khôi phục được ghi bền vững trong cùng giao dịch giữ sân (Phase 1).             |
 | Hủy                    | Hủy paid thông thường: trừ 10% tổng giá, hoàn phần thực nhận còn lại; late-cancel/no-show áp deposit 30% riêng. Tổng 1.000.000đ, đã trả 300.000đ: phí 100.000đ, hoàn 200.000đ. Đã trả 1.000.000đ: hoàn 900.000đ. |
 | Xác nhận hủy           | Hiển thị chính sách, phí và tiền hoàn; chỉ hủy sau khi khách đồng ý. Lưu bằng chứng điều khoản và thời điểm đồng ý.                                                                                              |
 | Mốc được hủy           | Hủy paid thông thường phải quote/consent và còn deadline snapshot; từ T-12h đến trước endsAt chỉ staff late-cancel, giữ deposit 30%.                                                                             |
 | Sau hủy                | Giải phóng lịch khi hủy đã được áp dụng. Refund xử lý riêng; lỗi hoàn tiền không tự phục hồi lịch booking.                                                                                                       |
 | Trả phần còn lại       | Nhân viên ghi nhận tiền mặt hoặc chuyển khoản thực nhận tại quầy. Đây là khoản BALANCE, khác với tiền đến sau khi HOLDING hết hạn.                                                                               |
 | Tiền đến sau hết hạn   | Lưu receipt và đưa vào đối soát/hoàn tiền; không tự xác nhận lại một booking EXPIRED/CANCELLED.                                                                                                                  |
-| Lịch sử khách vãng lai | Booking vẫn được lưu trong hệ thống. Không có trang lịch sử gắn tài khoản; khách quản lý bằng token gắn booking; delivery email/recovery phụ thuộc adapter và hạ tầng, không tự suy thư đã gửi.                  |
+| Lịch sử khách vãng lai | Booking vẫn được lưu trong hệ thống. Khách tra cứu lại bằng `/api/guest/bookings/lookup` (gửi email qua `outbox_messages`) hoặc quản lý qua token `MANAGE_BOOKING` / `CHECKOUT_RECOVERY`.                        |
 | Một chi nhánh          | Giữ branches với một bản ghi để tránh đổi cấu trúc sau này. Chưa cần branch_memberships; MANAGER/STAFF hiện có quyền trong chi nhánh duy nhất.                                                                   |
 
 Phí 10% là policy hủy thông thường, không phải biểu phí payOS; cần quote/consent và policy version. HOLDING hết hạn không tự sinh phí này. Late-cancel/no-show giữ deposit 30%, tạo nghĩa vụ hoàn phần verified vượt deposit, không cộng thêm 10%. Ngoại lệ sân chủ động hủy/reschedule và payout cần owner xác nhận; xem [WORKFLOWS.md](WORKFLOWS.md).
@@ -50,19 +50,19 @@ Booking mới tạo khoản cọc 30%; khoản BALANCE thu phần còn thiếu t
 - Không xóa cứng booking, receipt hay refund để sửa số liệu. Quyền lưu/ẩn thông tin cá nhân và thời hạn lưu dữ liệu cần chính sách riêng; guest không có tài khoản không có nghĩa lưu vô thời hạn.
 - Hồ sơ cá nhân chung nằm ở user_profiles; không nhân đôi full_name/email/phone theo vai trò. user_roles cho phép một người vừa CUSTOMER vừa STAFF/MANAGER.
 
-## Danh sách 21 bảng nghiệp vụ
+## Danh sách 27 bảng trong cơ sở dữ liệu
 
-| Module sở hữu      | Bảng                                                                                                                           |
-| ------------------ | ------------------------------------------------------------------------------------------------------------------------------ |
-| Nhóm Auth          | users, user_roles, refresh_tokens                                                                                              |
-| Nhóm Users         | user_profiles                                                                                                                  |
-| Nhóm Courts        | branches, courts, branch_business_hours, price_rules                                                                           |
-| Nhóm Bookings      | bookings, court_occupancies, booking_price_items, booking_status_history, booking_access_tokens, booking_cancellation_requests |
-| Nhóm Check-in      | booking_checkins                                                                                                               |
-| Nhóm Payments      | payment_requests, payment_transactions, payment_webhook_events, refund_requests, refund_attempts                               |
-| Nhóm Notifications | notification_deliveries                                                                                                        |
+| Module sở hữu                  | Bảng PostgreSQL                                                                                                                                                                                        |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Nhóm Auth                      | `users`, `user_roles`, `refresh_tokens`                                                                                                                                                                |
+| Nhóm Users                     | `user_profiles`                                                                                                                                                                                        |
+| Nhóm Courts                    | `branches`, `courts`, `branch_business_hours`, `price_rules`                                                                                                                                           |
+| Nhóm Bookings                  | `bookings`, `court_occupancies`, `booking_price_items`, `booking_status_history`, `booking_access_tokens`, `booking_cancellation_requests`                                                             |
+| Nhóm Check-in                  | `booking_checkins`                                                                                                                                                                                     |
+| Nhóm Payments & Guest Recovery | `payment_requests`, `payment_transactions`, `payment_webhook_events`, `refund_requests`, `refund_attempts`, `payment_audit_logs`, `guest_otp_challenges`, `guest_otp_proofs`, `guest_checkout_intents` |
+| Nhóm Notifications & Outbox    | `notification_deliveries`, `outbox_events`, `outbox_messages`                                                                                                                                          |
 
-Các nhóm là module trong một backend/một DB. V1 thêm outbox_events cho tác vụ BullMQ tin cậy, chưa có inbox_events hay broker liên dịch vụ.
+Các nhóm là module trong một backend và cùng một database PostgreSQL. `PrismaService` luôn gắn `-c timezone=UTC` vào kết nối để chuẩn hóa múi giờ phiên truy vấn.
 
 ## Nhóm Auth
 
@@ -71,9 +71,9 @@ Các nhóm là module trong một backend/một DB. V1 thêm outbox_events cho t
 | Tên cột           | Kiểu PostgreSQL    | Ràng buộc                 | Ý nghĩa                                                       |
 | ----------------- | ------------------ | ------------------------- | ------------------------------------------------------------- |
 | id                | UUID               | PK                        | ID tài khoản                                                  |
-| username          | VARCHAR(100)       | NULL, UQ                  | Tên đăng nhập tùy chọn; bỏ nếu chỉ đăng nhập email/điện thoại |
-| phone             | VARCHAR(20)        | NN, UQ                    | Số điện thoại đăng nhập, chuẩn hóa thống nhất                 |
-| email             | VARCHAR(254)       | NULL, UQ                  | Email tài khoản; booking vẫn bắt buộc email snapshot          |
+| username          | VARCHAR(100)       | NN, UQ                    | Tên đăng nhập bắt buộc (siết NOT NULL từ `20261013082736`)    |
+| phone             | VARCHAR(20)        | NN, UQ                    | Số điện thoại đăng nhập 10 số `0xxxxxxxxx` (`20261013090000`) |
+| email             | VARCHAR(254)       | NN, UQ                    | Email tài khoản bắt buộc (siết NOT NULL từ `20261013082736`)  |
 | password_hash     | VARCHAR(255)       | NN                        | Hash mật khẩu                                                 |
 | status            | user_status (ENUM) | NN, DEFAULT ACTIVE        | ACTIVE, SUSPENDED, CLOSED                                     |
 | phone_verified_at | TIMESTAMPTZ        | NULL                      | Thời điểm xác minh điện thoại                                 |
@@ -143,17 +143,17 @@ Giờ mở/đóng cửa chuyển sang branch_business_hours.
 
 ### courts — sân con
 
-| Tên cột         | Kiểu PostgreSQL     | Ràng buộc                   | Ý nghĩa                                   |
-| --------------- | ------------------- | --------------------------- | ----------------------------------------- |
-| id              | UUID                | PK                          | ID sân                                    |
-| branch_id       | UUID                | NN, FK → branches.id        | Chi nhánh sở hữu                          |
-| code            | VARCHAR(30)         | NN                          | Mã sân trong chi nhánh                    |
-| name            | VARCHAR(100)        | NN                          | Tên sân                                   |
-| court_type      | court_type (ENUM)   | NN, DEFAULT STANDARD        | STANDARD, VIP                             |
-| status          | court_status (ENUM) | NN, DEFAULT ACTIVE          | ACTIVE, INACTIVE                          |
-| cleanup_minutes | SMALLINT            | NN, DEFAULT 15, CHECK >= 15 | Khoảng vệ sinh; nghiệp vụ hiện cố định 15 |
-| created_at      | TIMESTAMPTZ         | NN, DEFAULT NOW()           | Tạo                                       |
-| updated_at      | TIMESTAMPTZ         | NN, DEFAULT NOW()           | Cập nhật                                  |
+| Tên cột         | Kiểu PostgreSQL     | Ràng buộc                 | Ý nghĩa                                                               |
+| --------------- | ------------------- | ------------------------- | --------------------------------------------------------------------- |
+| id              | UUID                | PK                        | ID sân                                                                |
+| branch_id       | UUID                | NN, FK → branches.id      | Chi nhánh sở hữu                                                      |
+| code            | VARCHAR(30)         | NN                        | Mã sân trong chi nhánh                                                |
+| name            | VARCHAR(100)        | NN                        | Tên sân                                                               |
+| court_type      | court_type (ENUM)   | NN, DEFAULT STANDARD      | STANDARD, VIP                                                         |
+| status          | court_status (ENUM) | NN, DEFAULT ACTIVE        | ACTIVE, INACTIVE                                                      |
+| cleanup_minutes | SMALLINT            | NN, DEFAULT 0, CHECK >= 0 | Số phút nghỉ vệ sinh sau mỗi ca (`20261031000000_allow_zero_cleanup`) |
+| created_at      | TIMESTAMPTZ         | NN, DEFAULT NOW()         | Tạo                                                                   |
+| updated_at      | TIMESTAMPTZ         | NN, DEFAULT NOW()         | Cập nhật                                                              |
 
 UQ (branch_id, code), index branch_id. Không dùng status MAINTENANCE thay cho một khoảng chặn lịch có thời gian.
 
@@ -208,9 +208,9 @@ CHECK end_time > start_time, effective_to NULL hoặc >= effective_from. Không 
 | customer_phone               | VARCHAR(20)              | NN                                     | Snapshot điện thoại liên hệ                                                |
 | starts_at                    | TIMESTAMPTZ              | NN                                     | Bắt đầu chơi                                                               |
 | ends_at                      | TIMESTAMPTZ              | NN                                     | Kết thúc chơi                                                              |
-| cleanup_minutes              | SMALLINT                 | NN, DEFAULT 15, CHECK >= 15            | Snapshot khoảng vệ sinh tại lúc đặt                                        |
+| cleanup_minutes              | SMALLINT                 | NN, DEFAULT 0, CHECK >= 0              | Snapshot khoảng vệ sinh tại lúc đặt (`20261031000000_allow_zero_cleanup`)  |
 | total_amount                 | NUMERIC(14,0)            | NN, CHECK > 0                          | Tổng giá sân đã chốt                                                       |
-| prepayment_percent           | NUMERIC(5,2)             | NN                                     | 30.00 hoặc 100.00                                                          |
+| prepayment_percent           | NUMERIC(5,2)             | NN                                     | `30.00` cho mọi hold tạo mới; `100.00` giữ tương thích đơn lịch sử         |
 | required_prepayment_amount   | NUMERIC(14,0)            | NN, CHECK > 0                          | Khoản cần nhận để xác nhận booking                                         |
 | currency                     | CHAR(3)                  | NN, DEFAULT VND                        | Đồng tiền                                                                  |
 | status                       | booking_status (ENUM)    | NN, DEFAULT HOLDING                    | HOLDING, CONFIRMED, CHECKED_IN, COMPLETED, EXPIRED, CANCELLED, NO_SHOW     |
@@ -233,7 +233,7 @@ CHECK end_time > start_time, effective_to NULL hoặc >= effective_from. Không 
 Ràng buộc:
 
 - ends_at > starts_at; required_prepayment_amount <= total_amount. Đề xuất độ chính xác lịch đến phút: giây bằng 0 để duration_minutes là số nguyên; không yêu cầu bội số 15 phút.
-- prepayment_percent thuộc {30.00, 100.00}; user_id NULL bắt buộc 100.00 và required_prepayment_amount = total_amount.
+- `prepayment_percent` thuộc `{30.00, 100.00}` ở mức DB để tương thích dữ liệu lịch sử; từ migration `20261026000000_guest_deposit_policy`, CHECK ép guest trả 100% đã được gỡ bỏ và ứng dụng bắt buộc cọc `30.00` cho mọi đơn giữ chỗ mới (cả Member và Guest).
 - required_prepayment_amount được tính từ giá đã chốt và tỷ lệ, với quy tắc làm tròn VND thống nhất.
 - hold_expires_at > created_at và không vượt starts_at. Không nhận booking đã bắt đầu.
 - BEFORE_START yêu cầu cancellation_deadline_at = starts_at; BEFORE_CHECKIN có deadline NULL nhưng kiểm tra trạng thái khi hủy.
@@ -305,22 +305,24 @@ Index booking_id. Các đoạn phủ toàn bộ khoảng chơi, không trùng nh
 
 Index (booking_id, created_at). Ghi append-only trong transaction đổi trạng thái; không dùng việc có log để thay cho trạng thái hiện tại.
 
-### booking_access_tokens — QR check-in và link quản lý guest
+### booking_access_tokens — QR check-in, link quản lý và link khôi phục thanh toán guest
 
-| Tên cột     | Kiểu PostgreSQL              | Ràng buộc            | Ý nghĩa                                  |
-| ----------- | ---------------------------- | -------------------- | ---------------------------------------- |
-| id          | UUID                         | PK                   | ID token                                 |
-| booking_id  | UUID                         | NN, FK → bookings.id | Đơn được truy cập                        |
-| purpose     | booking_token_purpose (ENUM) | NN                   | CHECKIN, MANAGE_BOOKING                  |
-| token_hash  | CHAR(64)                     | NN, UQ               | SHA-256 hex của token ngẫu nhiên đủ mạnh |
-| expires_at  | TIMESTAMPTZ                  | NN                   | Hết hạn theo mục đích token              |
-| consumed_at | TIMESTAMPTZ                  | NULL                 | Token CHECKIN đã dùng                    |
-| revoked_at  | TIMESTAMPTZ                  | NULL                 | Thu hồi khi hủy/cấp lại                  |
-| created_at  | TIMESTAMPTZ                  | NN, DEFAULT NOW()    | Tạo                                      |
+| Tên cột     | Kiểu PostgreSQL              | Ràng buộc            | Ý nghĩa                                                      |
+| ----------- | ---------------------------- | -------------------- | ------------------------------------------------------------ |
+| id          | UUID                         | PK                   | ID token                                                     |
+| booking_id  | UUID                         | NN, FK → bookings.id | Đơn được truy cập                                            |
+| purpose     | booking_token_purpose (ENUM) | NN                   | `CHECKIN`, `MANAGE_BOOKING`, `CHECKOUT_RECOVERY`             |
+| token_hash  | CHAR(64)                     | NN, UQ               | SHA-256 hex của token ngẫu nhiên đủ mạnh                     |
+| expires_at  | TIMESTAMPTZ                  | NN                   | Hết hạn theo mục đích token                                  |
+| consumed_at | TIMESTAMPTZ                  | NULL                 | Thời điểm dùng một lần (với `CHECKIN` / `CHECKOUT_RECOVERY`) |
+| revoked_at  | TIMESTAMPTZ                  | NULL                 | Thu hồi khi hủy/cấp lại                                      |
+| created_at  | TIMESTAMPTZ                  | NN, DEFAULT NOW()    | Tạo                                                          |
 
 Index (booking_id, purpose). CHECK expires_at > created_at.
 
-CHECKIN phát sau khi booking được xác nhận và dùng một lần. MANAGE_BOOKING có thể đọc nhiều lần trong thời hạn, không consumed ngay khi mở email. Token QR chỉ nhận diện booking; nhân viên vẫn phải đăng nhập và có quyền check-in. Link quản lý không cho truy cập lịch sử theo email/điện thoại và không tự liên kết booking guest vào tài khoản đăng ký sau này.
+- `CHECKIN`: phát sau khi booking được xác nhận và dùng một lần khi nhân viên quét tại sân.
+- `MANAGE_BOOKING`: cho phép khách vãng lai đọc trạng thái đơn, tải QR check-in hoặc hủy đơn trong thời hạn hiệu lực (không bị đánh dấu `consumed_at` ngay lần mở đầu tiên).
+- `CHECKOUT_RECOVERY` (bổ sung từ migration `20261029000000_guest_checkout_recovery_contracts`): token một lần gửi qua email khôi phục để đổi lấy `MANAGE_BOOKING` token mới tại `POST /api/guest/bookings/:bookingId/recovery` khi khách vãng lai mất `sessionStorage` trên trình duyệt.
 
 ### booking_checkins — một lần check-in thành công
 
@@ -397,6 +399,9 @@ Index (booking_id, created_at). Chỉ một request APPLIED cho một booking b�
 | provider_order_code      | BIGINT                        | NULL có điều kiện             | orderCode số nguyên của payOS                                       |
 | provider_payment_link_id | VARCHAR(100)                  | NULL                          | ID link do provider trả về                                          |
 | checkout_url             | TEXT                          | NULL                          | URL thanh toán nếu có                                               |
+| viet_qr_payload          | TEXT                          | NULL                          | Chuỗi EMVCo VietQR (`20261021000000_payments_m03_metadata`)         |
+| provider_account_name    | VARCHAR(150)                  | NULL                          | Tên chủ tài khoản thụ hưởng từ payOS                                |
+| provider_bin             | VARCHAR(10)                   | NULL                          | Mã BIN ngân hàng thụ hưởng từ payOS                                 |
 | status                   | payment_request_status (ENUM) | NN, DEFAULT CREATING          | CREATING, PENDING, PARTIALLY_PAID, PAID, CANCELLED, EXPIRED, FAILED |
 | expires_at               | TIMESTAMPTZ                   | NULL                          | Deadline link/hold; thu tại quầy có thể không cần                   |
 | idempotency_key          | VARCHAR(100)                  | NN, UQ                        | Tránh tạo yêu cầu thu trùng                                         |
@@ -537,6 +542,83 @@ UQ (refund_request_id, attempt_number); UQ (provider, provider_payout_id) khi c�
 
 Timeout/không biết kết quả phải ở UNKNOWN và query đối soát hoặc retry cùng idempotency key. Không tạo attempt mới hoặc đổi sang chi tay khi chưa biết lệnh trước có chi thành công không. Chỉ có một attempt đang chi/chưa rõ kết quả cho một refund request. HTTP 200/PROCESSING không đủ để ghi SUCCEEDED; chỉ hoàn tất khi đã kiểm tra kết quả chi, số tiền và người nhận.
 
+### payment_audit_logs — nhật ký kiểm toán thanh toán, hoàn tiền và đối soát
+
+| Tên cột         | Kiểu PostgreSQL | Ràng buộc         | Ý nghĩa                                                         |
+| --------------- | --------------- | ----------------- | --------------------------------------------------------------- |
+| id              | UUID            | PK                | ID bản ghi kiểm toán                                            |
+| action          | VARCHAR(80)     | NN                | Hành động kiểm toán (xác nhận, đối soát, hoàn tiền, hủy…)       |
+| entity_type     | VARCHAR(50)     | NN                | Loại thực thể (`PAYMENT_REQUEST`, `REFUND_REQUEST`, `BOOKING`…) |
+| entity_id       | UUID            | NN                | ID thực thể đích                                                |
+| booking_id      | UUID            | NULL              | ID booking liên quan (nếu có)                                   |
+| actor_type      | VARCHAR(20)     | NN                | `SYSTEM`, `STAFF`, `MANAGER`, `CUSTOMER`, `GUEST`               |
+| actor_user_id   | UUID            | NULL              | ID người dùng thực hiện (nếu có tài khoản)                      |
+| idempotency_key | VARCHAR(150)    | NULL              | Khóa idempotency của thao tác                                   |
+| before_state    | JSONB           | NULL              | Trạng thái trước thay đổi                                       |
+| after_state     | JSONB           | NULL              | Trạng thái sau thay đổi                                         |
+| metadata        | JSONB           | NULL              | Siêu dữ liệu bổ sung đã lọc thông tin nhạy cảm                  |
+| created_at      | TIMESTAMPTZ     | NN, DEFAULT NOW() | Thời điểm ghi kiểm toán                                         |
+
+Index `(entity_type, entity_id, created_at)` và `(booking_id, created_at)`. Được bổ sung tại migration `20261022000000_payments_audit_log`.
+
+### guest_otp_challenges — thử thách OTP 6 số cho khách vãng lai
+
+| Tên cột        | Kiểu PostgreSQL | Ràng buộc                 | Ý nghĩa                                                      |
+| -------------- | --------------- | ------------------------- | ------------------------------------------------------------ |
+| id             | UUID            | PK                        | ID thử thách OTP                                             |
+| contact_key    | CHAR(64)        | NN, UQ                    | Băm SHA-256 của cặp liên hệ chuẩn hóa (`email` + `phone`)    |
+| email_hash     | CHAR(64)        | NN                        | Băm SHA-256 của email chuẩn hóa                              |
+| phone_hash     | CHAR(64)        | NN                        | Băm SHA-256 của số điện thoại chuẩn hóa                      |
+| code_hash      | CHAR(64)        | NN                        | Băm SHA-256 của mã OTP 6 chữ số                              |
+| expires_at     | TIMESTAMPTZ     | NN                        | Thời điểm hết hạn mã OTP                                     |
+| resend_at      | TIMESTAMPTZ     | NN                        | Thời điểm sớm nhất được phép yêu cầu gửi lại OTP             |
+| attempts       | INTEGER         | NN, DEFAULT 0, CHECK >= 0 | Số lần nhập sai hiện tại                                     |
+| window_ends_at | TIMESTAMPTZ     | NN                        | Thời điểm kết thúc cửa sổ đếm tần suất gửi                   |
+| send_count     | INTEGER         | NN, DEFAULT 1, CHECK >= 1 | Số lần gửi OTP trong cửa sổ hiện tại                         |
+| locked_until   | TIMESTAMPTZ     | NULL                      | Thời điểm khóa tạm thời khi vượt ngưỡng thử sai              |
+| consumed_at    | TIMESTAMPTZ     | NULL                      | Thời điểm xác minh thành công và đổi sang `guest_otp_proofs` |
+| created_at     | TIMESTAMPTZ     | NN, DEFAULT NOW()         | Tạo                                                          |
+| updated_at     | TIMESTAMPTZ     | NN, DEFAULT NOW()         | Cập nhật                                                     |
+
+Index `(expires_at)`. Được bổ sung tại migration `20261029020000_guest_otp_challenges`.
+
+### guest_otp_proofs — bằng chứng đã xác thực OTP của khách vãng lai
+
+| Tên cột       | Kiểu PostgreSQL               | Ràng buộc          | Ý nghĩa                                                |
+| ------------- | ----------------------------- | ------------------ | ------------------------------------------------------ |
+| id            | UUID                          | PK                 | ID bằng chứng OTP (`otpProofId`)                       |
+| token_hash    | CHAR(64)                      | NN, UQ             | Băm SHA-256 của `otpProofToken` cấp cho trình duyệt    |
+| email_hash    | CHAR(64)                      | NN                 | Băm SHA-256 của email đã xác minh                      |
+| phone_hash    | CHAR(64)                      | NN                 | Băm SHA-256 của số điện thoại đã xác minh              |
+| status        | guest_otp_proof_status (ENUM) | NN, DEFAULT ACTIVE | `ACTIVE`, `CONSUMED`, `EXPIRED`                        |
+| expires_at    | TIMESTAMPTZ                   | NN                 | Thời điểm hết hạn proof (15 phút)                      |
+| consumed_at   | TIMESTAMPTZ                   | NULL               | Thời điểm proof được gắn kết vào `GuestCheckoutIntent` |
+| attempt_count | INTEGER                       | NN, DEFAULT 0      | Số lần kiểm tra                                        |
+| created_at    | TIMESTAMPTZ                   | NN, DEFAULT NOW()  | Tạo                                                    |
+| updated_at    | TIMESTAMPTZ                   | NN, DEFAULT NOW()  | Cập nhật                                               |
+
+Index `(email_hash, phone_hash, status)`. Được bổ sung tại migration `20261029000000_guest_checkout_recovery_contracts`.
+
+### guest_checkout_intents — định danh phiên thanh toán và khôi phục cùng trình duyệt của khách vãng lai
+
+| Tên cột              | Kiểu PostgreSQL                     | Ràng buộc                        | Ý nghĩa                                                     |
+| -------------------- | ----------------------------------- | -------------------------------- | ----------------------------------------------------------- |
+| id                   | UUID                                | PK                               | `checkoutIntentId` do trình duyệt sinh cho phiên đặt sân    |
+| otp_proof_id         | UUID                                | NN, UQ, FK → guest_otp_proofs.id | Proof OTP đã dùng (siết `NOT NULL` tại `20261029010000`)    |
+| booking_id           | UUID                                | NULL, UQ, FK → bookings.id       | Đơn giữ chỗ được tạo gắn với phiên thanh toán này           |
+| recovery_secret_hash | CHAR(64)                            | NN                               | Băm SHA-256 của `recoverySecret` lưu trong `sessionStorage` |
+| court_id             | UUID                                | NN                               | Sân đã chọn                                                 |
+| starts_at            | TIMESTAMPTZ                         | NN                               | Thời điểm bắt đầu chơi                                      |
+| ends_at              | TIMESTAMPTZ                         | NN                               | Thời điểm kết thúc chơi                                     |
+| email_hash           | CHAR(64)                            | NN                               | Băm SHA-256 của email khách                                 |
+| phone_hash           | CHAR(64)                            | NN                               | Băm SHA-256 của số điện thoại khách                         |
+| status               | guest_checkout_intent_status (ENUM) | NN, DEFAULT COMMITTED            | `COMMITTED`, `EXPIRED`                                      |
+| expires_at           | TIMESTAMPTZ                         | NN                               | Hạn hiệu lực của intent                                     |
+| created_at           | TIMESTAMPTZ                         | NN, DEFAULT NOW()                | Tạo                                                         |
+| updated_at           | TIMESTAMPTZ                         | NN, DEFAULT NOW()                | Cập nhật                                                    |
+
+Index `(booking_id)` và `(email_hash, phone_hash)`. Được tạo tại `20261029000000_guest_checkout_recovery_contracts` và cập nhật `otp_proof_id NOT NULL` tại `20261029010000_guest_checkout_recovery_remediation`.
+
 ## Nhóm Notifications
 
 ### notification_deliveries — gửi email check-in có retry và lưu kết quả
@@ -564,7 +646,7 @@ Email thất bại không làm booking mất hiệu lực: nhân viên có luồ
 
 ## Bảng kỹ thuật cho tác vụ nền
 
-DB commit và Redis enqueue không atomic kể cả trong monolith. V1 tạo outbox_events; chưa viết dispatcher/worker.
+DB commit và Redis enqueue không atomic kể cả trong monolith. Hệ thống dùng `outbox_events` cho sự kiện nghiệp vụ tổng quát và `outbox_messages` cho hàng đợi gửi thư khôi phục/quản lý đơn khách vãng lai có mã hóa AES-256-GCM.
 
 ### outbox_events — dùng chung trong monolith
 
@@ -582,52 +664,61 @@ DB commit và Redis enqueue không atomic kể cả trong monolith. V1 tạo out
 | next_retry_at  | TIMESTAMPTZ     | NULL                      | Retry                                                   |
 | last_error     | TEXT            | NULL                      | Lỗi publish đã lọc                                      |
 
-Ghi outbox cùng transaction dữ liệu nguồn. published_at nghĩa queue nhận job, không phải nghiệp vụ/email hoàn tất. Không lưu raw token/secret. inbox_events chỉ xem xét khi thực sự dùng broker, không có trong v1.
+Ghi outbox cùng transaction dữ liệu nguồn. published_at nghĩa queue nhận job, không phải nghiệp vụ/email hoàn tất. Không lưu raw token/secret.
 
-## Trạng thái và quan hệ cần ghi trong sheet
+### outbox_messages — hàng đợi gửi thư mã hóa AES-256-GCM và tombstone chống gửi trùng
+
+| Tên cột            | Kiểu PostgreSQL              | Ràng buộc                        | Ý nghĩa                                                                  |
+| ------------------ | ---------------------------- | -------------------------------- | ------------------------------------------------------------------------ |
+| id                 | UUID                         | PK                               | ID bản ghi outbox message                                                |
+| topic              | VARCHAR(80)                  | NN                               | Chủ đề thông điệp (ví dụ khôi phục thanh toán / tra cứu đơn guest)       |
+| dedupe_key         | VARCHAR(160)                 | NN, UQ                           | Khóa chống gửi trùng trong suốt vòng đời                                 |
+| status             | outbox_message_status (ENUM) | NN, DEFAULT QUEUED               | `QUEUED`, `SENDING`, `SENT`, `FAILED`, `EXPIRED_SKIPPED`                 |
+| payload_ciphertext | BYTEA                        | NULL khi `purged_at IS NOT NULL` | Bản mã AES-256-GCM chứa thông tin người nhận và đường dẫn bí mật         |
+| payload_iv         | BYTEA                        | NULL khi `purged_at IS NOT NULL` | Vector khởi tạo (IV) 12 byte của AES-GCM                                 |
+| payload_auth_tag   | BYTEA                        | NULL khi `purged_at IS NOT NULL` | Thẻ xác thực (Auth Tag) 16 byte của AES-GCM                              |
+| key_version        | VARCHAR(20)                  | NN, DEFAULT `'v1'`               | Phiên bản khóa mã hóa (`GUEST_OUTBOX_ENCRYPTION_KEY_V1`)                 |
+| attempts           | INTEGER                      | NN, DEFAULT 0                    | Số lần worker thử gửi                                                    |
+| next_attempt_at    | TIMESTAMPTZ                  | NN, DEFAULT NOW()                | Thời điểm thử gửi tiếp theo                                              |
+| locked_at          | TIMESTAMPTZ                  | NULL                             | Thời điểm worker giữ khóa gửi                                            |
+| locked_by          | VARCHAR(100)                 | NULL                             | Định danh worker đang xử lý                                              |
+| expires_at         | TIMESTAMPTZ                  | NN                               | Thời điểm thông điệp hết giá trị nghiệp vụ (sẽ chuyển `EXPIRED_SKIPPED`) |
+| sent_at            | TIMESTAMPTZ                  | NULL                             | Thời điểm gửi SMTP thành công                                            |
+| purged_at          | TIMESTAMPTZ                  | NULL                             | Thời điểm xóa trắng `payload_*` sau khi hoàn tất (`20261029010000`)      |
+| last_error_code    | VARCHAR(80)                  | NULL                             | Mã lỗi lần thử gần nhất (đã lọc secret)                                  |
+| created_at         | TIMESTAMPTZ                  | NN, DEFAULT NOW()                | Tạo                                                                      |
+| updated_at         | TIMESTAMPTZ                  | NN, DEFAULT NOW()                | Cập nhật                                                                 |
+
+Index `(status, next_attempt_at)` và `(expires_at)`. Ràng buộc `outbox_messages_payload_shape_check` (migration `20261029010000_guest_checkout_recovery_remediation`) bảo đảm: khi `purged_at IS NULL` thì cả 3 cột `payload_ciphertext`, `payload_iv`, `payload_auth_tag` đều `NOT NULL`; khi `purged_at IS NOT NULL` (đã dọn PII/secret) thì cả 3 cột đều `NULL` và `status` phải thuộc `{SENT, FAILED, EXPIRED_SKIPPED}`.
+
+## Trạng thái và quan hệ cần ghi nhớ
 
 | Luồng           | Trạng thái chính                                                                       |
 | --------------- | -------------------------------------------------------------------------------------- |
 | Booking         | HOLDING → CONFIRMED → CHECKED_IN → COMPLETED                                           |
 | Giữ chỗ hết hạn | HOLDING → EXPIRED; occupancy RELEASED                                                  |
-| Khách hủy       | CONFIRMED → CANCELLED sau đồng ý quote; occupancy RELEASED                             |
-| Không tới       | CONFIRMED → NO_SHOW theo chính sách chưa chốt; không tự suy ra phí/hoàn                |
+| Khách hủy       | HOLDING/CONFIRMED → CANCELLED; occupancy RELEASED                                      |
+| Không tới       | CONFIRMED → NO_SHOW; giữ deposit 30%, hoàn phần verified vượt deposit (nếu có)         |
 | Refund          | REQUESTED → APPROVED → PROCESSING → COMPLETED; attempt lỗi/UNKNOWN được đối soát riêng |
 
-booking_cancellation_requests không thay thế refund_requests. Booking CANCELLED không đồng nghĩa tiền đã hoàn, cũng không chờ refund thành công mới hiển thị sân trống.
+`booking_cancellation_requests` không thay thế `refund_requests`. Booking `CANCELLED` không đồng nghĩa tiền đã hoàn, cũng không chờ refund thành công mới giải phóng lịch sân.
 
-Một booking nhiều payment_requests; một payment_request nhiều receipt; một receipt có nhiều refund_requests nhưng không vượt tiền có thể hoàn; mỗi refund_request nhiều attempt lịch sử nhưng không chi song song.
+Một booking có thể có nhiều `payment_requests`; một `payment_request` có thể có nhiều `payment_transactions` (receipt); một receipt có thể có nhiều `refund_requests` nhưng tổng tiền hoàn không vượt quá số tiền receipt còn được phép hoàn; mỗi `refund_request` có thể có nhiều `refund_attempts` lịch sử nhưng không chạy song song hai lệnh chi chưa rõ kết quả.
 
 Giá và thông tin liên hệ trên booking là snapshot có chủ đích. Không tự sửa lịch sử khi user đổi profile hoặc quản lý đổi bảng giá.
 
-## Những thay đổi so với sheet gốc
+## Lịch sử tiến hóa Schema (11 Migrations)
 
-- users: chuyển full_name sang user_profiles; role sang user_roles; is_active sang status.
-- branches: chuyển open_time/close_time sang branch_business_hours.
-- bookings: thay booking_date/start_time/end_time bằng starts_at/ends_at; deposit_amount bằng required_prepayment_amount và prepayment_percent; thêm email bắt buộc; chuyển payment_code sang payment_requests; chuyển checkin_code sang booking_access_tokens.
-- checkin_logs: đổi thành booking_checkins, giữ đúng nghĩa một check-in thành công.
-- payments: tách thành payment_requests và payment_transactions; không bắt transaction_reference có trước khi có tiền.
-- court_blocks: không thêm bảng riêng, dùng court_occupancies chung cho booking/block để bảo vệ lịch.
-- V1 dùng FK vật lý giữa các nhóm trong DB chung. Khi scale chi nhánh, thêm branch_memberships thay vì thêm trường branch_id cố định vào profile.
-- Chưa thêm bảng products/orders/inventory/shipping. V1 reference_type chỉ BOOKING, reference_id có FK bookings. Commerce cần đích tham chiếu mới, không chỉ thêm enum SALES_ORDER; không dùng bookings làm sales_orders.
+1. **`20261009000100_v1_initial`**: Tạo 21 bảng nghiệp vụ gốc, `outbox_events`, các enum, khóa ngoại ghép, `CHECK` constraints và exclusion constraint `court_occupancies_no_overlap_active`.
+2. **`20261013082736_updated_user_optional_v2_edit`**: Chuyển `users.username` và `users.email` sang `NOT NULL`.
+3. **`20261013090000_normalize_auth_phone`**: Chuẩn hóa số điện thoại trong `users.phone` về dạng 10 chữ số `0xxxxxxxxx` kèm `CHECK` regex.
+4. **`20261016090000_booking_user_idempotency`**: Đổi unique idempotency của Member sang `(user_id, idempotency_key)` và giữ partial unique index cho Guest (`user_id IS NULL`).
+5. **`20261021000000_payments_m03_metadata`**: Thêm `viet_qr_payload`, `provider_account_name`, `provider_bin` vào `payment_requests`.
+6. **`20261022000000_payments_audit_log`**: Thêm bảng `payment_audit_logs`.
+7. **`20261026000000_guest_deposit_policy`**: Gỡ `bookings_guest_full_prepayment_check`, đồng nhất đặt cọc 30% cho cả Member và Guest đối với các đơn tạo mới.
+8. **`20261029000000_guest_checkout_recovery_contracts`**: Thêm `CHECKOUT_RECOVERY` vào `booking_token_purpose`; tạo `guest_otp_proofs`, `guest_checkout_intents` và `outbox_messages`.
+9. **`20261029010000_guest_checkout_recovery_remediation`**: Siết `guest_checkout_intents.otp_proof_id` thành `NOT NULL`; thêm `purged_at` và `outbox_messages_payload_shape_check` cho `outbox_messages`.
+10. **`20261029020000_guest_otp_challenges`**: Tạo bảng `guest_otp_challenges`.
+11. **`20261031000000_allow_zero_cleanup`**: Cho phép `cleanup_minutes >= 0` (mặc định `0`) trên `courts` và `bookings`.
 
-## Các điểm còn mở
-
-1. Mốc hủy: trước starts_at hay trước check-in, kể cả đã quá starts_at.
-2. Khoảng thời gian check-in sớm/muộn; có bắt buộc trả hết phần còn lại trước check-in không (đề xuất có).
-3. Sân chủ động hủy: đề xuất hoàn toàn bộ tiền khách đã trả và không áp phạt khách 10%, nhưng chưa phải quyết định người dùng.
-4. No-show, đổi lịch và booking đã sử dụng: chưa xác định; không gộp vào chính sách khách hủy trước check-in.
-5. Thời hạn hoàn tiền cam kết với khách, phí chi do ai chịu, nguồn vốn Kênh Chi và quyền merchant: chưa xác minh cho tài khoản cụ thể.
-6. Làm tròn giá cho phút lẻ và khoản trả trước/phạt: đề xuất làm tròn đến 1 VND, lưu giá đã chốt; cần công bố nhất quán.
-
-Đã tạo schema/migration v1; chưa apply DB, generate client, build/test hoặc gọi ngân hàng. Google Sheet không sửa trực tiếp.
-
-## Phạm vi migration v1
-
-V1 có21 bảng nghiệp vụ và outbox_events,30 enum,38 FK,78 CHECK. Khóa ghép bảo đảm sân/chi nhánh booking, sân occupancy và QR booking check-in đồng nhất. Exclusion bảo vệ khoảng ACTIVE; vệ sinh tối thiểu15phút không tính phí.
-
-Booking MVP đã có transaction giữ chỗ/giá/history/occupancy, expiry và hủy HOLDING. Quy tắc đã chốt cho phase này xem [BOOKING-MVP.md](BOOKING-MVP.md); các điểm OPEN ở trên vẫn áp dụng cho giai đoạn có thanh toán. Tổng receipt/refund qua nhiều row, quyền nhân viên và workflow payment/check-in còn chưa triển khai.
-
-Expression unique lower(email/username), partial unique một cancellation APPLIED, dedup webhook hợp lệ, một refund attempt đang chạy/UNKNOWN/SUCCEEDED, cùng chứng từ chi không ghi hai lần đều nằm trong SQL. Migration tùy chỉnh không được bỏ khi tạo v2.
-
-Đọc [OPERATIONS.md](OPERATIONS.md) để áp dụng migration. Schema sinh client; SQL migration giữ lịch sử DDL. Chưa có Prisma CLI local nên SQL được viết từ cùng định nghĩa model, chưa kiểm chứng trên DB.
+Xem [OPERATIONS.md](OPERATIONS.md) và [PIPELINES.md](PIPELINES.md) để biết quy trình chạy `prisma:migrate:deploy`, `prisma:generate` và kiểm thử tích hợp trên PostgreSQL.

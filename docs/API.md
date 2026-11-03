@@ -1,80 +1,157 @@
 # Tham chiếu HTTP API
 
-Trang này định vị các API chính trong source, không thay schema DTO. Nest mount Swagger tại `/api/docs` và OpenAPI JSON tại `/api/docs-json` khi không ở production. Không có global prefix thống nhất: giữ nguyên route trong bảng, đặc biệt `/legal`, `/privacy` và `/support`.
+Trang này định vị các API chính trong mã nguồn, không thay thế định nghĩa DTO. NestJS khởi tạo Swagger tại `/api/docs` và OpenAPI JSON tại `/api/docs-json` khi `NODE_ENV !== 'production'`. Dự án không đặt một global prefix duy nhất: các nhóm `/api/*`, `/legal/*`, `/privacy/*`, `/guest/bookings/:bookingId/privacy/*` và `/support/*` giữ nguyên đường dẫn theo từng controller.
 
-## Base URL và xác thực
+## Base URL và cơ chế xác thực
 
-Local theo hướng dẫn: `http://localhost:4000`, với `PORT=4000`. Thiếu PORT, bootstrap mặc định `3000`. Frontend lấy origin từ `NEXT_PUBLIC_API_URL`.
+Local theo hướng dẫn chạy ở `http://localhost:4000` (khi cấu hình `PORT=4000`; nếu thiếu `PORT`, bootstrap mặc định `3000`). Frontend đọc origin từ `NEXT_PUBLIC_API_URL`.
 
-- Member dùng cookie HttpOnly `access_token`; JWT strategy cũng hỗ trợ Bearer. Browser gửi `credentials: include`.
-- Trước mutation dùng cookie, lấy `GET /api/auth/csrf`, gửi `X-CSRF-Token`, giữ cookie context và Origin đúng `WEB_ORIGIN`.
-- Guest quản lý booking qua `X-Booking-Access-Token`; token gắn booking/purpose/expiry. Không gửi token bằng URL hoặc dùng mã booking làm bằng chứng sở hữu.
-- Checkout recovery có guard/token riêng; xem [guest recovery contracts](GUEST-BOOKING-RECOVERY-CONTRACTS.md).
-- Staff API kiểm JWT/current DB roles và guard theo route; không suy quyền từ giao diện dashboard.
+| Ngữ cảnh                       | Header / Cookie xác thực                                       | Quy tắc áp dụng                                                                                                                                                        |
+| ------------------------------ | -------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Hội viên (Member)              | Cookie HttpOnly `access_token` (hoặc `Authorization: Bearer`)  | Trình duyệt gửi `credentials: 'include'`. Các thao tác ghi (`POST`/`PATCH`/`DELETE`) bắt buộc lấy token từ `GET /api/auth/csrf` và gửi kèm header `X-CSRF-Token`.      |
+| Khách vãng lai — Phiên đặt chỗ | `X-Booking-Checkout-Token` (`purpose = CHECKOUT_RECOVERY`)     | Hiệu lực 10 phút tính từ thời điểm tạo đơn giữ chỗ. Cho phép đọc snapshot khôi phục, tạo yêu cầu cọc 30% và hủy giữ chỗ khi đơn còn hạn (`serverNow < holdExpiresAt`). |
+| Khách vãng lai — Quản lý đơn   | `X-Booking-Access-Token` (`purpose = MANAGE_BOOKING`)          | Hiệu lực đến `startsAt + 30 ngày`. Dùng cho thanh toán, xem trạng thái/hoàn tiền, báo phí hủy đơn đã xác nhận, lấy mã QR check-in và gửi yêu cầu quyền riêng tư.       |
+| Nhân viên / Quản lý (Staff)    | Cookie `access_token` / Bearer + `X-CSRF-Token` + `RolesGuard` | Kiểm tra vai trò hiện hành trong DB (`STAFF`, `MANAGER`, `ADMIN`). Một số thao tác hoàn tiền nhạy cảm chỉ cho phép `MANAGER` và `ADMIN`.                               |
+| Webhook nhà cung cấp           | Chữ ký HMAC trong body payload (`PayosSignatureService`)       | Route công khai, không gắn JWT/CSRF. Xác minh chữ ký trước khi kiểm tra trùng lặp và ghi vào hộp thư đến (`payment_webhook_events`).                                   |
 
-Chi tiết session, lỗi auth và throttling tại [SECURITY.md](SECURITY.md). Webhook dùng signature provider, không dùng session khách hàng.
+Chi tiết phiên, mã lỗi xác thực và giới hạn tần suất (rate limit) tại [SECURITY.md](SECURITY.md) và [Guest recovery contracts](GUEST-BOOKING-RECOVERY-CONTRACTS.md).
 
-## Tra cứu public
+## 1. Tra cứu công khai, pháp lý, hỗ trợ và trợ lý AI
 
-| Method | Route                          | Mục đích                                                     |
-| ------ | ------------------------------ | ------------------------------------------------------------ |
-| GET    | `/api/courts`                  | Catalog sân/chi nhánh ACTIVE                                 |
-| GET    | `/api/courts/:id`              | Chi tiết sân ACTIVE                                          |
-| GET    | `/api/courts/:id/availability` | Query `startsAt`, `endsAt`; kiểm lịch và báo giá theo khoảng |
-| GET    | `/api/courts/:id/occupancies`  | Lịch chiếm sân theo DTO query của controller                 |
-| GET    | `/legal/policies`              | Danh mục policy                                              |
-| GET    | `/legal/booking-offer`         | Chính sách áp dụng cho booking offer                         |
-| GET    | `/legal/business`              | Thông tin chủ thể theo cấu hình                              |
-| POST   | `/api/ai/chat`                 | Hỏi đáp theo provider/knowledge và hạn mức                   |
+| Method | Route                             | Đầu vào (Query / Body)                                                                                                                                                | Phản hồi chính / Ghi chú                                                                            |
+| ------ | --------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| GET    | `/api/courts`                     | Không                                                                                                                                                                 | `{ success: true, data: Court[] }` — danh mục các sân đang `ACTIVE` kèm giá khởi điểm.              |
+| GET    | `/api/courts/:id`                 | Param `id` (UUID)                                                                                                                                                     | `{ success: true, data: CourtDetail }` — chi tiết sân đang `ACTIVE`.                                |
+| GET    | `/api/courts/:id/availability`    | Query `startsAt`, `endsAt` (`BookingWindowDto`: ISO 8601 có timezone, chính xác đến phút)                                                                             | `{ success: true, data }` — kiểm tra lịch trống và báo giá chi tiết theo từng khung giờ.            |
+| GET    | `/api/courts/:id/occupancies`     | Query `date` (`YYYY-MM-DD`)                                                                                                                                           | `{ success: true, data }` — danh sách các khoảng bận đã ẩn thông tin cá nhân trong ngày.            |
+| GET    | `/legal/policies`                 | Query tùy chọn `locale` (mặc định `'vi'`)                                                                                                                             | `{ success: true, data }` — danh mục chính sách pháp lý.                                            |
+| GET    | `/legal/booking-offer`            | Không                                                                                                                                                                 | `{ success: true, data }` — gói điều khoản và chính sách áp dụng khi đặt sân.                       |
+| GET    | `/legal/business`                 | Không                                                                                                                                                                 | `{ success: true, data }` — thông tin pháp nhân (trả `503 BUSINESS_INFO_NOT_PUBLISHED` nếu trống).  |
+| POST   | `/api/ai/chat`                    | Body `ChatAiRequestDto`: `{ message: string (1..500), history?: { role: 'user'\|'assistant', content }[] }`                                                           | `{ success: true, data }` — trả lời tự động; trả `429 AI_QUOTA_EXCEEDED` hoặc `503 AI_DISABLED`.    |
+| POST   | `/support/cases`                  | Body `CreateSupportCaseDto`: `{ category, subjectKind?, bookingId?, contactEmail, contactPhone?, description, idempotencyKey? }`, Header tùy chọn `X-Idempotency-Key` | `{ success: true, data: { id, caseCode, category, status, receivedAt, resolutionTargetAt, ... } }`. |
+| GET    | `/support/cases/:codeOrId/status` | Param `codeOrId`                                                                                                                                                      | `{ success: true, data }` — trạng thái xử lý và chuỗi sự kiện công khai của yêu cầu hỗ trợ.         |
 
-Các route dịch vụ bổ sung `/api/courts/:id/services` và `/api/courts/:id/quote` chưa có controller; UI không được xem là contract backend đã hoàn thiện.
+Lưu ý: Các đường dẫn dịch vụ phụ trợ `/api/courts/:id/services` và `/api/courts/:id/quote` được phía giao diện gọi thử có xử lý dự phòng nhưng hiện chưa có controller phía backend.
 
-## Tài khoản và booking
+## 2. Xác thực, hồ sơ và quyền riêng tư
 
-| Nhóm               | Routes chính                                                                            | Quyền/điều kiện                                            |
-| ------------------ | --------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
-| Auth               | `/api/auth/register`, `/login`, `/me`, `/logout`, `/csrf` dưới cùng prefix auth         | Mutation theo CSRF contract; `/me` cần JWT                 |
-| Recovery           | `/api/auth/verify-email`, `/resend-verification`, `/forgot-password`, `/reset-password` | OTP/proof/token tương ứng                                  |
-| Profile            | GET/PATCH `/api/users/me/profile`                                                       | JWT; PATCH có CSRF                                         |
-| Tạo hold           | POST `/api/bookings`                                                                    | JWT + CSRF, body idempotency key                           |
-| Danh sách/chi tiết | GET `/api/bookings/me`, GET `/api/bookings/:id`                                         | Owner/current authorization; list có cursor                |
-| Hủy hold           | PATCH `/api/bookings/:id/cancel`                                                        | Chỉ hold chưa thanh toán đủ điều kiện; không phải hủy paid |
-| Hủy paid           | POST `/api/bookings/:id/cancel-quote`, `/cancel-apply` trên cùng booking                | Quote còn hiệu lực, consent và idempotency                 |
+| Method | Route                                             | Quyền / Guard                    | Đầu vào (Body) & Phản hồi chính                                                                                                                       |
+| ------ | ------------------------------------------------- | -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| GET    | `/api/auth/csrf`                                  | Công khai                        | Cấp cookie CSRF và trả `{ csrfToken }`.                                                                                                               |
+| POST   | `/api/auth/register`                              | CSRF + Rate limit (`register`)   | Body `RegisterDto`: `{ username, fullName, email, phone, password, confirmPassword }`. Trả `201` kèm thông báo chung và `verificationProof` (nếu có). |
+| POST   | `/api/auth/login`                                 | CSRF + Rate limit (`login`)      | Body `LoginDto`: `{ identifier, password }`. Đặt cookie `access_token` và trả `{ user }` (hoặc `401 EMAIL_NOT_VERIFIED` kèm proof).                   |
+| POST   | `/api/auth/verify-email`                          | CSRF + Rate limit (`token`)      | Body `VerifyEmailCodeDto`: `{ email, code (6 chữ số) }`. Trả `{ success: true, message }`.                                                            |
+| POST   | `/api/auth/resend-verification`                   | CSRF + Rate limit (`recovery`)   | Body `SendEmailOtpDto`: `{ email, proof }`. Gửi lại mã OTP xác minh email.                                                                            |
+| POST   | `/api/auth/forgot-password`                       | CSRF + Rate limit (`recovery`)   | Body `AuthEmailDto`: `{ email }`. Gửi hướng dẫn đặt lại mật khẩu.                                                                                     |
+| POST   | `/api/auth/reset-password`                        | CSRF + Rate limit (`token`)      | Body `ResetPasswordDto`: `{ token (64 hex), password, confirmPassword }`.                                                                             |
+| GET    | `/api/auth/me`                                    | `JwtAuthGuard`                   | Trả `{ user }` từ phiên hiện hành.                                                                                                                    |
+| POST   | `/api/auth/logout`                                | `JwtAuthGuard` + `AuthCsrfGuard` | Thu hồi phiên, xóa cookie và trả `{ success: true, message }`.                                                                                        |
+| GET    | `/api/users/me/profile`                           | `JwtAuthGuard`                   | Trả `{ success: true, data: profile }` (tài khoản không tồn tại trả `404 ACCOUNT_NOT_FOUND`).                                                         |
+| PATCH  | `/api/users/me/profile`                           | `JwtAuthGuard` + `AuthCsrfGuard` | Body `UpdateProfileDto`: `{ fullName?, avatarUrl? }`. Cập nhật họ tên/ảnh đại diện.                                                                   |
+| POST   | `/privacy/requests`                               | `JwtAuthGuard` + `AuthCsrfGuard` | Body `CreatePrivacyRequestDto`: `{ type, contactEmail, description, idempotencyKey? }`. Tạo yêu cầu dữ liệu cá nhân.                                  |
+| GET    | `/privacy/requests`                               | `JwtAuthGuard`                   | Danh sách yêu cầu dữ liệu cá nhân của hội viên đang đăng nhập.                                                                                        |
+| GET    | `/privacy/requests/:id`                           | `JwtAuthGuard`                   | Chi tiết một yêu cầu dữ liệu cá nhân của hội viên.                                                                                                    |
+| POST   | `/guest/bookings/:bookingId/privacy/requests`     | Header `X-Booking-Access-Token`  | Body `CreatePrivacyRequestDto`. Tạo yêu cầu dữ liệu cá nhân gắn với đơn của khách vãng lai.                                                           |
+| GET    | `/guest/bookings/:bookingId/privacy/requests`     | Header `X-Booking-Access-Token`  | Danh sách yêu cầu dữ liệu cá nhân của đơn khách vãng lai.                                                                                             |
+| GET    | `/guest/bookings/:bookingId/privacy/requests/:id` | Header `X-Booking-Access-Token`  | Chi tiết yêu cầu dữ liệu cá nhân của đơn khách vãng lai.                                                                                              |
 
-Payload member hold được định nghĩa tại [DTO](../backend/src/modules/bookings/presentation/dto/booking-request.dto.ts): `courtId`, `startsAt`, `endsAt`, `idempotencyKey`, `policyAccepted: true`; `prepaymentPercent` tùy chọn và chỉ nhận `30`. Datetime có timezone và chính xác đến phút. Giá do server tính; không gửi tổng tiền client làm authority.
+## 3. Đặt sân, hủy đơn và check-in cho Hội viên
 
-Booking response thường có `{ success: true, data }`; list có `nextCursor`. Không coi mọi endpoint là cùng envelope: auth và các module khác có response riêng. Xem DTO/presenter và Swagger của revision tương ứng.
+Tất cả các route dưới `/api/bookings` và `/api/refunds` yêu cầu `JwtAuthGuard` và `AuthCsrfGuard` (CSRF áp dụng cho các lệnh ghi).
 
-## Guest, payment và staff
+| Method | Route                              | Đầu vào (Query / Body)                                                                                                 | Hành vi & Phản hồi                                                                               |
+| ------ | ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| POST   | `/api/bookings`                    | Body `CreateBookingDto`: `{ courtId, startsAt, endsAt, policyAccepted: true, idempotencyKey, prepaymentPercent?: 30 }` | Giữ chỗ 5 phút với mức cọc 30%. Gửi lại cùng `idempotencyKey` trả lại trạng thái đơn hiện tại.   |
+| GET    | `/api/bookings/me`                 | Query tùy chọn `cursor` (UUID)                                                                                         | `{ success: true, data: Booking[], nextCursor }` — danh sách đơn của hội viên.                   |
+| GET    | `/api/bookings/:id`                | Param `id` (UUID)                                                                                                      | `{ success: true, data: Booking }` — chi tiết đơn (trả `404` nếu không thuộc quyền sở hữu).      |
+| GET    | `/api/bookings/:id/payment-quote`  | Param `id` (UUID)                                                                                                      | Báo giá thanh toán từ snapshot máy chủ cho đơn đang `HOLDING`.                                   |
+| PATCH  | `/api/bookings/:id/cancel`         | Param `id` (UUID)                                                                                                      | Hủy đơn đang `HOLDING` chưa phát sinh thanh toán xác minh; giải phóng lịch sân ngay.             |
+| POST   | `/api/bookings/:id/cancel-quote`   | Body `RequestCancelQuoteDto`: `{ reason?, idempotencyKey }`                                                            | Tính phí hủy 10% và số tiền hoàn dự kiến cho đơn `CONFIRMED`, lưu bản báo phí có thời hạn.       |
+| POST   | `/api/bookings/:id/cancel-apply`   | Body `ApplyCancelDto`: `{ quoteId, accepted: true, idempotencyKey }`                                                   | Áp dụng hủy đơn sau khi khách xác nhận đồng ý báo phí, giải phóng sân và tạo nghĩa vụ hoàn tiền. |
+| POST   | `/api/bookings/:id/check-in-token` | Param `id` (UUID)                                                                                                      | Cấp mã QR check-in một lần (`201`) cho đơn `CONFIRMED` đã thanh toán đủ.                         |
 
-| Nhóm              | Routes chính                                                                                     | Điều kiện                                                           |
-| ----------------- | ------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------- |
-| Guest OTP/hold    | POST `/api/guest/bookings/send-otp`, `/verify-otp`, `/resume-intent`; POST `/api/guest/bookings` | Proof, contact và intent theo DTO; không tạo user giả               |
-| Guest recovery    | POST `/api/guest/bookings/:bookingId/cancel-hold`; GET `/api/guest/bookings/:bookingId/recovery` | Checkout token guard riêng                                          |
-| Member payment    | POST/GET `/api/payments/requests`; GET `/api/payments/requests/:id`, `/:id/status`               | JWT, ownership; mutation CSRF                                       |
-| Guest payment     | `/api/guest/payments/requests` và detail/status                                                  | Guest token + bookingId theo guard                                  |
-| Provider callback | POST `/api/webhooks/payos`                                                                       | Signature và inbox processing phía server                           |
-| Check-in token    | POST `/api/bookings/:id/check-in-token`; guest tương ứng dưới `/api/guest/bookings/:bookingId`   | Owner/token, trạng thái và tiền verified                            |
-| Staff check-in    | POST `/api/staff/check-ins/verify`, `/manual`; POST `/api/staff/bookings/:id/complete`           | JWT + CSRF + STAFF/MANAGER/ADMIN                                    |
-| Staff late cancel | POST `/api/staff/bookings/:id/late-cancel`                                                       | Role guard, reason, thời gian và idempotency                        |
-| Refund            | `/api/refunds`, `/api/staff/refunds`, các action approve/reject/destination/reconcile            | Quyền riêng từng action; không suy tất cả staff đều đọc destination |
+## 4. Đặt sân, khôi phục đơn và quản lý đơn cho Khách vãng lai
 
-Các path rút gọn ở bảng phải ghép với prefix của cùng nhóm; controller/DTO là nguồn chính xác khi tích hợp. Không gọi request tạo tiền hoặc webhook thật để thử documentation.
+Luồng khách vãng lai tách biệt hai loại token: `X-Booking-Checkout-Token` (dùng trong phiên thanh toán/khôi phục ban đầu qua `GuestCheckoutTokenGuard`) và `X-Booking-Access-Token` (dùng quản lý đơn qua `GuestTokenGuard`).
 
-## Lỗi và retry
+| Method | Route                                             | Quyền / Guard                             | Đầu vào & Phản hồi chính                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| ------ | ------------------------------------------------- | ----------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| POST   | `/api/guest/bookings/send-otp`                    | Công khai (5 lượt / 5 phút / IP)          | Body `{ email }`. Tạo `GuestOtpChallenge` (hiệu lực 5 phút, chờ 60 giây giữa các lần gửi) và gửi mã 6 chữ số qua email.                                                                                                                                                                                                                                                                                                                                    |
+| POST   | `/api/guest/bookings/verify-otp`                  | Công khai (10 lượt / 5 phút / IP)         | Body `{ email, code }`. Xác thực mã 6 số, phát hành `otpProof` một lần (`gop_...`) kèm `otpProofExpiresAt`.                                                                                                                                                                                                                                                                                                                                                |
+| POST   | `/api/guest/bookings`                             | Công khai (10 lượt / 5 phút / IP)         | Body `GuestCreateBookingDto`: `{ courtId, startsAt, endsAt, customerName, customerPhone, customerEmail, prepaymentPercent?: 30, idempotencyKey, otpProof, checkoutIntentId, recoverySecret, termsVersion? }`. Từ chối nếu request đang có JWT/cookie đăng nhập (`GUEST_JWT_REJECTED`). Tạo đơn giữ chỗ 30%, tạo `PaymentRequest` trạng thái `CREATING`, ghi `OutboxMessage` và trả về `accessToken`, `checkoutToken`, `paymentRequestId`, `paymentStatus`. |
+| POST   | `/api/guest/bookings/resume-intent`               | Công khai (10 lượt / 5 phút / IP)         | Body `ResumeGuestIntentDto`: `{ checkoutIntentId (UUID), recoverySecret }`. Khôi phục kết quả giữ chỗ cùng tab mà không cần xác thực lại OTP.                                                                                                                                                                                                                                                                                                              |
+| POST   | `/api/guest/bookings/lookup`                      | Công khai (`@SkipThrottle`, quota nội bộ) | Body `GuestLookupContactDto`: `{ contact }`. Luôn trả `202` với thông báo chung để chống dò thông tin; nếu có đơn `HOLDING` còn hạn sẽ xếp hàng gửi email chứa liên kết khôi phục.                                                                                                                                                                                                                                                                         |
+| GET    | `/api/guest/bookings/:bookingId/recovery`         | `GuestCheckoutTokenGuard`                 | Chỉ đọc (`GET`): trả snapshot `GuestHoldRecoverySnapshot` (`booking`, `serverClock`, `payment`, `allowedActions`) do máy chủ quyết định.                                                                                                                                                                                                                                                                                                                   |
+| POST   | `/api/guest/bookings/:bookingId/payment-requests` | `GuestCheckoutTokenGuard`                 | Body `CreateGuestPrepaymentRequestDto`: `{ prepaymentPercent?: 30, method?: 'PAYOS_TRANSFER' }`. Tạo hoặc sử dụng lại yêu cầu thu cọc 30% bằng khóa chuẩn `pay_guest_{bookingId}`.                                                                                                                                                                                                                                                                         |
+| POST   | `/api/guest/bookings/:bookingId/cancel-hold`      | `GuestCheckoutTokenGuard`                 | Hủy đơn giữ chỗ khi còn trong cửa sổ thao tác (`serverNow < holdExpiresAt`); trả `409 CHECKOUT_READ_ONLY` nếu đã sang cửa sổ chỉ đọc (phút 5–10) hoặc `409 ALREADY_PAID`.                                                                                                                                                                                                                                                                                  |
+| POST   | `/api/guest/bookings/:bookingId/cancel-quote`     | `GuestTokenGuard`                         | Body `RequestCancelQuoteDto`. Báo phí hủy có hoàn tiền cho đơn đã `CONFIRMED` của khách vãng lai.                                                                                                                                                                                                                                                                                                                                                          |
+| POST   | `/api/guest/bookings/:bookingId/cancel-apply`     | `GuestTokenGuard`                         | Body `ApplyCancelDto`. Áp dụng hủy đơn có hoàn tiền cho khách vãng lai.                                                                                                                                                                                                                                                                                                                                                                                    |
+| POST   | `/api/guest/bookings/:bookingId/check-in-token`   | `GuestTokenGuard`                         | Cấp mã QR check-in một lần cho khách vãng lai khi đơn `CONFIRMED` và đã thanh toán đủ.                                                                                                                                                                                                                                                                                                                                                                     |
 
-| HTTP    | Cách xử lý                                                               |
-| ------- | ------------------------------------------------------------------------ |
-| 400     | Sửa input/DTO, timezone hoặc khoảng thời gian                            |
-| 401     | Phiên hoặc token không hợp lệ; auth code có thể yêu cầu xác minh email   |
-| 403     | Kiểm Origin, CSRF, quyền hoặc điều kiện truy cập                         |
-| 404     | Không tồn tại/không được truy cập; không suy resource người khác tồn tại |
-| 409/410 | Xung đột trạng thái, slot hoặc hết hạn; tải lại trạng thái server        |
-| 429     | Tôn trọng rate limit và Retry-After nếu có                               |
-| 503     | Dependency/config chưa sẵn sàng; không giả trạng thái thành công         |
+## 5. Thanh toán, Webhook, Mô phỏng và Hoàn tiền
 
-Mutation không tự retry bằng key mới sau timeout. Kiểm tra trạng thái hoặc replay cùng logical request/key theo contract; payment UNKNOWN cần đối soát. Response lỗi có thể có `code`, `message`, `statusCode` tùy module; không chỉ parse một chuỗi tiếng Việt.
+### Hội viên & Khách vãng lai
 
-## Nguồn
+| Method | Route                                     | Quyền / Guard                    | Đầu vào & Phản hồi chính                                                                                                                |
+| ------ | ----------------------------------------- | -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| POST   | `/api/payments/requests`                  | `JwtAuthGuard` + `AuthCsrfGuard` | Body `CreatePaymentRequestDto`: `{ bookingId, purpose: 'PREPAYMENT'\|'BALANCE', prepaymentPercent?: 30\|100, method, idempotencyKey }`. |
+| GET    | `/api/payments/requests`                  | `JwtAuthGuard`                   | Query `bookingId` (UUID), `purpose?`. Lấy kết quả thanh toán mới nhất của đơn.                                                          |
+| GET    | `/api/payments/requests/:id`              | `JwtAuthGuard`                   | Chi tiết yêu cầu thanh toán (`PaymentRequestResponseDto`).                                                                              |
+| GET    | `/api/payments/requests/:id/status`       | `JwtAuthGuard`                   | Trạng thái kết quả thanh toán (`PaymentOutcome`: `screen`, `bookingStatus`, `netCredited`, `reviewRequired`, `serverNow`).              |
+| POST   | `/api/payments/refunds/quote`             | `JwtAuthGuard` + `AuthCsrfGuard` | Body `RefundQuoteRequestDto`: `{ bookingId, cancellationRequestId, idempotencyKey? }`.                                                  |
+| GET    | `/api/refunds`                            | `JwtAuthGuard`                   | Query `bookingId` (UUID). Theo dõi tiến độ hoàn tiền (đã che thông tin tài khoản).                                                      |
+| POST   | `/api/guest/payments/requests`            | `GuestTokenGuard`                | Body `CreatePaymentRequestDto`. Tạo yêu cầu thanh toán dưới quyền token quản lý của khách vãng lai.                                     |
+| GET    | `/api/guest/payments/requests`            | `GuestTokenGuard`                | Query `bookingId` (UUID). Lấy kết quả thanh toán mới nhất cho khách vãng lai.                                                           |
+| GET    | `/api/guest/payments/requests/:id`        | `GuestTokenGuard`                | Chi tiết yêu cầu thanh toán cho khách vãng lai.                                                                                         |
+| GET    | `/api/guest/payments/requests/:id/status` | `GuestTokenGuard`                | Trạng thái kết quả thanh toán cho khách vãng lai.                                                                                       |
+| GET    | `/api/guest/payments/refunds`             | `GuestTokenGuard`                | Query `bookingId` (UUID). Theo dõi tiến độ hoàn tiền cho khách vãng lai.                                                                |
 
-Controller/DTO tại [Auth](../backend/src/modules/auth/auth.controller.ts), [Bookings](../backend/src/modules/bookings/presentation/bookings.controller.ts), [Payments](../backend/src/modules/payments/presentation/payments.controller.ts), [Guest](../backend/src/modules/payments/presentation/guest-bookings.controller.ts), [Check-in](../backend/src/modules/check-in/presentation/staff-checkins.controller.ts), [Courts](../backend/src/modules/courts/presentation/courts.controller.ts). Xem [Workflows](WORKFLOWS.md) để hiểu điều kiện nghiệp vụ; source không thay evidence runtime.
+### Webhook & Mô phỏng (Showcase Simulation)
+
+| Method | Route                                       | Quyền / Guard                    | Đầu vào & Phản hồi chính                                                                                                         |
+| ------ | ------------------------------------------- | -------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| POST   | `/api/webhooks/payos`                       | Chữ ký HMAC payOS                | Tiếp nhận callback từ payOS, lưu bền vững vào `payment_webhook_events` và điều phối xác nhận đơn.                                |
+| POST   | `/api/webhooks/payos/simulate`              | `DemoPaymentAccessGuard`         | Body `{ requestId?, orderCode?, bookingId? }`. Chỉ hoạt động khi `ENABLE_PAYMENT_SIMULATION=true` và yêu cầu thuộc dòng `DEMO_`. |
+| POST   | `/api/payments/requests/:id/simulate`       | `JwtAuthGuard` + `AuthCsrfGuard` | Mô phỏng thanh toán thành công cho yêu cầu `DEMO_` của hội viên.                                                                 |
+| POST   | `/api/guest/payments/requests/:id/simulate` | `GuestTokenGuard`                | Body `{ bookingId }`. Mô phỏng thanh toán thành công cho yêu cầu `DEMO_` của khách vãng lai.                                     |
+
+## 6. Nghiệp vụ Nhân viên và Quản lý (Staff & Manager)
+
+Tất cả các route `/api/staff/*` yêu cầu `JwtAuthGuard`, `AuthCsrfGuard` và `RolesGuard`.
+
+| Method | Route                                               | Vai trò được phép           | Đầu vào & Mục đích                                                                                                                                                                             |
+| ------ | --------------------------------------------------- | --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| GET    | `/api/staff/bookings/lookup`                        | `STAFF`, `MANAGER`, `ADMIN` | Query `query` (mã đơn hoặc số điện thoại). Tra cứu đơn có ghi nhận kiểm toán (`payment_audit_logs`) và che số ĐT.                                                                              |
+| POST   | `/api/staff/bookings/:bookingId/issue-manage-token` | `STAFF`, `MANAGER`          | Body `{ reason (tối thiểu 8 ký tự) }`. Thu hồi token quản lý cũ và cấp token mới cho đơn khách vãng lai.                                                                                       |
+| POST   | `/api/staff/bookings/:id/late-cancel`               | `STAFF`, `MANAGER`, `ADMIN` | Body `StaffLateCancelDto`: `{ reason, idempotencyKey }`. Hủy muộn trong cửa sổ `[startsAt - 12h, endsAt)`, giữ cọc 30%.                                                                        |
+| POST   | `/api/staff/check-ins/verify`                       | `STAFF`, `MANAGER`, `ADMIN` | Body `VerifyCheckinDto`: `{ bookingId, token }`. Quét và tiêu thụ mã QR check-in.                                                                                                              |
+| POST   | `/api/staff/check-ins/manual`                       | `STAFF`, `MANAGER`, `ADMIN` | Body `ManualCheckinDto`: `{ bookingId, note }`. Check-in thủ công tại quầy kèm ghi chú bắt buộc.                                                                                               |
+| POST   | `/api/staff/bookings/:id/complete`                  | `STAFF`, `MANAGER`, `ADMIN` | Chuyển đơn đã `CHECKED_IN` sang `COMPLETED` sau khi kết thúc giờ chơi.                                                                                                                         |
+| POST   | `/api/staff/payments/balance`                       | `STAFF`, `MANAGER`, `ADMIN` | Body `StaffBalanceDto`: `{ bookingId, method: 'CASH'\|'MANUAL_BANK_TRANSFER', amount?, transactionReference?, idempotencyKey }`. Thu 70% số dư tại quầy.                                       |
+| POST   | `/api/staff/payments/receipts/:receiptId/allocate`  | `STAFF`, `MANAGER`, `ADMIN` | Body `StaffAllocateDto`: `{ paymentRequestId, note?, idempotencyKey }`. Phân bổ biên lai thu vào yêu cầu thanh toán.                                                                           |
+| POST   | `/api/staff/payments/requests/:requestId/reconcile` | `STAFF`, `MANAGER`, `ADMIN` | Đối soát trạng thái yêu cầu thanh toán với cổng thanh toán.                                                                                                                                    |
+| POST   | `/api/staff/payments/refunds/prepare`               | `STAFF`, `MANAGER`, `ADMIN` | Body `PrepareManualRefundDto`. Khóa thông tin và tạo lần thử hoàn tiền thủ công (`RefundAttempt`).                                                                                             |
+| POST   | `/api/staff/payments/refunds/complete`              | `STAFF`, `MANAGER`, `ADMIN` | Body `CompleteManualRefundDto`: `{ attemptId, bankTransactionReference, evidenceReference }`. Hoàn tất lệnh hoàn thủ công.                                                                     |
+| GET    | `/api/staff/refunds`                                | `MANAGER`, `ADMIN`          | Query `status?`, `bookingId?`. Danh sách yêu cầu hoàn tiền (đã che số tài khoản).                                                                                                              |
+| POST   | `/api/staff/refunds/:id/approve`                    | `STAFF`, `MANAGER`, `ADMIN` | Body `RefundApproveDto`: `{ note?, idempotencyKey, destinationBankBin?, destinationAccountLast4?, destinationAccountName?, destinationAccountNumber? }`. Duyệt hoàn tiền (nguyên tắc bốn mắt). |
+| POST   | `/api/staff/refunds/:id/reject`                     | `STAFF`, `MANAGER`, `ADMIN` | Body `RefundRejectDto`: `{ rejectionReason, idempotencyKey }`. Từ chối yêu cầu hoàn tiền khi chưa có lệnh chi đang chạy.                                                                       |
+| GET    | `/api/staff/refunds/:id/destination`                | `MANAGER`, `ADMIN`          | Giải mã và hiển thị số tài khoản nhận hoàn tiền (có ghi log kiểm toán).                                                                                                                        |
+| POST   | `/api/staff/refunds/:id/reconcile`                  | `STAFF`, `MANAGER`, `ADMIN` | Body `RefundReconcileDto`: `{ bankTransactionReference?, evidenceReference? }`. Mở khóa/đối soát lệnh hoàn ở trạng thái `UNKNOWN`.                                                             |
+
+## Xử lý lỗi và nguyên tắc thử lại (Retry)
+
+| HTTP    | Cách xử lý                                                                                      |
+| ------- | ----------------------------------------------------------------------------------------------- |
+| 400     | Sửa dữ liệu đầu vào/DTO, định dạng UUID, múi giờ hoặc khoảng thời gian.                         |
+| 401     | Phiên đăng nhập hoặc token không hợp lệ/hết hạn; luồng đăng nhập có thể yêu cầu xác minh email. |
+| 403     | Kiểm tra `Origin`, `X-CSRF-Token`, vai trò người dùng hoặc quyền trên token đặt sân.            |
+| 404     | Không tồn tại hoặc không thuộc quyền truy cập (chống dò IDOR).                                  |
+| 409/410 | Xung đột trạng thái (`CHECKOUT_READ_ONLY`, `ALREADY_PAID`), trùng lịch sân hoặc đơn đã hết hạn. |
+| 429     | Vượt giới hạn tần suất; tuân thủ `Retry-After` hoặc bộ đếm thời gian chờ.                       |
+| 503     | Dịch vụ phụ thuộc hoặc cấu hình chưa sẵn sàng; không tự suy diễn giao dịch thành công.          |
+
+Các yêu cầu ghi (mutation) tuyệt đối không tự sinh khóa `idempotencyKey` mới để gửi lại sau khi gặp lỗi mạng hoặc hết thời gian chờ. Phía gọi phải đọc lại trạng thái từ máy chủ (`GET`) hoặc gửi lại đúng khóa định danh ban đầu.
+
+## Nguồn đối chiếu
+
+Controller và DTO tại [Auth](../backend/src/modules/auth/auth.controller.ts), [Profile](../backend/src/modules/users/presentation/profile.controller.ts), [Courts](../backend/src/modules/courts/presentation/courts.controller.ts), [Bookings](../backend/src/modules/bookings/presentation/bookings.controller.ts), [Availability](../backend/src/modules/bookings/presentation/booking-availability.controller.ts), [Payments](../backend/src/modules/payments/presentation/payments.controller.ts), [Guest Bookings](../backend/src/modules/payments/presentation/guest-bookings.controller.ts), [Staff Refunds](../backend/src/modules/payments/presentation/staff-refunds.controller.ts), [Check-in](../backend/src/modules/check-in/presentation/staff-checkins.controller.ts), [AI Assistant](../backend/src/modules/ai-assistant/presentation/ai-assistant.controller.ts), [Legal](../backend/src/modules/legal-content/presentation/legal-content.controller.ts), [Privacy](../backend/src/modules/privacy-requests/presentation/privacy-requests.controller.ts) và [Support](../backend/src/modules/support/presentation/support.controller.ts). Xem thêm [Workflows](WORKFLOWS.md) để nắm rõ điều kiện nghiệp vụ.
