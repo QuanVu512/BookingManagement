@@ -348,10 +348,20 @@ describe('AuthService.login', () => {
 });
 
 describe('AuthService.register', () => {
-  const register = (
+  const register = async (
     input: Parameters<AuthService['register']>[0],
     _response: Response,
-  ) => service.register(input);
+  ) => {
+    const pending = service.register(input);
+    const outcome = pending.then(
+      (value) => ({ ok: true as const, value }),
+      (error: unknown) => ({ ok: false as const, error }),
+    );
+    await jest.runAllTimersAsync();
+    const settled = await outcome;
+    if (!settled.ok) throw settled.error;
+    return settled.value;
+  };
   const prismaMock = {
     user: {
       findFirst: jest.fn<(...args: unknown[]) => Promise<unknown>>(),
@@ -374,10 +384,12 @@ describe('AuthService.register', () => {
   let service: AuthController;
 
   afterEach(() => {
+    jest.useRealTimers();
     jest.restoreAllMocks();
   });
 
   beforeEach(async () => {
+    jest.useFakeTimers();
     jest.clearAllMocks();
     prismaMock.user.findFirst.mockReset();
     prismaMock.user.findUnique.mockReset();

@@ -33,7 +33,7 @@ export const AUTH_CSRF_HEADER_NAME = 'x-csrf-token';
 export const AUTH_CSRF_TTL_SECONDS = 30 * 60;
 export const AUTH_MAIL_TIMEOUT_MS = 10000;
 export const AUTH_MAIL_CONNECT_TIMEOUT_MS = 5000;
-export const AUTH_RECOVERY_RESPONSE_MS = 11000;
+export const AUTH_RECOVERY_RESPONSE_MS = 3500;
 export const AUTH_ONE_TIME_TTLS = {
   'verify-email': 24 * 60 * 60,
   'email-otp-delivery': 10 * 60,
