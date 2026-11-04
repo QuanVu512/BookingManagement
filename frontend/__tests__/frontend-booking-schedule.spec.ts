@@ -4,6 +4,7 @@ import {
   assertBookableWindow,
   formatBookingDate,
   bookingTime,
+  initialBookingWindow,
 } from '../features/booking/model/booking-time';
 import { describe, expect, it } from '@jest/globals';
 import {
@@ -54,6 +55,15 @@ describe('Booking schedule selection', () => {
     ).toEqual({
       start: '2026-11-04T',
       end: '2026-11-04T',
+    });
+  });
+  it('computes initialBookingWindow for tomorrow accurately across UTC and month boundaries', () => {
+    const endOfMonthLateNight = new Date('2026-10-31T16:30:00Z'); // 23:30 Asia/Ho_Chi_Minh on Oct 31
+    expect(
+      initialBookingWindow('Asia/Ho_Chi_Minh', endOfMonthLateNight),
+    ).toEqual({
+      start: '2026-11-01T08:00',
+      end: '2026-11-01T09:00',
     });
   });
 });

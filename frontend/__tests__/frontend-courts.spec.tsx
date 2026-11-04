@@ -56,7 +56,7 @@ const COURT: CourtItem = {
   code: 'VIP-01',
   courtType: 'VIP',
   status: 'ACTIVE',
-  surfaceType: 'Sân Pickleball trong nhà Cushion Pro',
+  surfaceType: '',
   features: ['Vệ sinh 15 phút sau lượt chơi'],
   pricePerHour: 100000,
   imageUrl: '/courts/court-1.jpg',
@@ -488,8 +488,9 @@ describe('Court detail page composition', () => {
     expect(text()).toContain('Tóm tắt thanh toán');
     expect(text()).toContain('Nước uống & dụng cụ');
     const preset = container?.querySelector<HTMLButtonElement>(
-      'button[aria-label="18:00 – 19:00"]',
+      'button[aria-label^="18:00 – 19:00"]',
     );
+    expect(preset).not.toBeNull();
     await act(async () => preset?.click());
     expect(text()).not.toContain('Khoảng sân đang trống');
     const hold = container?.querySelector<HTMLButtonElement>(

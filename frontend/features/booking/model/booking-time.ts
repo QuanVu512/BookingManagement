@@ -1,4 +1,3 @@
-const MINUTE_MS = 60_000;
 export const BOOKING_REFRESH_MS = 15_000;
 const MAX_BOOKING_ADVANCE_MONTHS = 2;
 export const DEFAULT_BOOKING_TIMEZONE = 'Asia/Ho_Chi_Minh';
@@ -194,10 +193,10 @@ export function initialBookingWindow(timezone: string, now = new Date()) {
     };
   }
 
-  const tomorrow = wallClock(
-    new Date(now.getTime() + 24 * 60 * MINUTE_MS),
-    timezone,
-  ).slice(0, 10);
+  const [year, month, day] = current.date.split('-').map(Number);
+  const tomorrow = new Date(Date.UTC(year, month - 1, day + 1))
+    .toISOString()
+    .slice(0, 10);
   return { start: `${tomorrow}T08:00`, end: `${tomorrow}T09:00` };
 }
 export function bookingTime(value: string, timezone: string) {

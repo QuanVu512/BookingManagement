@@ -77,6 +77,8 @@ function mount(account = 'A') {
 
 describe('Quản lý phiên đặt sân trực tiếp và tính toàn vẹn dữ liệu (Booking client reconciliation and session boundaries)', () => {
   beforeEach(async () => {
+    jest.useFakeTimers({ doNotFake: ['setTimeout', 'clearTimeout'] });
+    jest.setSystemTime(new Date('2026-10-30T00:00:00Z'));
     const element = document.getElementById('app');
     if (!element) throw new Error('Missing fixture root');
     root = createRoot(element);
@@ -84,6 +86,7 @@ describe('Quản lý phiên đặt sân trực tiếp và tính toàn vẹn dữ
   });
   afterEach(async () => {
     await act(async () => root.unmount());
+    jest.useRealTimers();
     jest.restoreAllMocks();
   });
 
