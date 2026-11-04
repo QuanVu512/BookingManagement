@@ -15,8 +15,12 @@ FROM node:24-alpine AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-# Đổi tên để `next build` tự nạp (Next chỉ tự đọc `.env.production`).
-COPY frontend/.env.prod frontend/.env.production
+# Nhúng các biến cấu hình công khai cho frontend lúc Next build
+ENV NEXT_PUBLIC_API_URL=https://smashpickleball.id.vn/api \
+    NEXT_PUBLIC_SITE_ORIGIN=https://smashpickleball.id.vn \
+    NEXT_PUBLIC_COURT_DETAILS_ENABLED=true \
+    NEXT_PUBLIC_AI_ASSISTANT_ENABLED=true \
+    NEXT_PUBLIC_PAYMENT_SIMULATION_ENABLED=false
 RUN npm run build:web
 
 FROM node:24-alpine AS runner
