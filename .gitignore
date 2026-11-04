@@ -71,6 +71,7 @@ report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 # AI agents: local configuration, coordination and session state
 # Local agent skills and references (including addyosmani/agent-skills)
 /.agents/
+/.commandcode/
 /.opencode/
 /ai/
 AGENTS.md
