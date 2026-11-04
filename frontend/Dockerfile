@@ -28,8 +28,10 @@ WORKDIR /app
 ENV NODE_ENV=production \
     PORT=3000 \
     HOSTNAME=0.0.0.0
-# Bản standalone chỉ gồm file thực sự chạy (server.js + node_modules đã lọc).
-COPY --from=builder /app/frontend/.next/standalone ./
+# Bản standalone của Next.js khi project nằm trong thư mục con frontend/
+# sẽ sinh ra cấu trúc: standalone/frontend/server.js
+COPY --from=builder /app/frontend/.next/standalone/node_modules ./node_modules
+COPY --from=builder /app/frontend/.next/standalone/frontend ./
 # Tài nguyên tĩnh và ảnh public không nằm trong standalone, chép thủ công.
 COPY --from=builder /app/frontend/.next/static ./.next/static
 COPY --from=builder /app/frontend/public ./public
