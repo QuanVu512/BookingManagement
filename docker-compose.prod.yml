@@ -1,0 +1,113 @@
+# Booking Project — Production topology (VPS + Neon + Mat Bao SMTP).
+#
+# Cách dùng từ thư mục gốc của repository:
+#   docker compose -f docker-compose.prod.yml config   # kiểm tra nội dung ghép
+#   docker compose -f docker-compose.prod.yml up -d --build
+#
+# Quy ước cấu hình:
+# - backend đọc backend/.env.prod (DATABASE_URL trỏ Neon, SMTP trỏ Mắt Bão).
+#   File đó viết cho backend chạy trên máy, nên Compose ghi đè REDIS_HOST/PORT/URL
+#   để backend trong container trỏ đúng service redis nội bộ (ưu tiên `environment`
+#   cao hơn `env_file`). Redis prod không đặt mật khẩu, khớp REDIS_PASSWORD rỗng.
+# - frontend nhúng NEXT_PUBLIC_* vào bundle lúc build từ frontend/.env.prod.
+# - PostgreSQL KHÔNG chạy trong Compose (dùng Neon); migrate chạy tự động lúc
+#   backend khởi động (`prisma migrate deploy` trong backend/Dockerfile).
+# - nginx đứng ngoài cùng, nhận cổng 80/443; chứng chỉ TLS do operator cấp trên
+#   máy chủ rồi mount vào /etc/letsencrypt (xem ghi chú service nginx).
+
+name: booking-prod
+
+services:
+  redis:
+    image: redis:7.4.11-alpine
+    command: ['redis-server', '--appendonly', 'yes']
+    volumes:
+      - redis_prod_data:/data
+    networks:
+      - app
+    restart: unless-stopped
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    image: booking-backend:prod
+    env_file:
+      - backend/.env.prod
+    environment:
+      # Ghi đè host/port Redis để dùng service nội bộ thay vì localhost.
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_URL: redis://redis:6379
+    depends_on:
+      redis:
+        condition: service_healthy
+    expose:
+      - '4000'
+    networks:
+      - app
+    restart: unless-stopped
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - node -e "require('net').connect(process.env.PORT || 4000, '127.0.0.1').on('connect', () => process.exit(0)).on('error', () => process.exit(1))"
+      interval: 15s
+      timeout: 5s
+      start_period: 60s
+      retries: 5
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    image: booking-frontend:prod
+    env_file:
+      - frontend/.env.prod
+    depends_on:
+      backend:
+        condition: service_healthy
+    expose:
+      - '3000'
+    networks:
+      - app
+    restart: unless-stopped
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - node -e "require('net').connect(process.env.PORT || 3000, '127.0.0.1').on('connect', () => process.exit(0)).on('error', () => process.exit(1))"
+      interval: 15s
+      timeout: 5s
+      start_period: 30s
+      retries: 5
+
+  nginx:
+    image: nginx:1.27-alpine
+    ports:
+      - '80:80'
+      - '443:443'
+    volumes:
+      - ./infra/nginx/production.conf:/etc/nginx/conf.d/production.conf:ro
+      # Chứng chỉ do certbot cấp trên máy chủ (ví dụ /etc/letsencrypt/live/...).
+      # Lần đầu chưa có chứng chỉ: cấp cert trước rồi mới mở khối 443,
+      # xem chú thích ssl_certificate trong infra/nginx/production.conf.
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+    depends_on:
+      backend:
+        condition: service_healthy
+      frontend:
+        condition: service_started
+    networks:
+      - app
+    restart: unless-stopped
+
+networks:
+  app:
+    driver: bridge
+
+volumes:
+  redis_prod_data:

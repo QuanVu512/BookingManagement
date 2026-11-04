@@ -31,6 +31,8 @@ const cspDirectives = [
 const contentSecurityPolicy = cspDirectives.join('; ');
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Production Docker: gom bản build tối ưu, image chạy nhẹ trên VPS.
+  output: 'standalone',
   poweredByHeader: false,
   async headers() {
     return [

@@ -5,6 +5,9 @@ dist
 .env
 .env.*
 !.env.example
+# Cho phép Dockerfile frontend sao chép file env public (chỉ chứa NEXT_PUBLIC_*)
+# để nhúng vào bản build. Tuyệt đối không mở ngoại lệ cho backend/.env.prod.
+!frontend/.env.prod
 coverage
 *.tsbuildinfo
 .temp
