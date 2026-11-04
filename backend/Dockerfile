@@ -19,6 +19,8 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 # Sinh Prisma client rồi biên dịch TypeScript ra backend/dist/.
+# Prisma generate chỉ tạo code Typescript, đặt DATABASE_URL giả lúc build để vượt qua kiểm tra env
+ENV DATABASE_URL="postgresql://dummy:dummy@localhost:5432/dummy"
 RUN npm run build
 
 FROM node:24-alpine AS runner
