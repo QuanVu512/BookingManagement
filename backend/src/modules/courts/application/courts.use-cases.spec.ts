@@ -2,6 +2,10 @@ import { describe, expect, it, jest } from '@jest/globals';
 import { NotFoundException } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { CourtsService } from '../courts.service.js';
+import {
+  listCourtServiceProducts,
+  quoteCourtServices,
+} from '../domain/court-services.catalog.js';
 import type { ActiveCourtReadModel } from './models/court-read-models.js';
 import { CourtReader } from '../ports/court-reader.js';
 import { CourtResponsePresenter } from '../presentation/court-response.presenter.js';
@@ -107,10 +111,56 @@ describe('Public court catalog has no silent fixture fallback', () => {
     });
     expect(await facade.getPublicCourt('court-1')).toMatchObject({
       id: 'court-1',
-      branchName: 'SMASH ARENA — Cơ sở thử nghiệm',
-      address: 'Khu Thể Thao Phức Hợp SMASH ARENA — Hà Nội (Cơ sở thử nghiệm)',
+      branchName: 'SMASH ARENA DEMO',
+      address: 'SMASH ARENA DEMO',
       pricePerHour: 100000,
       features: ['Vệ sinh 15 phút sau lượt chơi'],
     });
+  });
+
+  it('normalizes legacy seeded court names and hides zero-cleanup default feature', async () => {
+    const { facade } = await moduleFor({
+      findActiveCourtById: async () => ({
+        ...readModel(),
+        name: 'Center Court Pro 1',
+        cleanupMinutes: 0,
+      }),
+    });
+    expect(await facade.getPublicCourt('court-1')).toMatchObject({
+      name: 'Demo Court VIP 1',
+      surfaceType: '',
+      features: [],
+      branchName: 'SMASH ARENA DEMO',
+      address: 'SMASH ARENA DEMO',
+    });
+  });
+
+  it('lists and quotes court service products for rental and sale items', () => {
+    const products = listCourtServiceProducts();
+    expect(products.length).toBeGreaterThan(0);
+    const quote = quoteCourtServices(
+      [
+        { productId: 'svc-paddle-carbon', quantity: 2 },
+        { productId: 'svc-drink-pocari', quantity: 3 },
+      ],
+      90,
+    );
+    expect(quote.items).toEqual([
+      expect.objectContaining({
+        productId: 'svc-paddle-carbon',
+        billingMode: 'HOURLY_RENTAL',
+        quantity: 2,
+        durationMinutes: 90,
+        amount: 150000,
+      }),
+      expect.objectContaining({
+        productId: 'svc-drink-pocari',
+        billingMode: 'SALE',
+        quantity: 3,
+        durationMinutes: 0,
+        amount: 60000,
+      }),
+    ]);
+    expect(quote.totalAmount).toBe(210000);
   });
 });

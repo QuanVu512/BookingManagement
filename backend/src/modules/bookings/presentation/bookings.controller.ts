@@ -75,6 +75,7 @@ export class BookingsController {
             endsAt: input.endsAt,
             idempotencyKey: input.idempotencyKey,
             prepaymentPercent: input.prepaymentPercent,
+            services: input.services,
           }),
         ),
       };
@@ -147,7 +148,9 @@ export class BookingsController {
 
   @Post(':id/cancel-quote')
   @Header('Cache-Control', 'no-store, private')
-  @ApiOperation({ summary: 'C08: báo phí hủy có hoàn (persist quote + consent)' })
+  @ApiOperation({
+    summary: 'C08: báo phí hủy có hoàn (persist quote + consent)',
+  })
   async cancelQuote(
     @CurrentUser('userId') userId: string,
     @Param('id', ParseUUIDPipe) id: string,

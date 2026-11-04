@@ -476,7 +476,7 @@ describe('Court detail page composition', () => {
         children: createElement(CourtInfoCard, { court: COURT }),
       }),
     );
-    expect(text()).toContain('Giờ theo Asia/Ho_Chi_Minh');
+    expect(text()).toContain('Chọn lịch & khung giờ');
     await waitForQuote(fetch);
     expect(fetch).toHaveBeenCalledWith(
       expect.stringContaining('/api/courts/court-1/availability?'),
@@ -506,7 +506,7 @@ describe('Court detail page composition', () => {
       }),
     );
     expect(text()).toContain('Thiếu cấu hình múi giờ của sân. Chưa thể đặt.');
-    expect(text()).not.toContain('Giờ theo');
+    expect(text()).not.toContain('Chọn lịch & khung giờ');
     expect(fetch).not.toHaveBeenCalled();
   });
 });

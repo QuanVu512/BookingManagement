@@ -151,19 +151,30 @@ export function wallTimeToUtcMs(
   return instant;
 }
 
+const WALL_CLOCK_FORMATTERS = new Map<string, Intl.DateTimeFormat>();
+
+function getWallClockFormatter(timezone: string): Intl.DateTimeFormat {
+  let formatter = WALL_CLOCK_FORMATTERS.get(timezone);
+  if (!formatter) {
+    formatter = new Intl.DateTimeFormat('en-CA', {
+      timeZone: timezone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hourCycle: 'h23',
+    });
+    WALL_CLOCK_FORMATTERS.set(timezone, formatter);
+  }
+  return formatter;
+}
+
 function wallClockParts(
   instant: Date,
   timezone: string,
 ): { year: number; month: number; day: number; hour: number; minute: number } {
-  const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone: timezone,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    hourCycle: 'h23',
-  }).formatToParts(instant);
+  const parts = getWallClockFormatter(timezone).formatToParts(instant);
   const part = (key: string): number =>
     Number(parts.find((value) => value.type === key)?.value);
   return {

@@ -1,3 +1,4 @@
+import type { DomainServiceLine } from '../../courts/domain/court-services.catalog.js';
 import type { TransactionContext } from '../../../infrastructure/prisma/transaction-context.js';
 
 export interface ExpiryScope {
@@ -60,6 +61,7 @@ export interface StoredBooking {
   requiredPrepaymentAmount: number;
   currency: string;
   priceItems: BookingPriceLine[];
+  serviceItems?: DomainServiceLine[];
 }
 
 export interface ReplayBooking {

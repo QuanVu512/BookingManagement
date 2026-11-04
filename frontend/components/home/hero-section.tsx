@@ -86,7 +86,7 @@ export function HeroSection({
           price: c.pricePerHour,
           surface: c.surfaceType,
           image: c.imageUrl || `/courts/court-${(idx % 4) + 1}.jpg`,
-          tagline: `${c.name} • ${c.surfaceType}`,
+          tagline: c.surfaceType ? `${c.name} • ${c.surfaceType}` : c.name,
         }))
       : [];
 
@@ -97,14 +97,16 @@ export function HeroSection({
     if (viewMode === 'overview') {
       onOpenLightbox(
         '/courts/court-overview-angle.jpg',
-        'Toàn cảnh cụm 4 sân SMASH ARENA (Cơ sở thử nghiệm)',
-        'Góc chụp toàn cảnh từ trên cao: 4 sân đấu trong nhà, mái che cách nhiệt, đèn LED thi đấu và thảm Cushion Pro.',
+        'Toàn cảnh cụm 4 sân SMASH ARENA DEMO',
+        'Góc chụp toàn cảnh từ trên cao: 4 sân đấu trong nhà, mái che cách nhiệt và đèn LED thi đấu.',
       );
     } else if (activeCourt) {
       onOpenLightbox(
         activeCourt.image,
         activeCourt.name,
-        `${activeCourt.surface} • Hà Nội (Cơ sở thử nghiệm)`,
+        activeCourt.surface
+          ? `${activeCourt.surface} • SMASH ARENA DEMO`
+          : 'SMASH ARENA DEMO',
       );
     }
   };
@@ -193,6 +195,7 @@ export function HeroSection({
                         }`}
                       >
                         {court.name
+                          .replace('Demo Court ', '')
                           .replace('Center Court ', '')
                           .replace('Championship Arena ', '')
                           .replace('Pickle Standard ', '')
@@ -338,9 +341,11 @@ export function HeroSection({
                     <h3 className="font-bold text-base tracking-tight text-white">
                       {activeCourt.name}
                     </h3>
-                    <p className="text-xs text-white/65">
-                      Mặt sân: {activeCourt.surface}
-                    </p>
+                    {activeCourt.surface && (
+                      <p className="text-xs text-white/65">
+                        Mặt sân: {activeCourt.surface}
+                      </p>
+                    )}
                   </div>
                   <a
                     href={`/booking?courtId=${encodeURIComponent(activeCourt.id)}`}

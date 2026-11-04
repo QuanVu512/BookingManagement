@@ -1,15 +1,19 @@
 import {
+  Body,
   Controller,
   Get,
   Header,
+  HttpCode,
+  HttpStatus,
   Param,
   ParseUUIDPipe,
+  Post,
   Query,
 } from '@nestjs/common';
 import { ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import { QuoteAvailabilityUseCase } from '../application/quote-availability.use-case.js';
 import { GetCourtDayOccupanciesUseCase } from '../application/get-court-day-occupancies.use-case.js';
-import { BookingWindowDto } from './dto/booking-request.dto.js';
+import { BookingWindowDto, QuoteCourtDto } from './dto/booking-request.dto.js';
 import { AvailabilityResponseDto } from './dto/booking-response.dto.js';
 import { CourtDayOccupanciesResponseDto } from './dto/court-occupancies.dto.js';
 import {
@@ -40,6 +44,27 @@ export class BookingAvailabilityController {
           courtId: id,
           startsAt: window.startsAt,
           endsAt: window.endsAt,
+        }),
+      ),
+    };
+  }
+
+  @Post(':id/quote')
+  @HttpCode(HttpStatus.OK)
+  @ApiOkResponse({ type: AvailabilityResponseDto })
+  @Header('Cache-Control', 'no-store, private')
+  async quote(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: QuoteCourtDto,
+  ) {
+    return {
+      success: true,
+      data: presentAvailability(
+        await this.quoteAvailability.execute({
+          courtId: id,
+          startsAt: body.startsAt,
+          endsAt: body.endsAt,
+          services: body.services ?? [],
         }),
       ),
     };

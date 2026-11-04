@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import {
   BOOKING_PERIODS,
@@ -121,7 +121,7 @@ function PresetButton({
   const effectiveNowMs = gridEffectiveNowMs(occupancy);
   const legacyPast = isSlotInPast(selectedDate, hour, timezone);
   const slotPast = grid
-    ? isSlotPast(selectedDate, hour, timezone, effectiveNowMs)
+    ? isSlotPast(selectedDate, hour, timezone, effectiveNowMs) || legacyPast
     : legacyPast;
   const conflict = grid
     ? findSlotOccupancy(
@@ -389,11 +389,6 @@ export function BookingSchedulePicker(props: LiveBookingViewProps) {
         )}
       {/* Đưa phần chọn giờ Bắt đầu / Kết thúc lên ngay dưới Ngày chơi */}
       <CustomTimeRange {...props} />
-      <p className="detail-muted" style={{ marginTop: '10px' }}>
-        Giờ theo {props.timezone}. Chọn các giờ liền nhau ở các buổi bên dưới
-        hoặc điều chỉnh khoảng chơi ở trên. Giá sẽ tự động cập nhật ngay khi
-        chọn.
-      </p>
       {props.gridConflict === true && !props.state.booking && (
         <p
           className="schedule-time-error"

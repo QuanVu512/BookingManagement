@@ -2,6 +2,42 @@ const MINUTE_MS = 60_000;
 export const BOOKING_REFRESH_MS = 15_000;
 const MAX_BOOKING_ADVANCE_MONTHS = 2;
 export const DEFAULT_BOOKING_TIMEZONE = 'Asia/Ho_Chi_Minh';
+const WALL_CLOCK_FORMATTERS = new Map<string, Intl.DateTimeFormat>();
+const BOOKING_TIME_FORMATTERS = new Map<string, Intl.DateTimeFormat>();
+
+function getWallClockFormatter(timezone: string): Intl.DateTimeFormat {
+  let formatter = WALL_CLOCK_FORMATTERS.get(timezone);
+  if (!formatter) {
+    formatter = new Intl.DateTimeFormat('en-CA', {
+      timeZone: timezone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hourCycle: 'h23',
+    });
+    WALL_CLOCK_FORMATTERS.set(timezone, formatter);
+  }
+  return formatter;
+}
+
+function getBookingTimeFormatter(timezone: string): Intl.DateTimeFormat {
+  let formatter = BOOKING_TIME_FORMATTERS.get(timezone);
+  if (!formatter) {
+    formatter = new Intl.DateTimeFormat('vi-VN', {
+      timeZone: timezone,
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hourCycle: 'h23',
+    });
+    BOOKING_TIME_FORMATTERS.set(timezone, formatter);
+  }
+  return formatter;
+}
 
 export function formatBookingDate(value: string) {
   const date = value.slice(0, 10);
@@ -49,9 +85,7 @@ export function assertBookableWindow(
   const dateStart = window.start.slice(0, 10);
   const dateEnd = window.end.slice(0, 10);
   if (
-    ![dateStart, dateEnd].every((value) =>
-      isBookableDate(value, timezone, now),
-    )
+    ![dateStart, dateEnd].every((value) => isBookableDate(value, timezone, now))
   ) {
     const { min, max } = bookingDateBounds(timezone, now);
     throw new Error(
@@ -69,15 +103,7 @@ export function assertBookableWindow(
 }
 
 export function wallClock(instant: Date, timezone: string) {
-  const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone: timezone,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    hourCycle: 'h23',
-  }).formatToParts(instant);
+  const parts = getWallClockFormatter(timezone).formatToParts(instant);
   const part = (key: string) =>
     parts.find((value) => value.type === key)?.value;
   return `${part('year')}-${part('month')}-${part('day')}T${part('hour')}:${part('minute')}`;
@@ -152,8 +178,12 @@ export function isoToLocalInput(iso: string, timezone: string) {
 }
 export function initialBookingWindow(timezone: string, now = new Date()) {
   const current = getNowInTimezone(timezone, now);
-  const allHours = [6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22];
-  const upcomingHour = allHours.find((h) => !isSlotInPast(current.date, h, timezone, now));
+  const allHours = [
+    6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22,
+  ];
+  const upcomingHour = allHours.find(
+    (h) => !isSlotInPast(current.date, h, timezone, now),
+  );
 
   if (upcomingHour !== undefined) {
     const startH = String(upcomingHour).padStart(2, '0');
@@ -171,15 +201,7 @@ export function initialBookingWindow(timezone: string, now = new Date()) {
   return { start: `${tomorrow}T08:00`, end: `${tomorrow}T09:00` };
 }
 export function bookingTime(value: string, timezone: string) {
-  return new Intl.DateTimeFormat('vi-VN', {
-    timeZone: timezone,
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    hourCycle: 'h23',
-  }).format(new Date(value));
+  return getBookingTimeFormatter(timezone).format(new Date(value));
 }
 export function formatVnd(amount: number) {
   return new Intl.NumberFormat('vi-VN', {

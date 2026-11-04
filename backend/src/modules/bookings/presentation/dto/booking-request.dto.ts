@@ -1,13 +1,33 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { Type } from 'class-transformer';
 import {
   Equals,
+  IsArray,
   IsIn,
   IsInt,
   IsISO8601,
+  IsNotEmpty,
   IsOptional,
+  IsString,
   IsUUID,
   Matches,
+  Max,
+  Min,
+  ValidateNested,
 } from 'class-validator';
+
+export class ServiceSelectionDto {
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  productId!: string;
+
+  @ApiProperty({ minimum: 1, maximum: 99 })
+  @IsInt()
+  @Min(1)
+  @Max(99)
+  quantity!: number;
+}
 
 export class BookingWindowDto {
   @ApiProperty({
@@ -22,6 +42,15 @@ export class BookingWindowDto {
   @IsISO8601({ strict: true })
   @Matches(/T\d{2}:\d{2}(?::00(?:\.000)?)?(?:Z|[+-]\d{2}:\d{2})$/)
   endsAt!: string;
+}
+
+export class QuoteCourtDto extends BookingWindowDto {
+  @ApiProperty({ type: [ServiceSelectionDto], required: false })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => ServiceSelectionDto)
+  services?: ServiceSelectionDto[];
 }
 
 export class CreateBookingDto extends BookingWindowDto {
@@ -53,4 +82,11 @@ export class CreateBookingDto extends BookingWindowDto {
   @IsInt()
   @IsIn([30])
   prepaymentPercent?: 30;
+
+  @ApiProperty({ type: [ServiceSelectionDto], required: false })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => ServiceSelectionDto)
+  services?: ServiceSelectionDto[];
 }

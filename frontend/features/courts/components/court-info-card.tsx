@@ -4,7 +4,9 @@ import { CourtPhotoGallery } from './court-photo-gallery';
 import type { CourtItem } from '../model/court';
 
 function CourtHeading({ court }: { court: CourtItem }) {
-  const venue = [court.branchName, court.address].filter(Boolean).join(' · ');
+  const venue = Array.from(
+    new Set([court.branchName, court.address].filter(Boolean)),
+  ).join(' · ');
   return (
     <>
       <div className="detail-section-heading">
@@ -20,14 +22,24 @@ function CourtHeading({ court }: { court: CourtItem }) {
 }
 
 function CourtFeatures({ court }: { court: CourtItem }) {
+  const showSurface =
+    Boolean(court.surfaceType) &&
+    court.surfaceType !== 'Sân Pickleball trong nhà Cushion Pro';
+  const visibleFeatures = (court.features ?? []).filter(
+    (feature) => feature !== 'Vệ sinh theo yêu cầu',
+  );
   return (
     <>
-      <p className="court-detail-surface">{court.surfaceType}</p>
-      <ul className="court-detail-features">
-        {court.features.map((feature) => (
-          <li key={feature}>{feature}</li>
-        ))}
-      </ul>
+      {showSurface && (
+        <p className="court-detail-surface">{court.surfaceType}</p>
+      )}
+      {visibleFeatures.length > 0 && (
+        <ul className="court-detail-features">
+          {visibleFeatures.map((feature) => (
+            <li key={feature}>{feature}</li>
+          ))}
+        </ul>
+      )}
       <div className="court-detail-price">
         <span>Giá tham khảo từ</span>
         <strong>

@@ -51,7 +51,6 @@ function SelectedSchedule({ state }: Pick<LiveBookingViewProps, 'state'>) {
           ? `${startTime} – ${endTime}`
           : 'Chưa chọn khung giờ'}
       </strong>
-      <a href="#booking-slots">Chỉnh sửa lịch</a>
     </div>
   );
 }
@@ -148,7 +147,12 @@ function HoldButton(
 
   if (sessionChecking) {
     return (
-      <button type="button" className="btn btn-primary" disabled aria-label="Đang kiểm tra phiên đăng nhập">
+      <button
+        type="button"
+        className="btn btn-primary"
+        disabled
+        aria-label="Đang kiểm tra phiên đăng nhập"
+      >
         Đang kiểm tra phiên...
       </button>
     );
@@ -206,7 +210,10 @@ function BookingCheckout(
         event.preventDefault();
         // AC-23: phiên chưa xác định hoặc đang kiểm tra thì chặn submit mở
         // form khách; lối duy nhất là nút thử lại phiên trong HoldButton.
-        if (props.sessionStatus === 'unknown' || props.sessionLoading === true) {
+        if (
+          props.sessionStatus === 'unknown' ||
+          props.sessionLoading === true
+        ) {
           props.onRetrySession?.();
           return;
         }
@@ -314,7 +321,6 @@ function OrderExtras({
       ) : (
         <SelectedServices selected={state.services ?? []} products={products} />
       )}
-      <a href="#court-services">Chỉnh sửa dịch vụ</a>
     </div>
   );
 }

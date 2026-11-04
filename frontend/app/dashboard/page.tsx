@@ -416,7 +416,7 @@ export default function DashboardPage() {
                   <td style={{ padding: '14px 16px' }}>
                     <span className="badge badge-vip">CUSTOMER</span>
                   </td>
-                  <td style={{ padding: '14px 16px' }}>Center Court Pro #1</td>
+                  <td style={{ padding: '14px 16px' }}>Demo Court VIP 1</td>
                   <td style={{ padding: '14px 16px' }}>
                     18:00 - 20:00 (Hôm nay)
                   </td>
@@ -458,9 +458,7 @@ export default function DashboardPage() {
                   <td style={{ padding: '14px 16px' }}>
                     <span className="badge badge-standard">GUEST</span>
                   </td>
-                  <td style={{ padding: '14px 16px' }}>
-                    Championship Arena #2
-                  </td>
+                  <td style={{ padding: '14px 16px' }}>Demo Court VIP 2</td>
                   <td style={{ padding: '14px 16px' }}>
                     19:00 - 21:00 (Hôm nay)
                   </td>
@@ -502,7 +500,9 @@ export default function DashboardPage() {
                   <td style={{ padding: '14px 16px' }}>
                     <span className="badge badge-vip">CUSTOMER</span>
                   </td>
-                  <td style={{ padding: '14px 16px' }}>Pickle Standard #3</td>
+                  <td style={{ padding: '14px 16px' }}>
+                    Demo Court Standard 3
+                  </td>
                   <td style={{ padding: '14px 16px' }}>
                     08:00 - 10:00 (Ngày mai)
                   </td>

@@ -1,6 +1,16 @@
-import { Injectable, Logger, Optional } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  Logger,
+  Optional,
+} from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { CourtScheduleReader } from '../../courts/application/court-schedule-reader.js';
+import { CourtPricingError } from '../../courts/domain/court-pricing.types.js';
+import {
+  quoteCourtServices,
+  type DomainServiceLine,
+} from '../../courts/domain/court-services.catalog.js';
 import type { TransactionContext } from '../../../infrastructure/prisma/transaction-context.js';
 import {
   BOOKING_POLICY_VERSION,
@@ -175,10 +185,23 @@ export class CreateHoldUseCase {
       transaction,
     );
     const quote = this.schedule.quote(court, startsAt, endsAt);
+    const durationMinutes = quote.items.reduce(
+      (sum, item) => sum + item.durationMinutes,
+      0,
+    );
+    let serviceQuote: { items: DomainServiceLine[]; totalAmount: number };
+    try {
+      serviceQuote = quoteCourtServices(command.services, durationMinutes);
+    } catch (error) {
+      if (error instanceof CourtPricingError)
+        throw new BadRequestException(error.message);
+      throw error;
+    }
     const customer = await store.loadCustomer(transaction, command.userId);
     // Mandatory 30% deposit policy on court rental price for all users:
     const percent = 30;
     const required = Math.floor((quote.totalAmount * 30 + 50) / 100);
+    const totalAmount = quote.totalAmount + serviceQuote.totalAmount;
     const draft: BookingDraft = {
       bookingCode: `BK-${randomUUID().replaceAll('-', '').slice(0, 24)}`,
       userId: customer.id,
@@ -190,7 +213,7 @@ export class CreateHoldUseCase {
       customerPhone: customer.phone,
       startsAt,
       endsAt,
-      totalAmount: quote.totalAmount,
+      totalAmount,
       prepaymentPercent: percent,
       requiredPrepaymentAmount: required,
       holdExpiresAt: new Date(now.getTime() + HOLD_DURATION_MS),
@@ -206,6 +229,10 @@ export class CreateHoldUseCase {
       draft,
       priceLines,
     );
-    return store.readBooking(transaction, bookingId);
+    const stored = await store.readBooking(transaction, bookingId);
+    if (command.services !== undefined) {
+      return { ...stored, serviceItems: serviceQuote.items };
+    }
+    return stored;
   }
 }

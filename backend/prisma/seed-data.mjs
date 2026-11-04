@@ -8,8 +8,8 @@ export const SEED_MODES = ['courts', 'admin', 'all'];
 export const SEED_BRANCH = {
   id: '10000000-0000-4000-8000-000000000001',
   code: 'MVP-DEMO',
-  name: 'SMASH ARENA — Chi nhánh demo',
-  address: 'Khu Thể Thao Phức Hợp SMASH ARENA — Hà Nội (Cơ sở thử nghiệm)',
+  name: 'SMASH ARENA DEMO',
+  address: 'SMASH ARENA DEMO',
   phone: '02400000000',
   timezone: 'Asia/Ho_Chi_Minh',
 };
@@ -24,7 +24,7 @@ export const SEED_COURTS = [
   {
     id: '10000000-0000-4000-8000-000000000101',
     code: 'PRO-01',
-    name: 'Center Court Pro 1',
+    name: 'Demo Court VIP 1',
     courtType: 'VIP',
     priceId: '10000000-0000-4000-8000-000000000201',
     pricePerHour: '280000',
@@ -32,7 +32,7 @@ export const SEED_COURTS = [
   {
     id: '10000000-0000-4000-8000-000000000102',
     code: 'PRO-02',
-    name: 'Championship Arena 2',
+    name: 'Demo Court VIP 2',
     courtType: 'VIP',
     priceId: '10000000-0000-4000-8000-000000000202',
     pricePerHour: '240000',
@@ -40,7 +40,7 @@ export const SEED_COURTS = [
   {
     id: '10000000-0000-4000-8000-000000000103',
     code: 'STD-03',
-    name: 'Pickle Standard 3',
+    name: 'Demo Court Standard 3',
     courtType: 'STANDARD',
     priceId: '10000000-0000-4000-8000-000000000203',
     pricePerHour: '170000',
@@ -48,7 +48,7 @@ export const SEED_COURTS = [
   {
     id: '10000000-0000-4000-8000-000000000104',
     code: 'STD-04',
-    name: 'Dynamic Court 4',
+    name: 'Demo Court Standard 4',
     courtType: 'STANDARD',
     priceId: '10000000-0000-4000-8000-000000000204',
     pricePerHour: '160000',

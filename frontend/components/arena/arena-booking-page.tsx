@@ -61,6 +61,19 @@ export function ArenaBookingPage() {
   const court =
     catalog.courts.find((item) => item.id === selectedId) ?? catalog.courts[0];
 
+  // Chọn sẵn sân từ query ?courtId= nếu có trên URL
+  useEffect(() => {
+    if (selectedId || typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    const initialCourtId = params.get('courtId');
+    if (
+      initialCourtId &&
+      catalog.courts.some((item) => item.id === initialCourtId)
+    ) {
+      setSelectedId(initialCourtId);
+    }
+  }, [catalog.courts, selectedId]);
+
   // Kiểm tra đơn pending khi mount hoặc khi đổi sân
   useEffect(() => {
     const existing = getPendingBooking();
@@ -206,7 +219,9 @@ export function ArenaBookingPage() {
         )}
 
         <p className="arena-lookup-hint">
-          <Link href="/booking/lookup">Tìm lại đơn giữ chỗ chưa thanh toán</Link>
+          <Link href="/booking/lookup">
+            Tìm lại đơn giữ chỗ chưa thanh toán
+          </Link>
         </p>
 
         <ArenaCourtTabs
@@ -229,9 +244,8 @@ export function ArenaBookingPage() {
         >
           <p role="note" style={{ margin: 0 }}>
             <strong>Chính sách đặt cọc:</strong> Áp dụng đặt cọc bắt buộc đúng{' '}
-            <strong>30% tiền thuê sân</strong> cho tất cả khách hàng (thành viên
-            và khách vãng lai). 70% tiền thuê sân còn lại sẽ được thanh toán sau
-            theo quy trình tại cơ sở.
+            <strong>30% tiền thuê sân</strong> cho tất cả khách hàng. 70% tiền
+            thuê sân còn lại sẽ được thanh toán sau theo quy trình tại cơ sở.
           </p>
         </section>
 

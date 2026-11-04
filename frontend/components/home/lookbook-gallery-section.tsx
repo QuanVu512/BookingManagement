@@ -18,11 +18,11 @@ const FRAMES: LookbookFrame[] = [
   {
     id: 'frame-1',
     cols: 'md:col-span-7',
-    frameBadge: 'FRAME 01 // CENTER COURT PRO',
+    frameBadge: 'FRAME 01 // DEMO COURT VIP 1',
     badgeColor: 'bg-black/70',
     badgeTextColor: 'text-vipGold border border-vipGold/30',
     tagline: 'THE DISCIPLINE OF THE DINK',
-    title: 'Center Court Pro 1',
+    title: 'Demo Court VIP 1',
     description:
       'Độ ma sát bề mặt Silica đạt chuẩn USAPA, giúp mọi cú đánh drop shot đạt điểm rơi hoàn hảo.',
     priceNote: '280.000 ₫/H • Đèn chuẩn thi đấu',
@@ -32,11 +32,11 @@ const FRAMES: LookbookFrame[] = [
   {
     id: 'frame-2',
     cols: 'md:col-span-5',
-    frameBadge: 'FRAME 02 // CHAMPIONSHIP ARENA',
+    frameBadge: 'FRAME 02 // DEMO COURT VIP 2',
     badgeColor: 'bg-black/70',
     badgeTextColor: 'text-emeraldPro border border-emeraldPro/30',
     tagline: 'HIGH-CONTRAST VISUAL LINES',
-    title: 'Championship Arena 2',
+    title: 'Demo Court VIP 2',
     description:
       'Sân thi đấu với tông màu xanh đại dương, tích hợp khán đài mini.',
     priceNote: '240.000 ₫/H • Đèn chuẩn thi đấu',
@@ -48,7 +48,7 @@ const FRAMES: LookbookFrame[] = [
     cols: 'md:col-span-4',
     frameBadge: 'FRAME 03 // STD 3',
     tagline: 'HIGH-GRIP SURFACE',
-    title: 'Pickle Standard 3',
+    title: 'Demo Court Standard 3',
     description:
       'Tối ưu cho các buổi tập luyện cường độ cao và giao lưu câu lạc bộ.',
     priceNote: '170.000 ₫/H',
@@ -60,7 +60,7 @@ const FRAMES: LookbookFrame[] = [
     cols: 'md:col-span-4',
     frameBadge: 'FRAME 04 // STD 4',
     tagline: 'ELASTIC CUSHION',
-    title: 'Dynamic Court 4',
+    title: 'Demo Court Standard 4',
     description:
       'Mặt sân đàn hồi Elastic Cushion, bảo vệ khớp gối cho mọi lứa tuổi.',
     priceNote: '160.000 ₫/H',
@@ -75,7 +75,7 @@ const FRAMES: LookbookFrame[] = [
     tagline: '4 COURTS FULL INDOOR',
     title: 'Toàn Cảnh Cụm Sân',
     description:
-      'Góc nhìn minh họa từ trên cao bao quát 4 sân đấu tại cơ sở thử nghiệm.',
+      'Góc nhìn minh họa từ trên cao bao quát 4 sân đấu tại SMASH ARENA DEMO.',
     priceNote: '4 SÂN TRONG NHÀ',
     image: '/courts/court-overview-angle.jpg',
     aspectClass: 'aspect-[4/3]',
@@ -105,8 +105,7 @@ export function LookbookGallerySection({
               </h2>
             </div>
             <p className="text-sm text-[var(--text-secondary)] mt-2">
-              Hình ảnh minh họa không gian thi đấu tại SMASH ARENA — Hà Nội (Cơ
-              sở thử nghiệm)
+              Hình ảnh minh họa không gian thi đấu tại SMASH ARENA DEMO
             </p>
           </div>
 

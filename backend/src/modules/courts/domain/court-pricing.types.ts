@@ -50,7 +50,11 @@ export type CourtPricingErrorCode =
   | 'INVALID_WINDOW'
   | 'LOCAL_WINDOW_SPANS_DAYS'
   | 'MISSING_PRICE'
-  | 'INVALID_TOTAL_AMOUNT';
+  | 'INVALID_TOTAL_AMOUNT'
+  | 'INVALID_SERVICE_SELECTION'
+  | 'DUPLICATE_SERVICE_SELECTION'
+  | 'SERVICE_NOT_FOUND'
+  | 'SERVICE_OUT_OF_STOCK';
 
 /**
  * Domain-level pricing failure. Transport adapters translate this into the

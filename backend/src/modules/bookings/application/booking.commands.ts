@@ -1,8 +1,11 @@
+import type { DomainServiceSelection } from '../../courts/domain/court-services.catalog.js';
+
 /** Application input for availability quoting; presentation owns validation. */
 export interface QuoteAvailabilityQuery {
   courtId: string;
   startsAt: string;
   endsAt: string;
+  services?: readonly DomainServiceSelection[];
 }
 
 export interface CreateHoldCommand extends QuoteAvailabilityQuery {

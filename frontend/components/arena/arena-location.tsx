@@ -9,8 +9,7 @@ function VenueLocations() {
     <div className="arena-location-content">
       <div className="arena-map-preview">
         <ArenaIcon name="pin" width="40" height="40" />
-        <strong>SMASH ARENA</strong>
-        <span>Hà Nội (Cơ sở thử nghiệm)</span>
+        <strong>SMASH ARENA DEMO</strong>
       </div>
       <p>
         Địa chỉ mô phỏng phục vụ trình diễn công nghệ. Đang cập nhật địa chỉ
@@ -38,7 +37,7 @@ export function ArenaLocationButton({
         {label}
       </button>
       {open && (
-        <ArenaDialog title="Cơ sở thử nghiệm SMASH ARENA" onClose={close}>
+        <ArenaDialog title="SMASH ARENA DEMO" onClose={close}>
           <VenueLocations />
         </ArenaDialog>
       )}

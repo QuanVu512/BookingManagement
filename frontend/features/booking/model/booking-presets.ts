@@ -70,6 +70,7 @@ export function changeBookingDate(
   window: BookingWindow,
   date: string,
   timezone: string = DEFAULT_BOOKING_TIMEZONE,
+  now: Date = new Date(),
 ): BookingWindow {
   if (!date) {
     return { start: '', end: '' };
@@ -81,12 +82,19 @@ export function changeBookingDate(
   // Nếu chọn ngày hôm nay mà khung giờ bắt đầu đã qua,
   // tự động nhảy sang khung giờ sắp tới sớm nhất trong ngày
   const startHour = parseInt(startTime.slice(0, 2), 10);
-  if (isSlotInPast(date, startHour, timezone)) {
+  if (isSlotInPast(date, startHour, timezone, now)) {
     const allHours = BOOKING_PERIODS.flatMap((p) => p.hours);
-    const nextAvailableHour = allHours.find((h) => !isSlotInPast(date, h, timezone));
+    const nextAvailableHour = allHours.find(
+      (h) => !isSlotInPast(date, h, timezone, now),
+    );
     if (nextAvailableHour !== undefined) {
       startTime = presetTime(nextAvailableHour);
       endTime = presetTime(nextAvailableHour + 1);
+    } else {
+      return {
+        start: `${date}T`,
+        end: `${date}T`,
+      };
     }
   }
 

@@ -3,11 +3,11 @@ import type { CourtItem } from '../types/auth';
 export const FALLBACK_COURTS: CourtItem[] = [
   {
     id: 'court-pro-01',
-    name: 'Center Court Pro 1',
+    name: 'Demo Court VIP 1',
     code: 'PRO-01',
     courtType: 'VIP',
     status: 'ACTIVE',
-    surfaceType: 'Sân Pickleball trong nhà Cushion Pro',
+    surfaceType: '',
     features: [
       'Mái che cách nhiệt',
       'Đèn LED thi đấu 500 Lux',
@@ -21,11 +21,11 @@ export const FALLBACK_COURTS: CourtItem[] = [
   },
   {
     id: 'court-pro-02',
-    name: 'Championship Arena 2',
+    name: 'Demo Court VIP 2',
     code: 'PRO-02',
     courtType: 'VIP',
     status: 'ACTIVE',
-    surfaceType: 'Sân Pickleball trong nhà Cushion 5 lớp',
+    surfaceType: '',
     features: [
       'Khán đài mini theo dõi',
       'Đèn LED chuẩn thi đấu',
@@ -39,11 +39,11 @@ export const FALLBACK_COURTS: CourtItem[] = [
   },
   {
     id: 'court-std-03',
-    name: 'Pickle Court 3',
+    name: 'Demo Court Standard 3',
     code: 'STD-03',
     courtType: 'STANDARD',
     status: 'ACTIVE',
-    surfaceType: 'Sân Pickleball trong nhà High-Grip',
+    surfaceType: '',
     features: [
       'Mặt sân hai màu chống trơn trượt',
       'Hệ thống đèn LED siêu sáng',
@@ -57,11 +57,11 @@ export const FALLBACK_COURTS: CourtItem[] = [
   },
   {
     id: 'court-std-04',
-    name: 'Dynamic Court 4',
+    name: 'Demo Court Standard 4',
     code: 'STD-04',
     courtType: 'STANDARD',
     status: 'ACTIVE',
-    surfaceType: 'Sân Pickleball trong nhà Elastic Cushion',
+    surfaceType: '',
     features: [
       'Độ nảy bóng ổn định chuẩn thi đấu',
       'Mái che quạt trần công nghiệp',

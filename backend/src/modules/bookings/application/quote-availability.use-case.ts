@@ -1,5 +1,10 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { CourtScheduleReader } from '../../courts/application/court-schedule-reader.js';
+import { CourtPricingError } from '../../courts/domain/court-pricing.types.js';
+import {
+  quoteCourtServices,
+  type DomainServiceLine,
+} from '../../courts/domain/court-services.catalog.js';
 import { HOLD_DURATION_MS, MINUTE_MS } from '../booking.constants.js';
 import { BookingStore } from '../ports/booking-store.js';
 import type { QuoteAvailabilityQuery } from './booking.commands.js';
@@ -22,6 +27,7 @@ export interface AvailabilityView {
   totalAmount: number;
   currency: string;
   priceItems: AvailabilityPriceItem[];
+  serviceItems?: DomainServiceLine[];
 }
 
 @Injectable()
@@ -47,6 +53,18 @@ export class QuoteAvailabilityUseCase {
         const startsAt = new Date(query.startsAt);
         const endsAt = new Date(query.endsAt);
         const quote = this.schedule.quote(court, startsAt, endsAt);
+        const durationMinutes = quote.items.reduce(
+          (sum, item) => sum + item.durationMinutes,
+          0,
+        );
+        let serviceQuote: { items: DomainServiceLine[]; totalAmount: number };
+        try {
+          serviceQuote = quoteCourtServices(query.services, durationMinutes);
+        } catch (error) {
+          if (error instanceof CourtPricingError)
+            throw new BadRequestException(error.message);
+          throw error;
+        }
         const occupiedUntil = new Date(
           endsAt.getTime() + court.cleanupMinutes * MINUTE_MS,
         );
@@ -57,21 +75,27 @@ export class QuoteAvailabilityUseCase {
           occupiedUntil,
           now,
         );
+        const inPast = startsAt.getTime() <= now.getTime();
         const tooSoon = startsAt.getTime() - now.getTime() < HOLD_DURATION_MS;
         return {
           available: !conflict && !tooSoon,
           reason: conflict
             ? 'Khoảng sân đã được giữ, bao gồm thời gian vệ sinh.'
-            : tooSoon
-              ? 'Giờ bắt đầu phải cách hiện tại ít nhất 5 phút.'
-              : null,
+            : inPast
+              ? 'Khung giờ bắt đầu đã qua thời gian hiện tại.'
+              : tooSoon
+                ? 'Giờ bắt đầu phải cách hiện tại ít nhất 5 phút.'
+                : null,
           serverNow: now,
           timezone: court.branch.timezone,
           cleanupMinutes: court.cleanupMinutes,
           occupiedUntil,
-          totalAmount: quote.totalAmount,
+          totalAmount: quote.totalAmount + serviceQuote.totalAmount,
           currency: 'VND',
           priceItems: quote.items,
+          ...(query.services !== undefined
+            ? { serviceItems: serviceQuote.items }
+            : {}),
         };
       },
     );

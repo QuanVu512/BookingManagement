@@ -19,20 +19,32 @@ export const OCCUPANCY_LABELS: Record<OccupancyKind, string> = {
 const SLOT_MS = 60 * 60 * 1000;
 const MINUTE_MS = 60 * 1000;
 const HOLD_LEAD_MS = 5 * MINUTE_MS;
+const WALL_CLOCK_FORMATTERS = new Map<string, Intl.DateTimeFormat>();
+const SLOT_BOUNDARY_CACHE = new Map<string, number>();
+const MAX_SLOT_BOUNDARY_CACHE_SIZE = 512;
+
+function getWallClockFormatter(timezone: string): Intl.DateTimeFormat {
+  let formatter = WALL_CLOCK_FORMATTERS.get(timezone);
+  if (!formatter) {
+    formatter = new Intl.DateTimeFormat('en-CA', {
+      timeZone: timezone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hourCycle: 'h23',
+    });
+    WALL_CLOCK_FORMATTERS.set(timezone, formatter);
+  }
+  return formatter;
+}
 
 function wallClockParts(
   instant: Date,
   timezone: string,
 ): { year: number; month: number; day: number; hour: number; minute: number } {
-  const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone: timezone,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    hourCycle: 'h23',
-  }).formatToParts(instant);
+  const parts = getWallClockFormatter(timezone).formatToParts(instant);
   const part = (key: string): number =>
     Number(parts.find((value) => value.type === key)?.value);
   return {
@@ -50,6 +62,9 @@ export function slotBoundaryToUtcMs(
   hour: number,
   timezone: string,
 ): number {
+  const cacheKey = `${timezone}:${date}:${hour}`;
+  const cached = SLOT_BOUNDARY_CACHE.get(cacheKey);
+  if (cached !== undefined) return cached;
   const [year, month, day] = date.split('-').map(Number);
   const target = Date.UTC(year, month - 1, day, hour, 0);
   let instant = target;
@@ -64,6 +79,10 @@ export function slotBoundaryToUtcMs(
     );
     instant += target - renderedMs;
   }
+  if (SLOT_BOUNDARY_CACHE.size >= MAX_SLOT_BOUNDARY_CACHE_SIZE) {
+    SLOT_BOUNDARY_CACHE.clear();
+  }
+  SLOT_BOUNDARY_CACHE.set(cacheKey, instant);
   return instant;
 }
 

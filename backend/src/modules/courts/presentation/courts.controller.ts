@@ -9,6 +9,7 @@ import {
 import { ApiOkResponse } from '@nestjs/swagger';
 import { GetActiveCourtDetailUseCase } from '../application/get-active-court-detail.use-case.js';
 import { ListActiveCourtsUseCase } from '../application/list-active-courts.use-case.js';
+import { listCourtServiceProducts } from '../domain/court-services.catalog.js';
 import { CourtResponsePresenter } from './court-response.presenter.js';
 import { CourtsResponseDto } from './dto/courts-response.dto.js';
 
@@ -37,5 +38,17 @@ export class CourtsController {
     if (!court)
       throw new NotFoundException('Không tìm thấy sân đang hoạt động.');
     return { success: true, data: this.presenter.present(court) };
+  }
+
+  @Get(':id/services')
+  @Header('Cache-Control', 'no-store')
+  async services(@Param('id', ParseUUIDPipe) id: string) {
+    const court = await this.getActiveCourtDetail.execute(id);
+    if (!court)
+      throw new NotFoundException('Không tìm thấy sân đang hoạt động.');
+    return {
+      success: true,
+      data: listCourtServiceProducts(),
+    };
   }
 }

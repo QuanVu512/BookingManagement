@@ -34,8 +34,7 @@ export function CourtDetailHeader({ itemCount }: { itemCount: number }) {
   return (
     <header className="cb-header">
       <div className="cb-announcement">
-        Đặt sân SMASH ARENA (Cơ sở thử nghiệm) — Kiểm tra lịch trực tuyến linh
-        hoạt
+        Đặt sân SMASH ARENA DEMO — Kiểm tra lịch trực tuyến linh hoạt
       </div>
       <div className="cb-header-inner">
         <ClubBrand />

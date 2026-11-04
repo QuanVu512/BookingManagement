@@ -109,7 +109,7 @@ export function SportyFooter({
             © 2026 SMASH ARENA. Sân đấu & đặt lịch trực tuyến.
           </p>
           <span className="arena-footer-note">
-            Hà Nội (Cơ sở thử nghiệm) • Bảo lưu mọi quyền.
+            SMASH ARENA DEMO • Bảo lưu mọi quyền.
           </span>
         </div>
 

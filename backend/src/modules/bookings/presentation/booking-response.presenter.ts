@@ -30,6 +30,9 @@ export function presentBooking(booking: StoredBooking) {
       pricePerHour: item.pricePerHour,
       amount: item.amount,
     })),
+    ...(booking.serviceItems !== undefined
+      ? { serviceItems: booking.serviceItems }
+      : {}),
   };
 }
 
@@ -67,5 +70,8 @@ export function presentAvailability(availability: AvailabilityView) {
       pricePerHour: item.pricePerHour,
       amount: item.amount,
     })),
+    ...(availability.serviceItems !== undefined
+      ? { serviceItems: availability.serviceItems }
+      : {}),
   };
 }

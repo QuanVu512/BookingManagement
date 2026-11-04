@@ -173,9 +173,6 @@ export function CourtServices(props: CourtServicesProps) {
       aria-labelledby="court-services-heading"
     >
       <h2 id="court-services-heading">Nước uống & dụng cụ</h2>
-      <p className="detail-muted">
-        Chọn số lượng rồi kiểm tra lịch & giá để cập nhật tổng đơn.
-      </p>
       <ServiceCatalogStatus {...props} />
       <ServiceCards {...props} />
     </section>

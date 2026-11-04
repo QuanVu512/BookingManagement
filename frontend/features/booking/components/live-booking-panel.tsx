@@ -175,7 +175,7 @@ export function LiveBookingPanel({
       return;
     }
 
-    const currentKey = `${start}:${end}:${courtId}:${prepaymentPercent}`;
+    const currentKey = `${start}:${end}:${courtId}:${prepaymentPercent}:${JSON.stringify(props.state.services ?? [])}`;
     if (lastQuotedKey.current === currentKey) return;
 
     const timer = setTimeout(() => {
@@ -187,6 +187,7 @@ export function LiveBookingPanel({
   }, [
     props.state.window.start,
     props.state.window.end,
+    props.state.services,
     courtId,
     timezone,
     prepaymentPercent,
@@ -197,8 +198,8 @@ export function LiveBookingPanel({
   if (!detail) return <LiveBookingView {...propsWithGrid} />;
   return (
     <div className="court-detail-grid">
-      <BookingDayStrip {...propsWithGrid} />
       <div className="court-detail-main">
+        <BookingDayStrip {...propsWithGrid} />
         {detail.overview}
         <BookingSchedulePicker {...propsWithGrid} />
         <CourtServices

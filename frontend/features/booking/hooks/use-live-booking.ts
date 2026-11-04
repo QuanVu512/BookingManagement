@@ -272,20 +272,29 @@ async function readServiceCatalog(
   timezone?: string,
 ) {
   try {
-    if (bookingWindow && timezone)
-      assertBookableWindow(bookingWindow, timezone);
+    let resolvedWindow: { startsAt: string; endsAt: string } | undefined;
+    if (bookingWindow && timezone) {
+      const startTime = bookingWindow.start.slice(11);
+      const endTime = bookingWindow.end.slice(11);
+      if (startTime && endTime) {
+        try {
+          assertBookableWindow(bookingWindow, timezone);
+          resolvedWindow = {
+            startsAt: localInputToIso(bookingWindow.start, timezone),
+            endsAt: localInputToIso(bookingWindow.end, timezone),
+          };
+        } catch {
+          resolvedWindow = undefined;
+        }
+      }
+    }
     const products = await loadServiceProducts(
       courtId,
       AbortSignal.any([
         controller.signal,
         AbortSignal.timeout(READ_REQUEST_TIMEOUT_MS),
       ]),
-      bookingWindow && timezone
-        ? {
-            startsAt: localInputToIso(bookingWindow.start, timezone),
-            endsAt: localInputToIso(bookingWindow.end, timezone),
-          }
-        : undefined,
+      resolvedWindow,
     );
     if (!controller.signal.aborted)
       update({ products, loading: false, error: '' });

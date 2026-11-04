@@ -5,16 +5,14 @@ import Link from 'next/link';
 import type { CourtItem } from '../model/court';
 import { COURT_DETAILS_ENABLED } from '../../../constants/features';
 import { ArenaIcon } from '../../../components/arena/arena-icon';
-import { formatVnd } from '../../booking/model/booking-time';
+import {
+  DEFAULT_BOOKING_TIMEZONE,
+  formatVnd,
+  getNowInTimezone,
+  isSlotInPast,
+} from '../../booking/model/booking-time';
 
-const SAMPLE_SLOTS = [
-  { time: '16:00', available: true },
-  { time: '17:00', available: false },
-  { time: '18:00', available: true },
-  { time: '19:00', available: true },
-  { time: '20:00', available: true },
-  { time: '21:00', available: true },
-];
+const QUICK_SLOT_HOURS = [16, 17, 18, 19, 20, 21];
 
 function CourtMedia({ court }: { court: CourtItem }) {
   return (
@@ -38,7 +36,9 @@ function CourtMedia({ court }: { court: CourtItem }) {
             ? `${formatVnd(court.pricePerHour)} / Giờ`
             : 'Chưa có giá'}
         </span>
-        <small className="font-mono text-[10px] text-white/60 block">Giá tham khảo</small>
+        <small className="font-mono text-[10px] text-white/60 block">
+          Giá tham khảo
+        </small>
       </span>
     </div>
   );
@@ -64,10 +64,13 @@ function CourtBadges({ court }: { court: CourtItem }) {
 }
 
 function CourtFeatures({ court }: { court: CourtItem }) {
-  if (!court.features || court.features.length === 0) return null;
+  const visibleFeatures = (court.features ?? []).filter(
+    (feature) => feature !== 'Vệ sinh theo yêu cầu',
+  );
+  if (visibleFeatures.length === 0) return null;
   return (
     <div className="arena-court-features mt-3 flex flex-wrap gap-2">
-      {court.features.map((feature) => (
+      {visibleFeatures.map((feature) => (
         <span
           key={feature}
           className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs bg-[var(--bg-primary)] hairline-box text-[var(--text-secondary)]"
@@ -81,6 +84,11 @@ function CourtFeatures({ court }: { court: CourtItem }) {
 }
 
 function CourtDescription({ court }: { court: CourtItem }) {
+  const timezone = court.timezone || DEFAULT_BOOKING_TIMEZONE;
+  const todayDate = getNowInTimezone(timezone).date;
+  const showSurface =
+    Boolean(court.surfaceType) &&
+    court.surfaceType !== 'Sân Pickleball trong nhà Cushion Pro';
   return (
     <div className="arena-court-description p-6 flex-1 flex flex-col justify-between space-y-4">
       <div>
@@ -90,16 +98,22 @@ function CourtDescription({ court }: { court: CourtItem }) {
           </h3>
           <span className="arena-live inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-mono font-semibold bg-emeraldPro/15 text-emeraldPro border border-emeraldPro/30">
             <i className="w-1.5 h-1.5 rounded-full bg-emeraldPro" />
-            <span>{court.status === 'ACTIVE' ? 'Đang hoạt động' : 'Tạm ngừng'}</span>
+            <span>
+              {court.status === 'ACTIVE' ? 'Đang hoạt động' : 'Tạm ngừng'}
+            </span>
           </span>
         </div>
 
         <div className="mt-3 space-y-1.5 text-xs sm:text-sm">
-          <p className="flex items-center gap-2 text-[var(--text-secondary)]">
-            <ArenaIcon name="layers" />
-            <span>Mặt sân:</span>
-            <strong className="font-semibold text-[var(--text-primary)]">{court.surfaceType}</strong>
-          </p>
+          {showSurface && (
+            <p className="flex items-center gap-2 text-[var(--text-secondary)]">
+              <ArenaIcon name="layers" />
+              <span>Mặt sân:</span>
+              <strong className="font-semibold text-[var(--text-primary)]">
+                {court.surfaceType}
+              </strong>
+            </p>
+          )}
           {court.address && (
             <p className="flex items-center gap-2 text-[var(--text-secondary)]">
               <ArenaIcon name="pin" />
@@ -117,27 +131,33 @@ function CourtDescription({ court }: { court: CourtItem }) {
           <span className="text-[10px] font-mono uppercase tracking-wider opacity-60">
             CHỌN NHANH CA TRỐNG HÔM NAY:
           </span>
-          <span className="text-[10px] font-mono text-emeraldPro">Nhấn giờ để đặt</span>
+          <span className="text-[10px] font-mono text-emeraldPro">
+            Nhấn giờ để đặt
+          </span>
         </div>
         <div className="flex flex-wrap gap-1.5">
-          {SAMPLE_SLOTS.map((slot) =>
-            slot.available ? (
+          {QUICK_SLOT_HOURS.map((hour) => {
+            const timeLabel = `${String(hour).padStart(2, '0')}:00`;
+            const available =
+              court.status === 'ACTIVE' &&
+              !isSlotInPast(todayDate, hour, timezone);
+            return available ? (
               <Link
-                key={slot.time}
-                href={`/booking?courtId=${encodeURIComponent(court.id)}&slot=${encodeURIComponent(slot.time)}`}
+                key={timeLabel}
+                href={`/booking?courtId=${encodeURIComponent(court.id)}&slot=${encodeURIComponent(timeLabel)}`}
                 className="px-2.5 py-1.5 rounded-lg text-[11px] font-mono hairline-box bg-[var(--bg-primary)] hover:border-emeraldPro hover:text-emeraldPro transition-all text-center"
               >
-                {slot.time}
+                {timeLabel}
               </Link>
             ) : (
               <span
-                key={slot.time}
+                key={timeLabel}
                 className="px-2.5 py-1.5 rounded-lg text-[11px] font-mono hairline-box opacity-35 line-through cursor-not-allowed text-center"
               >
-                {slot.time}
+                {timeLabel}
               </span>
-            ),
-          )}
+            );
+          })}
         </div>
       </div>
     </div>
@@ -159,7 +179,11 @@ export function ArenaCourtCard({ court }: { court: CourtItem }) {
             <ArenaIcon name="arrow" />
           </Link>
         ) : (
-          <button type="button" className="arena-button w-full py-3.5 rounded-xl opacity-50 cursor-not-allowed" disabled>
+          <button
+            type="button"
+            className="arena-button w-full py-3.5 rounded-xl opacity-50 cursor-not-allowed"
+            disabled
+          >
             Tạm ngừng đặt sân
           </button>
         )}

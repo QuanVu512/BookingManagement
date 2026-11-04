@@ -42,6 +42,20 @@ describe('Booking schedule selection', () => {
       end: '2035-01-09T09:00',
     });
   });
+  it('clears the selected time when switching to today after all slots have passed (e.g. 22:30)', () => {
+    const lateNightNow = new Date('2026-11-04T15:30:00Z'); // 22:30 Asia/Ho_Chi_Minh
+    expect(
+      changeBookingDate(
+        { start: '2026-11-05T08:00', end: '2026-11-05T09:00' },
+        '2026-11-04',
+        'Asia/Ho_Chi_Minh',
+        lateNightNow,
+      ),
+    ).toEqual({
+      start: '2026-11-04T',
+      end: '2026-11-04T',
+    });
+  });
 });
 
 describe('Booking calendar bounds and Vietnamese dates', () => {

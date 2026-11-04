@@ -7,17 +7,27 @@ import {
 } from './court-pricing.types.js';
 
 const MILLISECONDS_PER_MINUTE = 60_000;
+const LOCAL_CLOCK_FORMATTERS = new Map<string, Intl.DateTimeFormat>();
+
+function getLocalClockFormatter(timezone: string): Intl.DateTimeFormat {
+  let formatter = LOCAL_CLOCK_FORMATTERS.get(timezone);
+  if (!formatter) {
+    formatter = new Intl.DateTimeFormat('en-CA', {
+      timeZone: timezone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hourCycle: 'h23',
+    });
+    LOCAL_CLOCK_FORMATTERS.set(timezone, formatter);
+  }
+  return formatter;
+}
 
 export function localClock(instant: Date, timezone: string) {
-  const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone: timezone,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    hourCycle: 'h23',
-  }).formatToParts(instant);
+  const parts = getLocalClockFormatter(timezone).formatToParts(instant);
   const part = (name: string) =>
     parts.find((entry) => entry.type === name)?.value ?? '';
   const date = `${part('year')}-${part('month')}-${part('day')}`;
@@ -104,11 +114,7 @@ function assertOpen(
     );
 }
 
-function priceSegments(
-  rules: DomainPricingRule[],
-  start: number,
-  end: number,
-) {
+function priceSegments(rules: DomainPricingRule[], start: number, end: number) {
   const boundaries = [
     ...new Set([
       start,
@@ -118,7 +124,8 @@ function priceSegments(
   ]
     .filter((minute) => minute >= start && minute <= end)
     .sort((left, right) => left - right);
-  const segments: { start: number; end: number; rule: DomainPricingRule }[] = [];
+  const segments: { start: number; end: number; rule: DomainPricingRule }[] =
+    [];
   for (let index = 0; index < boundaries.length - 1; index++) {
     const from = boundaries[index];
     const until = boundaries[index + 1];
@@ -191,11 +198,7 @@ export function quoteCourt(
   startsAt: Date,
   endsAt: Date,
 ): DomainCourtQuote {
-  const { start, end } = validatedLocalWindow(
-    startsAt,
-    endsAt,
-    court.timezone,
-  );
+  const { start, end } = validatedLocalWindow(startsAt, endsAt, court.timezone);
   assertOpen(court.businessHours, start.weekday, start.minute, end.minute);
   const rules = applicableRules(court.priceRules, start.date, start.weekday);
   const items = priceSegments(rules, start.minute, end.minute).map((segment) =>
@@ -239,15 +242,12 @@ export function calculateStartingPrice(
     minute++
   ) {
     const rule = rules.find(
-      (item) =>
-        item.startTimeMinute <= minute && item.endTimeMinute > minute,
+      (item) => item.startTimeMinute <= minute && item.endTimeMinute > minute,
     );
     if (rule) prices.push(rule.pricePerHour);
   }
   if (!prices.length) return 0;
-  const lowest = prices.reduce((left, right) =>
-    left < right ? left : right,
-  );
+  const lowest = prices.reduce((left, right) => (left < right ? left : right));
   // The schema caps a rate at 14 integer digits, well inside Number's safe
   // integer range, so the display value preserves the database value exactly.
   return Number(lowest);

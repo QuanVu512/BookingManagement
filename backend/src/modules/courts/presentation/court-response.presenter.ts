@@ -2,6 +2,18 @@ import { Injectable } from '@nestjs/common';
 import type { ActiveCourtWithStartingPrice } from '../application/models/court-read-models.js';
 import { PublicCourtDto } from './dto/courts-response.dto.js';
 
+const LEGACY_COURT_NAME_MAP: Readonly<Record<string, string>> = {
+  'Center Court Pro 1': 'Demo Court VIP 1',
+  'Championship Arena 2': 'Demo Court VIP 2',
+  'Pickle Standard 3': 'Demo Court Standard 3',
+  'Pickle Court 3': 'Demo Court Standard 3',
+  'Dynamic Court 4': 'Demo Court Standard 4',
+};
+
+function normalizeCourtName(name: string): string {
+  return LEGACY_COURT_NAME_MAP[name] ?? name;
+}
+
 /**
  * Maps the application read model to the public HTTP catalogue shape. The
  * response keys, labels and image conventions are preserved from the original
@@ -12,18 +24,15 @@ export class CourtResponsePresenter {
   present(court: ActiveCourtWithStartingPrice): PublicCourtDto {
     return {
       id: court.id,
-      name: court.name,
+      name: normalizeCourtName(court.name),
       code: court.code,
       courtType: court.courtType,
       status: court.status,
-      surfaceType:
-        court.courtType === 'VIP'
-          ? 'Sân Pickleball trong nhà Cushion Pro'
-          : 'Sân Pickleball tiêu chuẩn',
+      surfaceType: '',
       features:
         court.cleanupMinutes > 0
           ? [`Vệ sinh ${court.cleanupMinutes} phút sau lượt chơi`]
-          : ['Vệ sinh theo yêu cầu'],
+          : [],
       pricePerHour: court.startingPrice,
       priceLabel: 'Giá từ trong ngày; giá chính xác theo khoảng đặt',
       imageUrl:
@@ -34,8 +43,8 @@ export class CourtResponsePresenter {
       reviewCount: 0,
       timezone: court.schedule.timezone,
       // Public showcase must not reveal a previously seeded real venue.
-      branchName: 'SMASH ARENA — Cơ sở thử nghiệm',
-      address: 'Khu Thể Thao Phức Hợp SMASH ARENA — Hà Nội (Cơ sở thử nghiệm)',
+      branchName: 'SMASH ARENA DEMO',
+      address: 'SMASH ARENA DEMO',
       cleanupMinutes: court.cleanupMinutes,
     };
   }
