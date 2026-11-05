@@ -81,7 +81,7 @@ storageDescribe('guest recovery outbox trên PostgreSQL thật', () => {
         customerPhone: '+84901234567',
         startsAt: dayStart,
         endsAt: new Date(dayStart.getTime() + 3600_000),
-        cleanupMinutes: 0,
+        cleanupMinutes: 15,
         totalAmount: 300000,
         prepaymentPercent: 30,
         requiredPrepaymentAmount: 90000,

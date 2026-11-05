@@ -67,7 +67,7 @@ storageDescribe('tra cứu đơn giữ chỗ trên PostgreSQL thật (AC-22)', (
         customerPhone: input.phone ?? '0912345678',
         startsAt: dayStart,
         endsAt: new Date(dayStart.getTime() + 3600_000),
-        cleanupMinutes: 0,
+        cleanupMinutes: 15,
         totalAmount: 300000,
         prepaymentPercent: 30,
         requiredPrepaymentAmount: 90000,

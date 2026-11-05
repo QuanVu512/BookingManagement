@@ -314,7 +314,7 @@ export function BookingQrModal({
                 <p>Đang kiểm tra lại trạng thái đơn từ máy chủ…</p>
                 <button
                   type="button"
-                  className="arena-btn-primary arena-btn-sm"
+                  className="arena-btn-primary"
                   onClick={checkout.refreshRead}
                 >
                   Tải lại trạng thái
@@ -329,7 +329,7 @@ export function BookingQrModal({
                 </p>
                 <button
                   type="button"
-                  className="arena-btn-primary arena-btn-sm"
+                  className="arena-btn-primary"
                   onClick={checkout.refresh}
                   disabled={checkout.loading}
                 >
@@ -360,7 +360,7 @@ export function BookingQrModal({
                 </p>
                 <button
                   type="button"
-                  className="arena-btn-primary arena-btn-sm"
+                  className="arena-btn-primary"
                   onClick={checkout.refresh}
                   disabled={checkout.loading}
                 >

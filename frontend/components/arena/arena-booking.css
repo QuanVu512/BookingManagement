@@ -573,10 +573,11 @@ html[data-theme='light'] .arena-shell .detail-order .order-court-name {
 }
 .arena-shell .detail-order .btn {
   border-radius: 12px;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 800;
-  padding: 12px 16px;
-  min-height: 44px;
+  padding: 13px 20px;
+  min-height: 48px;
+  line-height: 1.4;
 }
 .arena-shell .detail-order .btn-primary {
   background: #10e760;
