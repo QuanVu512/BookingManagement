@@ -1,4 +1,6 @@
-export const BOOKING_REFRESH_MS = 15_000;
+export const BOOKING_REFRESH_MS = 60_000;
+export const OCCUPANCY_FOCUS_THROTTLE_MS = 10_000;
+export const OCCUPANCY_IDLE_TIMEOUT_MS = 180_000;
 const MAX_BOOKING_ADVANCE_MONTHS = 2;
 export const DEFAULT_BOOKING_TIMEZONE = 'Asia/Ho_Chi_Minh';
 const WALL_CLOCK_FORMATTERS = new Map<string, Intl.DateTimeFormat>();

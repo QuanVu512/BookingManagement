@@ -17,7 +17,7 @@ import {
 } from '../ports/booking-store.js';
 import { RedisService } from '../../../infrastructure/redis/redis.service.js';
 
-export const COURT_DAY_OCCUPANCIES_CACHE_TTL_SECONDS = 3;
+export const COURT_DAY_OCCUPANCIES_CACHE_TTL_SECONDS = 8;
 export const COURT_DAY_OCCUPANCIES_CACHE_PREFIX = 'court_day_occupancies';
 const COURT_DAY_OCCUPANCIES_GEN_PREFIX = 'court_day_occupancies_gen';
 

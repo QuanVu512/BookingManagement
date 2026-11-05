@@ -375,6 +375,18 @@ export function BookingSchedulePicker(props: LiveBookingViewProps) {
           </button>
         </p>
       )}
+      {occupancy?.status === 'ready' && occupancy.isIdlePaused && (
+        <p role="status" style={{ fontSize: '13px', color: '#fbbf24' }}>
+          Tự động cập nhật lịch đã tạm dừng do không có thao tác.{' '}
+          <button
+            type="button"
+            className="btn btn-secondary"
+            onClick={occupancy.refresh}
+          >
+            Bấm để làm mới bảng giờ
+          </button>
+        </p>
+      )}
       {occupancy?.status === 'ready' && occupancy.isStale && (
         <p role="status" style={{ fontSize: '13px', color: '#fbbf24' }}>
           Đang đồng bộ lịch mới nhất…

@@ -1,4 +1,5 @@
 import {
+  COURT_DAY_OCCUPANCIES_CACHE_TTL_SECONDS,
   GetCourtDayOccupanciesUseCase,
   invalidateCourtDayCache,
   parseCourtDayDate,
@@ -159,6 +160,7 @@ describe('GetCourtDayOccupanciesUseCase', () => {
       close: '23:00',
     });
     expect(useCase).toBeDefined();
+    expect(COURT_DAY_OCCUPANCIES_CACHE_TTL_SECONDS).toBe(8);
   });
 
   it('lets infrastructure DB errors propagate instead of masking as 404', async () => {

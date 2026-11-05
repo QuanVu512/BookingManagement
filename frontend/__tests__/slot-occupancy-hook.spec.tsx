@@ -282,4 +282,116 @@ describe('useCourtOccupancyGrid ordering and timeouts', () => {
     expect(latest?.data?.date).toBe('2026-10-29');
     root.unmount();
   });
+
+  it('throttles focus and visibility revalidation within 10s of a fresh fetch', async () => {
+    jest.useFakeTimers();
+    let latest: ReturnType<typeof useCourtOccupancyGrid> | undefined;
+    const root = createRoot(dom.window.document.getElementById('app')!);
+    await act(async () => {
+      root.render(
+        <Probe
+          courtId="court-1"
+          date="2026-10-29"
+          onState={(state) => {
+            latest = state;
+          }}
+        />,
+      );
+    });
+    await flush();
+    expect(pending).toHaveLength(1);
+    await act(async () => {
+      pending[0].resolve(payload('2026-10-29', 'initial'));
+    });
+    await flush();
+    expect(latest?.status).toBe('ready');
+
+    // Focus 3s after initial fetch -> throttled (no new request).
+    await act(async () => {
+      jest.advanceTimersByTime(3_000);
+      dom.window.dispatchEvent(new dom.window.Event('focus'));
+      dom.window.document.dispatchEvent(
+        new dom.window.Event('visibilitychange'),
+      );
+    });
+    await flush();
+    expect(pending).toHaveLength(1);
+
+    // Focus after 10s window -> revalidates.
+    await act(async () => {
+      jest.advanceTimersByTime(8_000);
+      dom.window.dispatchEvent(new dom.window.Event('focus'));
+    });
+    await flush();
+    expect(pending).toHaveLength(2);
+    root.unmount();
+  });
+
+  it('pauses polling after 3 minutes of inactivity and resumes on manual refresh', async () => {
+    jest.useFakeTimers();
+    let latest: ReturnType<typeof useCourtOccupancyGrid> | undefined;
+    const root = createRoot(dom.window.document.getElementById('app')!);
+    await act(async () => {
+      root.render(
+        <Probe
+          courtId="court-1"
+          date="2026-10-29"
+          onState={(state) => {
+            latest = state;
+          }}
+        />,
+      );
+    });
+    await flush();
+    await act(async () => {
+      pending[0].resolve(payload('2026-10-29', 'initial'));
+    });
+    await flush();
+    expect(latest?.isIdlePaused).toBe(false);
+
+    // Tick 1 (60s) and Tick 2 (120s) poll normally.
+    await act(async () => {
+      jest.advanceTimersByTime(60_000);
+    });
+    await flush();
+    expect(pending).toHaveLength(2);
+    await act(async () => {
+      pending[1].resolve(payload('2026-10-29', 'poll-1'));
+    });
+    await flush();
+
+    await act(async () => {
+      jest.advanceTimersByTime(60_000);
+    });
+    await flush();
+    expect(pending).toHaveLength(3);
+    await act(async () => {
+      pending[2].resolve(payload('2026-10-29', 'poll-2'));
+    });
+    await flush();
+
+    // Tick 3 (180s without interaction) transitions to idle-paused without firing a request.
+    await act(async () => {
+      jest.advanceTimersByTime(60_000);
+    });
+    await flush();
+    expect(latest?.isIdlePaused).toBe(true);
+    expect(pending).toHaveLength(3);
+
+    // Further ticks stay paused.
+    await act(async () => {
+      jest.advanceTimersByTime(60_000);
+    });
+    await flush();
+    expect(pending).toHaveLength(3);
+
+    // Manual refresh clears idle pause and fetches immediately.
+    await act(async () => {
+      latest?.refresh();
+    });
+    await flush();
+    expect(latest?.isIdlePaused).toBe(false);
+    expect(pending).toHaveLength(4);
+    root.unmount();
+  });
 });
