@@ -253,14 +253,14 @@ export function DemoSimulateSection({
   });
   if (!PAYMENT_SIMULATION_ENABLED || !visible) return null;
   return (
-    <section aria-label="Chế độ Showcase">
+    <section className="arena-demo-simulate-box" aria-label="Chế độ Showcase">
       <p role="note">
         Chế độ Showcase: bạn không cần chuyển khoản thật. Nhấn nút bên dưới để
         mô phỏng thanh toán thành công qua luồng webhook demo.
       </p>
       <button
         type="button"
-        className="btn btn-secondary"
+        className="btn btn-secondary arena-btn-secondary"
         disabled={!requestId || !demo.canSimulate}
         onClick={demo.simulate}
       >

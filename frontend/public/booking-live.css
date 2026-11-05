@@ -811,19 +811,19 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(6, 11, 20, 0.85);
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
-  padding: 16px;
+  background: rgba(4, 8, 16, 0.88);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  padding: 24px 16px;
   overflow-y: auto;
   animation: arenaFadeIn 0.18s cubic-bezier(0.16, 1, 0.3, 1);
 }
 .arena-modal-card {
   background: #0d1527;
   border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: 20px;
+  border-radius: 24px;
   width: 100%;
-  box-shadow: 0 20px 48px rgba(0, 0, 0, 0.6);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.75);
   color: #ffffff;
   transform: translate3d(0, 0, 0);
   will-change: transform, opacity;
@@ -937,18 +937,20 @@
 
 /* 5. QR Code Modal (PayOS / VietQR) - Redesigned Clean & Modern */
 .arena-qr-card {
-  max-width: 620px;
-  padding: 28px;
-  background: linear-gradient(145deg, #0d1527 0%, #080d18 100%);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  max-width: 860px;
+  width: 100%;
+  padding: 34px 38px;
+  background: #0b1324;
+  background: linear-gradient(150deg, #0d1629 0%, #080d19 100%);
+  border: 1px solid rgba(255, 255, 255, 0.14);
   box-shadow:
-    0 24px 60px rgba(0, 0, 0, 0.8),
-    0 0 1px 1px rgba(255, 255, 255, 0.05);
+    0 32px 80px rgba(0, 0, 0, 0.85),
+    0 0 0 1px rgba(255, 255, 255, 0.06);
   border-radius: 24px;
 }
 .arena-qr-header {
   text-align: center;
-  margin-bottom: 20px;
+  margin-bottom: 24px;
 }
 .arena-qr-badge-row {
   display: flex;
@@ -984,26 +986,27 @@
   animation: pulse 1.5s infinite;
 }
 .arena-qr-header h2 {
-  font-size: 22px;
+  font-size: 24px;
   font-weight: 800;
   color: #ffffff;
   margin: 0 0 4px;
+  letter-spacing: -0.01em;
 }
 .arena-qr-subtitle {
   color: #94a3b8;
-  font-size: 13px;
+  font-size: 13.5px;
   margin: 0;
 }
 .arena-qr-body {
   display: grid;
-  grid-template-columns: 210px 1fr;
-  gap: 20px;
+  grid-template-columns: 310px 1fr;
+  gap: 32px;
   align-items: stretch;
-  background: rgba(15, 23, 42, 0.65);
+  background: rgba(15, 23, 42, 0.7);
   border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 18px;
-  padding: 20px;
-  margin-bottom: 20px;
+  border-radius: 20px;
+  padding: 26px;
+  margin-bottom: 22px;
 }
 .arena-qr-canvas-box {
   display: flex;
@@ -1011,10 +1014,11 @@
   align-items: center;
   justify-content: center;
   background: #ffffff;
-  padding: 12px;
-  border-radius: 16px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
-  gap: 10px;
+  padding: 24px 20px;
+  border-radius: 18px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+  gap: 14px;
+  min-height: 310px;
 }
 .qr-image-wrapper {
   display: flex;
@@ -1024,24 +1028,25 @@
 }
 .qr-image-wrapper canvas {
   display: block;
-  width: 175px !important;
-  height: 175px !important;
-  border-radius: 8px;
+  width: 215px !important;
+  height: 215px !important;
+  border-radius: 10px;
 }
 .arena-qr-timer {
-  background: #0f172a;
+  background: #090e1a;
   color: #94a3b8;
-  border-radius: 10px;
-  padding: 8px 12px;
-  font-size: 11px;
+  border-radius: 12px;
+  padding: 10px 16px;
+  font-size: 12px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 3px;
+  gap: 4px;
   width: 100%;
+  border: 1px solid rgba(255, 255, 255, 0.06);
 }
 .arena-qr-timer .timer-digits {
-  font-size: 16px;
+  font-size: 18px;
   font-weight: 800;
   color: #10e760;
   font-variant-numeric: tabular-nums;
@@ -1054,18 +1059,18 @@
   justify-content: center;
   text-align: center;
   padding: 28px 16px;
-  gap: 12px;
+  gap: 14px;
   width: 100%;
-  min-height: 210px;
+  min-height: 240px;
 }
 .arena-qr-state-box .arena-btn-primary {
-  margin-top: 8px;
-  padding: 10px 24px;
-  min-height: 40px;
-  font-size: 13.5px;
+  margin-top: 10px;
+  padding: 11px 26px;
+  min-height: 42px;
+  font-size: 14px;
   font-weight: 700;
   line-height: 1.4;
-  border-radius: 10px;
+  border-radius: 11px;
   white-space: nowrap;
   box-shadow: 0 4px 14px rgba(16, 231, 96, 0.25);
 }
@@ -1075,28 +1080,28 @@
 }
 .arena-qr-state-box.is-success strong {
   color: #10e760;
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 700;
 }
 .arena-qr-state-box.is-expired strong {
   color: #f87171;
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 700;
 }
 .arena-qr-state-box p {
   color: #64748b;
-  font-size: 12px;
+  font-size: 13px;
   margin: 0;
-  line-height: 1.5;
-  max-width: 240px;
+  line-height: 1.55;
+  max-width: 260px;
 }
 .arena-qr-state-box.is-loading span {
   color: #64748b;
-  font-size: 12px;
+  font-size: 13px;
 }
 .qr-spinner {
-  width: 28px;
-  height: 28px;
+  width: 30px;
+  height: 30px;
   border: 3px solid rgba(16, 231, 96, 0.2);
   border-top-color: #10e760;
   border-radius: 50%;
@@ -1113,19 +1118,63 @@
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  gap: 12px;
+  gap: 16px;
+  min-width: 0;
 }
+
+/* Showcase / Demo Mode box trong modal QR */
+.arena-qr-details section[aria-label='Chế độ Showcase'],
+.arena-demo-simulate-box {
+  background: rgba(245, 158, 11, 0.08);
+  border: 1px solid rgba(245, 158, 11, 0.25);
+  border-radius: 14px;
+  padding: 14px 18px;
+  margin-bottom: 4px;
+}
+.arena-qr-details section[aria-label='Chế độ Showcase'] p[role='note'],
+.arena-demo-simulate-box p[role='note'] {
+  color: #cbd5e1;
+  font-size: 12.5px;
+  line-height: 1.5;
+  margin: 0 0 10px;
+}
+.arena-qr-details section[aria-label='Chế độ Showcase'] button,
+.arena-demo-simulate-box button {
+  width: 100%;
+  min-height: 40px;
+  padding: 9px 18px;
+  font-size: 13.5px;
+  font-weight: 700;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.arena-qr-details
+  section[aria-label='Chế độ Showcase']
+  button:hover:not(:disabled),
+.arena-demo-simulate-box button:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.18);
+  border-color: rgba(255, 255, 255, 0.35);
+}
+
 .arena-qr-info-group {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
 }
 .arena-qr-row {
   display: flex;
   justify-content: space-between;
   align-items: baseline;
-  gap: 12px;
-  font-size: 13px;
+  gap: 16px;
+  font-size: 14px;
+  padding: 3px 0;
 }
 .arena-qr-row .label {
   color: #94a3b8;
@@ -1139,12 +1188,12 @@
   word-break: break-word;
 }
 .arena-qr-row.highlight-row {
-  background: rgba(16, 231, 96, 0.06);
-  border: 1px solid rgba(16, 231, 96, 0.18);
-  border-radius: 12px;
-  padding: 10px 14px;
+  background: rgba(16, 231, 96, 0.08);
+  border: 1px solid rgba(16, 231, 96, 0.22);
+  border-radius: 14px;
+  padding: 14px 18px;
   align-items: center;
-  margin: 2px 0;
+  margin: 4px 0;
 }
 .arena-qr-row.highlight-row .amount-col {
   display: flex;
@@ -1154,15 +1203,15 @@
 .arena-qr-row.highlight-row .label {
   color: #ffffff;
   font-weight: 600;
-  font-size: 13px;
+  font-size: 14px;
 }
 .arena-qr-row.highlight-row .sub-label {
   color: #94a3b8;
-  font-size: 11px;
+  font-size: 12px;
 }
 .arena-qr-row.highlight-row .amount-val {
   color: #10e760;
-  font-size: 20px;
+  font-size: 22px;
   font-weight: 800;
   letter-spacing: -0.02em;
   white-space: nowrap;
@@ -1170,43 +1219,53 @@
 .transfer-content-row {
   flex-direction: column;
   align-items: stretch;
-  gap: 6px;
-  margin-top: 2px;
+  gap: 8px;
+  margin-top: 4px;
+  background: rgba(0, 0, 0, 0.22);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 12px 16px;
 }
 .transfer-content-row .transfer-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
 }
-.transfer-content-row .copy-btn {
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  color: #10e760;
-  font-size: 11px;
+.transfer-content-row .transfer-header .label {
+  font-size: 13px;
   font-weight: 600;
-  padding: 3px 10px;
-  border-radius: 6px;
+  color: #cbd5e1;
+}
+.transfer-content-row .copy-btn {
+  background: rgba(16, 231, 96, 0.12);
+  border: 1px solid rgba(16, 231, 96, 0.3);
+  color: #10e760;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 5px 14px;
+  border-radius: 8px;
   cursor: pointer;
   transition: all 0.15s ease;
 }
 .transfer-content-row .copy-btn:hover {
-  background: rgba(16, 231, 96, 0.15);
+  background: rgba(16, 231, 96, 0.22);
   border-color: #10e760;
+  transform: translateY(-1px);
 }
 .transfer-content-row .code-box {
   background: #060b14;
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 8px;
-  padding: 8px 12px;
+  padding: 10px 14px;
   display: flex;
   align-items: center;
 }
 .transfer-content-row .code-box code {
   color: #38bdf8;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 700;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.05em;
   word-break: break-all;
 }
 .arena-qr-instructions {
@@ -1214,11 +1273,12 @@
   align-items: center;
   background: rgba(16, 231, 96, 0.04);
   border: 1px dashed rgba(16, 231, 96, 0.2);
-  border-radius: 10px;
-  padding: 12px 14px;
-  font-size: 12px;
+  border-radius: 12px;
+  padding: 14px 18px;
+  font-size: 12.5px;
   color: #94a3b8;
-  line-height: 1.5;
+  line-height: 1.55;
+  margin-top: 4px;
 }
 .arena-qr-instructions p {
   margin: 0;
@@ -1230,7 +1290,8 @@
 .arena-qr-actions {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 14px;
+  margin-top: 6px;
 }
 .arena-btn-primary.btn-payos {
   display: flex;
@@ -1463,11 +1524,19 @@
     grid-template-columns: 1fr;
     gap: 14px;
   }
+  .arena-qr-card {
+    padding: 24px 16px;
+    border-radius: 20px;
+  }
   .arena-qr-body {
-    flex-direction: column;
+    grid-template-columns: 1fr;
+    gap: 20px;
+    padding: 18px;
   }
   .arena-qr-canvas-box {
     width: 100%;
+    min-height: auto;
+    padding: 20px 16px;
   }
   .arena-pending-alert-banner {
     flex-direction: column;
