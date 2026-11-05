@@ -39,6 +39,8 @@ import { GuestCheckoutStore } from './ports/guest-checkout-store.js';
 import { GuestOtpSender } from './ports/guest-otp-sender.js';
 import { GuestRecoveryOutboxCrypto } from './infrastructure/guest-recovery-outbox-crypto.js';
 import { GuestRecoveryMailService } from './infrastructure/guest-recovery-mail.service.js';
+import { BookingConfirmationMailService } from './infrastructure/booking-confirmation-mail.service.js';
+import { BookingConfirmationMailWorker } from './application/booking-confirmation-mail.worker.js';
 import { GuestRecoveryOutboxWriter } from './application/guest-recovery-outbox.writer.js';
 import { GuestRecoveryMailWorker } from './application/guest-recovery-mail.worker.js';
 import { RequestGuestRecoveryLinkUseCase } from './application/request-guest-recovery-link.use-case.js';
@@ -128,6 +130,8 @@ import {
     RefundDestinationCrypto,
     GuestRecoveryOutboxCrypto,
     GuestRecoveryMailService,
+    BookingConfirmationMailService,
+    BookingConfirmationMailWorker,
     PaymentAuditLogger,
     PaymentsJobScheduler,
     PaymentsWorker,

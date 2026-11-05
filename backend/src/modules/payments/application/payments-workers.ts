@@ -10,6 +10,7 @@ import { PayosWebhookInbox } from '../infrastructure/payos-webhook-inbox.js';
 import { PayosGatewayAdapter } from '../infrastructure/payos-gateway.adapter.js';
 import { isDemoLinkId } from '../infrastructure/payos-demo-gateway.adapter.js';
 import { GuestRecoveryMailWorker } from './guest-recovery-mail.worker.js';
+import { BookingConfirmationMailWorker } from './booking-confirmation-mail.worker.js';
 
 export const PAYMENTS_QUEUE = 'payments';
 
@@ -38,6 +39,7 @@ export class PaymentsJobScheduler implements OnModuleInit {
       { id: 'terminal-watch', every: 900_000 },
       { id: 'cancel-retry', every: 900_000 },
       { id: 'outbox-dispatch', every: 30_000 },
+      { id: 'booking-confirmation-mail', every: 30_000 },
       { id: 'guest-checkout-reconcile', every: 60_000 },
       { id: 'guest-recovery-mail', every: 15_000 },
     ];
@@ -68,6 +70,7 @@ export class PaymentsWorker extends WorkerHost {
     private readonly paymentRequests: CreatePaymentRequestUseCase,
     private readonly guestCheckoutReconcile: GuestCheckoutReconcileService,
     private readonly guestRecoveryMail: GuestRecoveryMailWorker,
+    private readonly bookingConfirmationMail: BookingConfirmationMailWorker,
   ) {
     super();
   }
@@ -90,6 +93,8 @@ export class PaymentsWorker extends WorkerHost {
         return this.outboxDispatch();
       case 'guest-checkout-reconcile':
         return this.guestCheckoutReconcile.run();
+      case 'booking-confirmation-mail':
+        return this.bookingConfirmationMail.runOnce();
       default:
         this.logger.warn(`Unknown job ${job.name}; ignoring.`);
         return { ignored: true };
@@ -380,6 +385,9 @@ export class PaymentsWorker extends WorkerHost {
     const due = await this.prisma.outboxEvent.findMany({
       where: {
         publishedAt: null,
+        // booking.confirmed đã có sink thật (BookingConfirmationMailWorker);
+        // dispatcher chung không chạm để tránh tranh chấp attempt/nextRetry.
+        eventType: { not: 'booking.confirmed' },
         OR: [{ nextRetryAt: null }, { nextRetryAt: { lte: new Date() } }],
       },
       orderBy: { occurredAt: 'asc' },
