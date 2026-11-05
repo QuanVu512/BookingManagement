@@ -12,7 +12,7 @@ export function useDemoSimulate(input: {
   requestId: string | null;
   orderCode?: string | null;
   bookingId: string;
-  onSimulated: () => void;
+  onSimulated: (result?: unknown) => void;
   enabled?: boolean;
 }) {
   const [phase, setPhase] = useState<'idle' | 'loading' | 'error'>('idle');
@@ -41,10 +41,23 @@ export function useDemoSimulate(input: {
         guestToken =
           sessionStorage.getItem(`guest-manage-token:${input.bookingId}`) ||
           undefined;
+        if (!guestToken && typeof window !== 'undefined') {
+          const pendingRaw = localStorage.getItem('pending_booking');
+          if (pendingRaw) {
+            const pending = JSON.parse(pendingRaw);
+            if (pending.bookingId === input.bookingId && pending.accessToken) {
+              guestToken = pending.accessToken;
+              sessionStorage.setItem(
+                `guest-manage-token:${input.bookingId}`,
+                pending.accessToken,
+              );
+            }
+          }
+        }
       } catch {
         guestToken = undefined;
       }
-      await simulateDemoPayment({
+      const result = await simulateDemoPayment({
         requestId: input.requestId,
         orderCode: input.orderCode,
         signal: controller.signal,
@@ -52,7 +65,7 @@ export function useDemoSimulate(input: {
         bookingId: input.bookingId,
       });
       if (!controller.signal.aborted) {
-        input.onSimulated();
+        input.onSimulated(result);
         setPhase('idle');
       }
     } catch (simulateError) {

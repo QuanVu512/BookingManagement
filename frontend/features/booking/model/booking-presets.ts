@@ -17,6 +17,10 @@ export function presetTime(hour: number) {
 export function selectPreset(
   window: BookingWindow,
   hour: number,
+  options?: {
+    isConflict?: boolean;
+    isOccupied?: (hour: number) => boolean;
+  },
 ): BookingWindow {
   const date = window.start.slice(0, 10);
   const start = `${date}T${presetTime(hour)}`;
@@ -29,6 +33,12 @@ export function selectPreset(
 
   // Nếu chưa chọn giờ nào (hoặc đã bị bỏ chọn trước đó)
   if (!currentStart || !currentEnd) {
+    return { start, end };
+  }
+
+  // Nếu dải giờ hiện tại đang bị trùng lịch (gridConflict),
+  // người dùng click vào slot bất kỳ sẽ chọn riêng slot mới này để lập tức hủy lỗi trùng!
+  if (options?.isConflict) {
     return { start, end };
   }
 
@@ -58,10 +68,22 @@ export function selectPreset(
   }
 
   // Trường hợp 3: Mở rộng dải liền kề
-  if (start === window.end) return { ...window, end };
-  if (end === window.start) return { ...window, start };
+  // CHỈ mở rộng dải nếu dải hiện tại không chứa slot đã bị chiếm / khóa
+  const currentStartHour = parseInt(currentStart.slice(0, 2), 10);
+  const currentEndHour = parseInt(currentEnd.slice(0, 2), 10);
+  const isOldRangeOccupied = options?.isOccupied
+    ? Array.from(
+        { length: Math.max(0, currentEndHour - currentStartHour) },
+        (_, i) => currentStartHour + i,
+      ).some((h) => options.isOccupied!(h))
+    : false;
 
-  // Trường hợp 4: Chọn nhảy giờ (khung giờ không liền kề hoặc bấm vào giữa dải)
+  if (!isOldRangeOccupied) {
+    if (start === window.end) return { ...window, end };
+    if (end === window.start) return { ...window, start };
+  }
+
+  // Trường hợp 4: Chọn nhảy giờ (khung giờ không liền kề hoặc bấm vào giữa dải hoặc dải cũ bị chiếm)
   // -> Hủy chọn dải cũ và chọn slot mới này
   return { start, end };
 }

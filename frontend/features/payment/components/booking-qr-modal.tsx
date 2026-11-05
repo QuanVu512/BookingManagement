@@ -194,8 +194,8 @@ export function BookingQrModal({
   // thiếu payload ⇒ loading (CREATING) hoặc lỗi có nút thử lại.
   const activeVietQr = checkout.request?.vietQrPayload || vietQrPayload || null;
   const activeCheckoutUrl = checkout.request?.checkoutUrl || checkoutUrl;
-  const isPaid = checkout.success;
   const paymentStatus = checkout.request?.status;
+  const isPaid = checkout.success || paymentStatus === 'PAID';
   // F4 server-authoritative: booking terminal/review khóa QR + link + retry,
   // bất kể payload/link từng hợp lệ.
   const isTerminal = checkout.terminal;
@@ -222,7 +222,8 @@ export function BookingQrModal({
     !paymentEnded &&
     !countdown.expired &&
     !isCreating &&
-    (paymentStatus === 'FAILED' || Boolean(checkout.error));
+    (paymentStatus === 'FAILED' ||
+      (Boolean(checkout.error) && paymentStatus !== 'PAID'));
 
   return (
     <div

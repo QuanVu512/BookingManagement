@@ -242,7 +242,7 @@ export function DemoSimulateSection({
   orderCode?: string | null;
   bookingId: string;
   visible: boolean;
-  onSimulated: () => void;
+  onSimulated: (result?: unknown) => void;
 }) {
   const demo = useDemoSimulate({
     requestId,

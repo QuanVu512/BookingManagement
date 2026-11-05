@@ -134,6 +134,19 @@ async function readCheckout(
     try {
       guestToken =
         sessionStorage.getItem(`guest-manage-token:${bookingId}`) || undefined;
+      if (!guestToken) {
+        const pendingRaw = localStorage.getItem('pending_booking');
+        if (pendingRaw) {
+          const pending = JSON.parse(pendingRaw);
+          if (pending.bookingId === bookingId && pending.accessToken) {
+            guestToken = pending.accessToken;
+            sessionStorage.setItem(
+              `guest-manage-token:${bookingId}`,
+              pending.accessToken,
+            );
+          }
+        }
+      }
     } catch {}
   }
   const [request, outcome] = await Promise.all([
@@ -230,7 +243,8 @@ function startCheckout(
 
 export function checkoutPresentation(checkout: CheckoutState) {
   const success =
-    checkout.outcome !== null && isPaymentSuccess(checkout.outcome);
+    (checkout.outcome !== null && isPaymentSuccess(checkout.outcome)) ||
+    checkout.request?.status === 'PAID';
   const bookingStatus = checkout.outcome?.bookingStatus;
   // F4: booking terminal do server báo phải khóa QR/thanh toán, kể cả khi
   // payload/link cũ vẫn còn trong DB.
@@ -347,10 +361,7 @@ function resumeRecoveryPoller(
   };
   const poll = async () => {
     try {
-      const snapshot = await getGuestHoldRecovery(
-        bookingId,
-        controller.signal,
-      );
+      const snapshot = await getGuestHoldRecovery(bookingId, controller.signal);
       if (controller.signal.aborted) return;
       const mapped = {
         ...resumeSnapshotToState(snapshot),
@@ -366,7 +377,11 @@ function resumeRecoveryPoller(
         error: '',
         recovery: snapshot,
       });
-      guardedUpdate({ ...mapped, request: mappedRequest, outcome: mappedOutcome });
+      guardedUpdate({
+        ...mapped,
+        request: mappedRequest,
+        outcome: mappedOutcome,
+      });
       if (
         presentation.success ||
         presentation.terminal ||
@@ -619,7 +634,7 @@ export function useBookingCheckout(
   // Countdown hết hạn và mọi trạng thái khóa dùng đường này; ở chế độ resume
   // thì đọc lại recovery (GET) thay vì request/outcome theo request id. Chỉ
   // retry chủ động sau FAILED mới được gọi refresh (re-POST cùng intent).
-  const refreshRead = useCallback(() => {
+  const refreshRead = useCallback((simulatedResult?: unknown) => {
     if (cancelledLockedRef.current) return;
     const subject = subjectRef.current;
     const isStale = () =>
@@ -630,6 +645,43 @@ export function useBookingCheckout(
       if (isStale()) return;
       setState((previous) => ({ ...previous, ...patch }));
     };
+
+    // Khi người dùng bấm nút Demo mô phỏng thanh toán thành công,
+    // áp dụng ngay trạng thái thành công để giao diện tức thời chuyển sang xanh lá.
+    const isSimulatePayload = Boolean(
+      simulatedResult &&
+      typeof simulatedResult === 'object' &&
+      !('nativeEvent' in (simulatedResult as Record<string, unknown>)) &&
+      ('status' in (simulatedResult as Record<string, unknown>) ||
+        'outcome' in (simulatedResult as Record<string, unknown>) ||
+        'data' in (simulatedResult as Record<string, unknown>)),
+    );
+    if (isSimulatePayload) {
+      const res = simulatedResult as {
+        outcome?: PaymentOutcome;
+        data?: { outcome?: PaymentOutcome };
+      };
+      const outcome = res.outcome ??
+        res.data?.outcome ?? {
+          screen: 'SCR04_SUCCESS',
+          bookingStatus: 'CONFIRMED',
+          reviewRequired: false,
+          reviewReasonCode: null,
+          netCredited: 0,
+          requiredPrepaymentAmount: 0,
+          serverNow: new Date().toISOString(),
+        };
+      guardedUpdate({
+        outcome: outcome as PaymentOutcome,
+        request: state.request ? { ...state.request, status: 'PAID' } : null,
+        error: '',
+        loading: false,
+      });
+      return;
+    }
+
+    // Đọc lại trạng thái mới: xóa cờ lỗi cũ
+    guardedUpdate({ error: '' });
     if (resumeOnlyRef.current) {
       const controller = new AbortController();
       inflightRef.current.add(controller);

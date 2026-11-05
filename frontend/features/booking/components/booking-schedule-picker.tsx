@@ -190,7 +190,23 @@ function PresetButton({
       className={slotPast ? 'slot-past' : undefined}
       onClick={() => {
         if (!slotPast && !occupier && !unavailable) {
-          onChangeWindow(selectPreset(state.window, hour));
+          onChangeWindow(
+            selectPreset(state.window, hour, {
+              isConflict: props.gridConflict === true,
+              isOccupied: (h) => {
+                if (!grid) return false;
+                const conflict = isOccupancyConflict(
+                  selectedDate,
+                  h,
+                  h + 1,
+                  grid.intervals,
+                  timezone,
+                  grid.courtTimezone,
+                );
+                return conflict !== null;
+              },
+            }),
+          );
         }
       }}
     >
