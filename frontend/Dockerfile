@@ -20,7 +20,7 @@ ENV NEXT_PUBLIC_API_URL=https://smashpickleball.id.vn \
     NEXT_PUBLIC_SITE_ORIGIN=https://smashpickleball.id.vn \
     NEXT_PUBLIC_COURT_DETAILS_ENABLED=true \
     NEXT_PUBLIC_AI_ASSISTANT_ENABLED=true \
-    NEXT_PUBLIC_PAYMENT_SIMULATION_ENABLED=false
+    NEXT_PUBLIC_PAYMENT_SIMULATION_ENABLED=true
 RUN npm run build:web
 
 FROM node:24-alpine AS runner
