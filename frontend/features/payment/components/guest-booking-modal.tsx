@@ -380,14 +380,13 @@ export function GuestBookingModal({
             <div className="arena-guest-booking-preview">
               <div className="preview-court-row">
                 <span className="preview-court-name">
-                  🏟️ <strong>{courtName || 'Sân Pickleball'}</strong>
+                  <strong>{courtName || 'Sân Pickleball'}</strong>
                   {courtCode ? ` (${courtCode})` : ''}
                 </span>
               </div>
 
               {startsAt && endsAt ? (
                 <div className="preview-schedule-chip">
-                  <span className="schedule-icon">📅</span>
                   <span>
                     {formatBookingDate(startsAt)}:{' '}
                     <strong>
@@ -397,7 +396,6 @@ export function GuestBookingModal({
                 </div>
               ) : (
                 <div className="preview-schedule-chip preview-schedule-empty">
-                  <span className="schedule-icon">⚠️</span>
                   <span>
                     Chưa chọn khung giờ. Vui lòng đóng popup (bấm ✕) và chọn
                     khung giờ trên lịch trước khi tiếp tục.
@@ -499,7 +497,6 @@ export function GuestBookingModal({
 
               {error && (
                 <div className="guest-form-alert" role="alert">
-                  <span className="alert-icon">⚠️</span>
                   <span>{error}</span>
                 </div>
               )}
@@ -584,7 +581,6 @@ export function GuestBookingModal({
                   role="alert"
                   style={{ marginTop: '12px' }}
                 >
-                  <span className="alert-icon">⚠️</span>
                   <span>{error}</span>
                 </div>
               )}

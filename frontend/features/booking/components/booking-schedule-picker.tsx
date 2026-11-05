@@ -337,8 +337,8 @@ function CustomTimeRange(props: PickerProps) {
           role="alert"
           style={{ color: '#f87171', fontSize: '13px', margin: '4px 0 0' }}
         >
-          ⚠️ Giờ bắt đầu đã qua thời gian hiện tại ({current.time}). Vui lòng
-          chọn khung giờ từ {current.time} trở đi.
+          Giờ bắt đầu đã qua thời gian hiện tại ({current.time}). Vui lòng chọn
+          khung giờ từ {current.time} trở đi.
         </p>
       )}
       {isInvalidRange && (
@@ -347,7 +347,7 @@ function CustomTimeRange(props: PickerProps) {
           role="alert"
           style={{ color: '#f87171', fontSize: '13px', margin: '4px 0 0' }}
         >
-          ⚠️ Giờ kết thúc phải sau giờ bắt đầu.
+          Giờ kết thúc phải sau giờ bắt đầu.
         </p>
       )}
     </div>
@@ -407,7 +407,7 @@ export function BookingSchedulePicker(props: LiveBookingViewProps) {
           role="alert"
           style={{ color: '#f87171', fontSize: '13px' }}
         >
-          ⚠️ Khoảng giờ bạn chọn đã bị trùng lịch. Vui lòng điều chỉnh lại khung
+          Khoảng giờ bạn chọn đã bị trùng lịch. Vui lòng điều chỉnh lại khung
           giờ.
         </p>
       )}

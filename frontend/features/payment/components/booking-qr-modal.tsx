@@ -283,7 +283,6 @@ export function BookingQrModal({
           <div className="arena-qr-canvas-box">
             {isPaid ? (
               <div className="arena-qr-state-box is-success">
-                <span className="state-icon">✅</span>
                 <strong>Đã thanh toán cọc 30%</strong>
                 <p>
                   Lịch đặt sân của bạn đã được xác nhận chính thức trên hệ
@@ -292,7 +291,6 @@ export function BookingQrModal({
               </div>
             ) : isTerminal ? (
               <div className="arena-qr-state-box is-expired" role="status">
-                <span className="state-icon">🔒</span>
                 <strong>Đơn đã kết thúc</strong>
                 <p>
                   Booking không còn hiệu lực thanh toán. Vui lòng chọn khung giờ
@@ -301,7 +299,6 @@ export function BookingQrModal({
               </div>
             ) : needsReview ? (
               <div className="arena-qr-state-box is-loading" role="status">
-                <span className="state-icon">🕵️</span>
                 <strong>Đang kiểm tra thanh toán</strong>
                 <p>
                   Đơn đang chờ bộ phận tài chính xác minh, chưa thanh toán thêm.
@@ -309,7 +306,6 @@ export function BookingQrModal({
               </div>
             ) : countdown.expired ? (
               <div className="arena-qr-state-box is-expired">
-                <span className="state-icon">⏰</span>
                 <strong>Hết thời gian hiển thị mã</strong>
                 {/* R1 (S4-P1-1): đồng hồ client về 0 chưa chứng minh slot đã giải
                     phóng hay đơn đã hết hạn — chỉ ẩn QR/link, cho đọc lại bằng
@@ -317,7 +313,7 @@ export function BookingQrModal({
                 <p>Đang kiểm tra lại trạng thái đơn từ máy chủ…</p>
                 <button
                   type="button"
-                  className="arena-btn-primary"
+                  className="arena-btn-primary arena-btn-sm"
                   onClick={checkout.refreshRead}
                 >
                   Tải lại trạng thái
@@ -325,7 +321,6 @@ export function BookingQrModal({
               </div>
             ) : canResumeCreate ? (
               <div className="arena-qr-state-box is-loading" role="status">
-                <span className="state-icon">🧾</span>
                 <strong>Chưa có mã thanh toán</strong>
                 <p>
                   Máy chủ cho phép tạo mã QR cho đơn này. Bấm nút dưới đây để
@@ -333,7 +328,7 @@ export function BookingQrModal({
                 </p>
                 <button
                   type="button"
-                  className="arena-btn-primary"
+                  className="arena-btn-primary arena-btn-sm"
                   onClick={checkout.refresh}
                   disabled={checkout.loading}
                 >
@@ -349,7 +344,6 @@ export function BookingQrModal({
               </div>
             ) : paymentEnded ? (
               <div className="arena-qr-state-box is-expired" role="status">
-                <span className="state-icon">⛔</span>
                 <strong>Yêu cầu thanh toán đã kết thúc</strong>
                 <p>
                   Mã thanh toán này không còn hiệu lực. Vui lòng tạo booking mới
@@ -358,7 +352,6 @@ export function BookingQrModal({
               </div>
             ) : isFailed ? (
               <div className="arena-qr-state-box is-expired" role="alert">
-                <span className="state-icon">⚠️</span>
                 <strong>Chưa tạo được mã thanh toán</strong>
                 <p>
                   {checkout.error ||
@@ -366,7 +359,7 @@ export function BookingQrModal({
                 </p>
                 <button
                   type="button"
-                  className="arena-btn-primary"
+                  className="arena-btn-primary arena-btn-sm"
                   onClick={checkout.refresh}
                   disabled={checkout.loading}
                 >
@@ -458,7 +451,6 @@ export function BookingQrModal({
 
             {!PAYMENT_SIMULATION_ENABLED && (
               <div className="arena-qr-instructions">
-                <span className="icon">💡</span>
                 <p>
                   Mở ứng dụng Ngân hàng hoặc Ví điện tử bất kỳ, chọn{' '}
                   <strong>Quét mã QR</strong>. Hệ thống xác nhận tự động sau{' '}

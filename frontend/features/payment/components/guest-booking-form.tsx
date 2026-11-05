@@ -295,7 +295,6 @@ export function GuestBookingForm({
 
         {error && (
           <div className="guest-form-alert" role="alert">
-            <span className="alert-icon">⚠️</span>
             <span>{error}</span>
           </div>
         )}

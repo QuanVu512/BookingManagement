@@ -3,7 +3,10 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { formatVnd, formatBookingDate } from '../model/booking-time';
-import { usePaymentCountdown, formatCountdown } from '../../payment/hooks/use-payment-countdown';
+import {
+  usePaymentCountdown,
+  formatCountdown,
+} from '../../payment/hooks/use-payment-countdown';
 
 export interface PendingBookingState {
   bookingId: string;
@@ -85,15 +88,33 @@ export function PendingBookingAlert({
       >
         <div className="arena-pending-alert-content">
           <div className="arena-pending-icon-wrap">
-            <span className="pending-badge-icon">⏰</span>
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="#eab308"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <circle cx="12" cy="12" r="10" />
+              <polyline points="12 6 12 12 16 14" />
+            </svg>
           </div>
           <div className="arena-pending-text">
             <div className="arena-pending-heading">
-              <strong>Hết thời gian giữ chỗ hiển thị — đang kiểm tra lại trạng thái đơn.</strong>
+              <strong>
+                Hết thời gian giữ chỗ hiển thị — đang kiểm tra lại trạng thái
+                đơn.
+              </strong>
             </div>
             <p className="arena-pending-desc">
-              Mã đơn: <strong>{pending.bookingCode}</strong> — {pending.courtName || pending.courtCode || 'Sân đấu'}.
-              Khung giờ chưa chắc đã được giải phóng; bấm đọc lại để nhận kết quả mới nhất từ máy chủ.
+              Mã đơn: <strong>{pending.bookingCode}</strong> —{' '}
+              {pending.courtName || pending.courtCode || 'Sân đấu'}. Khung giờ
+              chưa chắc đã được giải phóng; bấm đọc lại để nhận kết quả mới nhất
+              từ máy chủ.
             </p>
           </div>
         </div>
@@ -107,10 +128,7 @@ export function PendingBookingAlert({
           >
             Đọc lại trạng thái đơn
           </button>
-          <Link
-            href="/bookings"
-            className="arena-btn-secondary arena-btn-sm"
-          >
+          <Link href="/bookings" className="arena-btn-secondary arena-btn-sm">
             Lịch sử đặt sân
           </Link>
           {!confirmCancel ? (
@@ -157,21 +175,35 @@ export function PendingBookingAlert({
       setConfirmCancel(false);
     } catch (error) {
       // Lỗi mạng/server: GIỮ nguyên cảnh báo, báo rõ, không xóa storage.
-      setCancelError(error instanceof Error ? error.message : 'Chưa xác nhận được hủy, vui lòng thử lại.');
+      setCancelError(
+        error instanceof Error
+          ? error.message
+          : 'Chưa xác nhận được hủy, vui lòng thử lại.',
+      );
     } finally {
       setCancelling(false);
     }
   }
 
   return (
-    <div
-      className="arena-pending-alert-banner"
-      role="alert"
-      aria-live="polite"
-    >
+    <div className="arena-pending-alert-banner" role="alert" aria-live="polite">
       <div className="arena-pending-alert-content">
         <div className="arena-pending-icon-wrap">
-          <span className="pending-badge-icon">⚠️</span>
+          <svg
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="#eab308"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <circle cx="12" cy="12" r="10" />
+            <line x1="12" y1="8" x2="12" y2="12" />
+            <line x1="12" y1="16" x2="12.01" y2="16" />
+          </svg>
         </div>
         <div className="arena-pending-text">
           <div className="arena-pending-heading">
@@ -181,9 +213,12 @@ export function PendingBookingAlert({
             </span>
           </div>
           <p className="arena-pending-desc">
-            Mã đơn: <strong>{pending.bookingCode}</strong> — {pending.courtName || pending.courtCode || 'Sân đấu'} (
-            {formatBookingDate(pending.startsAt)} {pending.startsAt.slice(11, 16)} – {pending.endsAt.slice(11, 16)}).
-            Tiền cọc 30%: <strong>{formatVnd(pending.prepaymentAmount)}</strong>.
+            Mã đơn: <strong>{pending.bookingCode}</strong> —{' '}
+            {pending.courtName || pending.courtCode || 'Sân đấu'} (
+            {formatBookingDate(pending.startsAt)}{' '}
+            {pending.startsAt.slice(11, 16)} – {pending.endsAt.slice(11, 16)}).
+            Tiền cọc 30%: <strong>{formatVnd(pending.prepaymentAmount)}</strong>
+            .
           </p>
         </div>
       </div>
@@ -197,10 +232,7 @@ export function PendingBookingAlert({
         >
           Tiếp tục thanh toán (QR)
         </button>
-        <Link
-          href="/bookings"
-          className="arena-btn-secondary arena-btn-sm"
-        >
+        <Link href="/bookings" className="arena-btn-secondary arena-btn-sm">
           Lịch sử đặt sân
         </Link>
         {!confirmCancel ? (

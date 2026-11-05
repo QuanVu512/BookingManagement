@@ -212,7 +212,7 @@ export function LiveBookingView({
       </p>
       {gridConflict === true && !state.booking && (
         <p role="alert" style={{ color: '#f87171', fontSize: '13px' }}>
-          ⚠️ Khoảng giờ bạn chọn đã bị trùng lịch. Vui lòng điều chỉnh lại khung
+          Khoảng giờ bạn chọn đã bị trùng lịch. Vui lòng điều chỉnh lại khung
           giờ.
         </p>
       )}

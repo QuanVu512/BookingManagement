@@ -266,7 +266,7 @@ export function DemoSimulateSection({
       >
         {demo.phase === 'loading'
           ? 'Đang mô phỏng…'
-          : '⚡ Giả lập thanh toán thành công (Demo Mode)'}
+          : 'Giả lập thanh toán thành công (Demo Mode)'}
       </button>
       {demo.phase === 'error' && <p role="alert">{demo.error}</p>}
     </section>
