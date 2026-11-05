@@ -222,8 +222,7 @@ export function BookingQrModal({
     !paymentEnded &&
     !countdown.expired &&
     !isCreating &&
-    (paymentStatus === 'FAILED' ||
-      (Boolean(checkout.error) && paymentStatus !== 'PAID'));
+    (paymentStatus === 'FAILED' || Boolean(checkout.error));
 
   return (
     <div

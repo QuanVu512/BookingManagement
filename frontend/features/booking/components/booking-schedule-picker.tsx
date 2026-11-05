@@ -27,7 +27,7 @@ import {
 
 type PickerProps = Pick<
   LiveBookingViewProps,
-  'state' | 'onChangeWindow' | 'timezone' | 'occupancy' | 'gridLocked'
+  'state' | 'onChangeWindow' | 'timezone' | 'occupancy' | 'gridLocked' | 'gridConflict'
 >;
 
 export function BookingDateInput({
@@ -110,6 +110,7 @@ function PresetButton({
   timezone,
   occupancy,
   gridLocked,
+  gridConflict,
 }: PickerProps & { hour: number }) {
   const selectedDate = state.window.start.slice(0, 10);
   const grid = occupancy?.data ?? null;
@@ -192,18 +193,17 @@ function PresetButton({
         if (!slotPast && !occupier && !unavailable) {
           onChangeWindow(
             selectPreset(state.window, hour, {
-              isConflict: props.gridConflict === true,
+              isConflict: gridConflict === true,
               isOccupied: (h) => {
                 if (!grid) return false;
-                const conflict = isOccupancyConflict(
+                const occ = findSlotOccupancy(
                   selectedDate,
                   h,
-                  h + 1,
-                  grid.intervals,
-                  timezone,
-                  grid.courtTimezone,
+                  grid.timezone,
+                  grid.cleanupMinutes,
+                  grid.occupiedIntervals,
                 );
-                return conflict !== null;
+                return occ !== null;
               },
             }),
           );
